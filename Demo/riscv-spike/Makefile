@@ -84,9 +84,7 @@ PORT_ASM = $(FREERTOS_SOURCE_DIR)/portable/GCC/RISCV/portasm.S
 
 DEMO_SRC = \
 	arch/syscalls.c \
-	arch/clib.c \
 	arch/ns16550.c \
-	arch/lib_cc.c \
 	main.c
 
 INCLUDES = \
@@ -103,6 +101,8 @@ CFLAGS = \
 	$(WARNINGS) $(INCLUDES) \
 	-fomit-frame-pointer -fno-strict-aliasing -fno-builtin \
 	-D__gracefulExit -mcmodel=medany #-fPIC
+
+CFLAGS             += -specs=arch/bare.specs
 
 GCCVER 	= $(shell $(GCC) --version | grep gcc | cut -d" " -f9)
 

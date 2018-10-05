@@ -154,7 +154,7 @@ init_stack:
     /* set stack pointer */
     la	sp, _stack
 
-	j	vSyscallInit
+	j	main
 
 /* When trap is an interrupt, this function is called */
 interrupt:
@@ -225,7 +225,8 @@ trap_entry:
 
 
 	mv a2, sp
-	jal ulSyscallTrap
+  /* FIXME */
+	// jal ulSyscallTrap
 
 	csrw mepc, a0
 
