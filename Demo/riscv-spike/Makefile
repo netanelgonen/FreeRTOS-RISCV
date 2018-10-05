@@ -85,6 +85,8 @@ PORT_ASM = $(FREERTOS_SOURCE_DIR)/portable/GCC/RISCV/portasm.S
 DEMO_SRC = \
 	arch/syscalls.c \
 	arch/clib.c \
+	arch/ns16550.c \
+	arch/lib_cc.c \
 	main.c
 
 INCLUDES = \

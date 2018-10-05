@@ -3,7 +3,7 @@
 RISCV_XLEN ?= 32
 RISCV_LIB  ?= elf
 RISCV ?=
-CCPATH	= $(RISCV)
+CCPATH =
 
 TARGET=$(CCPATH)riscv${RISCV_XLEN}-unknown-${RISCV_LIB}
 #-----------------------------------------------------------
