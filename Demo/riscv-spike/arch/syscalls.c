@@ -170,6 +170,12 @@ int _getpid(
 
  FROM FreeRTOS
 */
+#define CAUSE_MACHINE_ECALL 0xb
+#define SYS_write 64
+#define SYS_exit 93
+#define SYS_timer 1234
+
+
 volatile uint64_t tohost __attribute__((aligned(64)));
 volatile uint64_t fromhost __attribute__((aligned(64)));
 
