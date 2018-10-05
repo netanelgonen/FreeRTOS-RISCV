@@ -103,6 +103,7 @@ CFLAGS = \
 	-D__gracefulExit -mcmodel=medany #-fPIC
 
 CFLAGS             += -specs=arch/bare.specs
+CFLAGS             += -DCONSOLE_UART
 
 GCCVER 	= $(shell $(GCC) --version | grep gcc | cut -d" " -f9)
 
