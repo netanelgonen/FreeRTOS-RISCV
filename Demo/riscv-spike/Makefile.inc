@@ -1,11 +1,11 @@
 # File to be included in all makefiles
 
-RISCV_XLEN ?= 64
+RISCV_XLEN ?= 32
 RISCV_LIB  ?= elf
-RISCV ?= /opt/riscv
+RISCV ?=
 CCPATH	= $(RISCV)
 
-TARGET=$(CCPATH)/bin/riscv${RISCV_XLEN}-unknown-${RISCV_LIB}
+TARGET=$(CCPATH)riscv${RISCV_XLEN}-unknown-${RISCV_LIB}
 #-----------------------------------------------------------
 GCC		= $(TARGET)-gcc
 OBJCOPY	= $(TARGET)-objcopy

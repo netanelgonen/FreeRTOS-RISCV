@@ -138,6 +138,8 @@ int main( void )
 {
 TimerHandle_t xCheckTimer = NULL;
 
+
+  printf("hello from RTOS\n");
 	/* Create the standard demo tasks, including the interrupt nesting test
 	tasks. */
 	vCreateBlockTimeTasks();
@@ -164,7 +166,10 @@ TimerHandle_t xCheckTimer = NULL;
 
 
 	/* Start the kernel.  From here on, only tasks and interrupts will run. */
+  printf("starting scheduler\n");
 	vTaskStartScheduler();
+
+  printf("just hanging here\n");
 
 	/* Exit FreeRTOS */
 	return 0;
