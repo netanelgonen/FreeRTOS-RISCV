@@ -89,6 +89,7 @@ uint64_t zeroExtend(long val)
 }
 
 /* Relay syscall to host */
+// this does literaly nothing on real hardware
 static uint64_t prvSyscallToHost(long which, long arg0, long arg1, long arg2)
 {
 	volatile uint64_t magic_mem[8] __attribute__((aligned(64)));
@@ -125,6 +126,7 @@ static void printstr(const char* s)
 /*-----------------------------------------------------------*/
 
 /* Fires a syscall */
+// this is how a trap handler is initiated
 long syscall(long num, long arg0, long arg1, long arg2)
 {
 	register long a7 asm("a7") = num;
@@ -153,19 +155,26 @@ void vSyscallInit(void)
 /*-----------------------------------------------------------*/
 
 /* Trap handeler */
+// does practically nothing
 unsigned long ulSyscallTrap(long cause, long epc, long regs[32])
 {
 	long returnValue = 0;
 
+  // exit if not ecall from M-mode
 	if (cause != CAUSE_MACHINE_ECALL) {
 		prvSyscallExit(cause);
 	} else if (regs[17] == SYS_exit) {
+    // if x17/a7 == SYS_EXIT ca; exit?
 		prvSyscallExit(regs[10]);
 	} else {
+    // pass a7, a0, a1, a2 to prvSyscallToHost
+    // since prvSyscallToHost does basically nothing, this just returns the same
+    // arguments as it was called with (returns 64bits
 		returnValue = prvSyscallToHost(regs[17], regs[10], regs[11], regs[12]);
 	}
-
+  // 64 bits are truncated to 32bit return value
 	regs[10] = returnValue;
+  // exception program counter is incremented
 	return epc + 4;
 }
 /*-----------------------------------------------------------*/

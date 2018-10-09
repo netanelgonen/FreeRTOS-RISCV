@@ -135,7 +135,7 @@
 	
 	/* Store current stackpointer in task control block (TCB) */
 	LOAD	t0, pxCurrentTCB	//pointer
-	STORE	sp, 0x0(t0)
+	STORE	sp, 0x0(t0) // save sp to t0
 	.endm
 
 /* Saves current error program counter (EPC) as task program counter */
@@ -201,12 +201,12 @@
 	mret
 	.endm
 
-/* Macro for restoring task context */
+/* handle timer interrupt */
 TIMER_CMP_INT:
-	portSAVE_CONTEXT
-	portSAVE_EPC
-	jal	vPortSysTickHandler
-	portRESTORE_CONTEXT
+	portSAVE_CONTEXT // save task context
+	portSAVE_EPC // epc is in t0
+	jal	vPortSysTickHandler // handle timer irq, possible context switch? tcp may hold a new value? uses pxCurrentTCB
+	portRESTORE_CONTEXT // restore context
 
 xPortStartScheduler:
 #ifdef __gracefulExit
@@ -247,7 +247,7 @@ xPortStartScheduler:
 	STORE	x30, 29 * REGBYTES(t0)
 	STORE	x31, 30 * REGBYTES(t0)
 #endif
-	jal		vPortSetupTimer
+	jal		vPortSetupTimer // enable timer irq
 	portRESTORE_CONTEXT
 
 vPortEndScheduler:

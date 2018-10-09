@@ -135,7 +135,9 @@ static void prvTaskExitError( void );
  */
 static void prvSetNextTimerInterrupt(void)
 {
-    if (mtime && timecmp) 
+    if (mtime && timecmp) // ??
+      // clear mtimecmp by writing the new deadline to it
+      // check that we are actually writing a 64 bit value
         *timecmp = *mtime + (configTICK_CLOCK_HZ / configTICK_RATE_HZ);
 }
 /*-----------------------------------------------------------*/
@@ -206,11 +208,14 @@ StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t px
 
 void vPortSysTickHandler( void )
 {
+  // clear timer interrupt and schedule another one
 	prvSetNextTimerInterrupt();
 
 	/* Increment the RTOS tick. */
+  // pdFALSE = 0
 	if( xTaskIncrementTick() != pdFALSE )
 	{
+    // context switch is required becasue some tasks are pending
 		vTaskSwitchContext();
 	}
 }

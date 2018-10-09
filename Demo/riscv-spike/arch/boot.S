@@ -154,41 +154,41 @@ init_stack:
     /* set stack pointer */
     la	sp, _stack
 
-	j	vSyscallInit
+	j	vSyscallInit // obscure way of calling "main" - this way we emit the exit ecall upon completion
 
 /* When trap is an interrupt, this function is called */
 interrupt:
-	slli    t0,t0,1
-	srli    t0,t0,1
-	addi    t0,t0,-3
-	beq		t0,x0,softwareInterrupt
-	LOAD	t0, 0x0(sp)
-	addi	sp, sp, REGBYTES
+	slli    t0,t0,1 // shift left by 1
+	srli    t0,t0,1 // shift right by 1 (remove the interrupt bit)
+	addi    t0,t0,-3 // t0 = t0 -3 (clears machine software interrupt bit?)
+	beq		t0,x0,softwareInterrupt // branch if equal: if t0 = x0 jumpt tp softwareInterrupt
+	LOAD	t0, 0x0(sp) // load 4 bytes from address *sp to t0
+	addi	sp, sp, REGBYTES // sp = sp+4
 
 	/* Interupt is timer interrupt */
-	j		TIMER_CMP_INT
-	mret
+	j		TIMER_CMP_INT // jump tp Timer Cmp Int (I guess it is always a timer irq?
+	mret // set pc = mepc, priviledge mode to mstatus.MPP, mstatus.MIE = mstatus.MPIE, mstatus.MPIE = 1 (prior irq enabled)
 
-softwareInterrupt:
+softwareInterrupt: // does nothing
 	/* Interupt is software interrupt */
-	LOAD  t0, 0x0(sp)
-	addi  sp, sp, REGBYTES
-	mret
+	LOAD  t0, 0x0(sp) // t0 = *sp
+	addi  sp, sp, REGBYTES // sp = sp +4
+	mret // return, pc = mepc ...
 
 /* For when a trap is fired */
 .align 2
 trap_entry:
 	/* Check for interrupt */
-	addi	sp, sp, -REGBYTES
-	STORE	t0, 0x0(sp)
-	csrr	t0, mcause
-	blt	t0,x0,interrupt
-	LOAD	t0, 0x0(sp)
-	addi	sp, sp, REGBYTES
+	addi	sp, sp, -REGBYTES // add immediate: sp = sp - 4
+	STORE	t0, 0x0(sp) // store word: save t0 to memory at address *sp 
+	csrr	t0, mcause // csr read: m0 = mcause
+	blt	t0,x0,interrupt // branch if less than: if t0 < x0, pc = pc + interrupt offset (if interrupt bit is set, jump)
+	LOAD	t0, 0x0(sp) // load t0 from *sp
+	addi	sp, sp, REGBYTES // sp = sp +4
 
 	/* System call and other traps */
-	addi sp, sp, -REGBYTES*32
-	STORE x1, 1*REGBYTES(sp)
+	addi sp, sp, -REGBYTES*32 // decrement stact
+	STORE x1, 1*REGBYTES(sp) // save registers on stack
 	STORE x2, 2*REGBYTES(sp)
 	STORE x3, 3*REGBYTES(sp)
 	STORE x4, 4*REGBYTES(sp)
@@ -220,16 +220,16 @@ trap_entry:
 	STORE x30, 30*REGBYTES(sp)
 	STORE x31, 31*REGBYTES(sp)
 
-	csrr a0, mcause
-	csrr a1, mepc
+	csrr a0, mcause // a0 = mcause , a0 is function argument
+	csrr a1, mepc // a1 = mepc (function argument)
 
 
-	mv a2, sp
-	jal ulSyscallTrap
+	mv a2, sp // a2 = sp
+	jal ulSyscallTrap // jump and link
 
-	csrw mepc, a0
+	csrw mepc, a0 // write the incremented exception pointer, so mepc = epc+4
 
-	LOAD x1, 1*REGBYTES(sp)
+	LOAD x1, 1*REGBYTES(sp) // restore context: x1 = *sp ...
 	LOAD x2, 2*REGBYTES(sp)
 	LOAD x3, 3*REGBYTES(sp)
 	LOAD x4, 4*REGBYTES(sp)
@@ -261,8 +261,8 @@ trap_entry:
 	LOAD x30, 30*REGBYTES(sp)
 	LOAD x31, 31*REGBYTES(sp)
 
-	addi sp, sp, REGBYTES*32
-	mret
+	addi sp, sp, REGBYTES*32 // increment stack
+	mret // return back to the execution
 
 /* Fills memory blocks */
 fill_block:
