@@ -229,6 +229,7 @@ long syscall(long num, long arg0, long arg1, long arg2)
 /* Trap handeler */
 unsigned long ulSyscallTrap(long cause, long epc, long regs[32])
 {
+/*
 	long returnValue = 0;
 
 	if (cause != CAUSE_MACHINE_ECALL) {
@@ -240,6 +241,8 @@ unsigned long ulSyscallTrap(long cause, long epc, long regs[32])
 	}
 
 	regs[10] = returnValue;
+*/
+  regs[10] = regs[17];
 	return epc + 4;
 }
 
