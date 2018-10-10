@@ -141,7 +141,7 @@ extern void vPortClearInterruptMask( int );
 extern void vTaskEnterCritical( void );
 extern void vTaskExitCritical( void );
 
-#define portDISABLE_INTERRUPTS()				__asm volatile 	( "csrc mstatus,8" )
+#define portDISABLE_INTERRUPTS()				__asm volatile 	( "csrc mstatus,0" )
 #define portENABLE_INTERRUPTS()					__asm volatile 	( "csrs mstatus,8" )
 #define portENTER_CRITICAL()					vTaskEnterCritical()
 #define portEXIT_CRITICAL()						vTaskExitCritical()

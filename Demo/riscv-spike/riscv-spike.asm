@@ -5,9 +5,17 @@ riscv-spike.elf:     file format elf32-littleriscv
 Disassembly of section .text:
 
 80000000 <boot>:
+# define LOAD     lw
+# define REGBYTES 4
+#endif
+
+boot:
+    li t6, 0x1800
 80000000:	00002fb7          	lui	t6,0x2
 80000004:	800f8f93          	addi	t6,t6,-2048 # 1800 <_HEAP_SIZE+0x800>
+    csrw mstatus, t6
 80000008:	300f9073          	csrw	mstatus,t6
+    j _mstart
 8000000c:	0340006f          	j	80000040 <_mstart>
 80000010:	00000013          	nop
 80000014:	00000013          	nop
@@ -23,176 +31,368 @@ Disassembly of section .text:
 8000003c:	00000013          	nop
 
 80000040 <_mstart>:
+	.align 6
+	.section .text,"ax",@progbits
+	.globl _mstart
+/* Startup code */
+_mstart:
+    la t0, trap_entry
 80000040:	00000297          	auipc	t0,0x0
 80000044:	11428293          	addi	t0,t0,276 # 80000154 <trap_entry>
+    csrw mtvec, t0
 80000048:	30529073          	csrw	mtvec,t0
+    li	x1, 0
 8000004c:	00000093          	li	ra,0
+    li	x2, 0
 80000050:	00000113          	li	sp,0
+    li	x3, 0
 80000054:	00000193          	li	gp,0
+    li	x4, 0
 80000058:	00000213          	li	tp,0
+    li	x5, 0
 8000005c:	00000293          	li	t0,0
+	li	x6, 0
 80000060:	00000313          	li	t1,0
+    li	x7, 0
 80000064:	00000393          	li	t2,0
+    li	x8, 0
 80000068:	00000413          	li	s0,0
+    li	x9, 0
 8000006c:	00000493          	li	s1,0
+    li	x10, 0
 80000070:	00000513          	li	a0,0
+    li	x11, 0
 80000074:	00000593          	li	a1,0
+    li	x12, 0
 80000078:	00000613          	li	a2,0
+    li	x13, 0
 8000007c:	00000693          	li	a3,0
+    li	x14, 0
 80000080:	00000713          	li	a4,0
+    li	x15, 0
 80000084:	00000793          	li	a5,0
+    li	x16, 0
 80000088:	00000813          	li	a6,0
+    li	x17, 0
 8000008c:	00000893          	li	a7,0
+    li	x18, 0
 80000090:	00000913          	li	s2,0
+    li	x19, 0
 80000094:	00000993          	li	s3,0
+    li	x20, 0
 80000098:	00000a13          	li	s4,0
+    li	x21, 0
 8000009c:	00000a93          	li	s5,0
+    li	x22, 0
 800000a0:	00000b13          	li	s6,0
+    li	x23, 0
 800000a4:	00000b93          	li	s7,0
+    li	x24, 0
 800000a8:	00000c13          	li	s8,0
+    li	x25, 0
 800000ac:	00000c93          	li	s9,0
+    li	x26, 0
 800000b0:	00000d13          	li	s10,0
+    li	x27, 0
 800000b4:	00000d93          	li	s11,0
+    li	x28, 0
 800000b8:	00000e13          	li	t3,0
+    li	x29, 0
 800000bc:	00000e93          	li	t4,0
+    li	x30, 0
 800000c0:	00000f13          	li	t5,0
+    li	x31, 0
 800000c4:	00000f93          	li	t6,0
+
+    /* initialize global pointer */
+    la	gp, _gp
 800000c8:	00021197          	auipc	gp,0x21
 800000cc:	63018193          	addi	gp,gp,1584 # 800216f8 <_gp>
 
 800000d0 <init_bss>:
+
+init_bss:
+    /* init bss section */
+    la	a0, __bss_start
 800000d0:	00022517          	auipc	a0,0x22
 800000d4:	83050513          	addi	a0,a0,-2000 # 80021900 <xStartContext>
+    la	a1, __bss_end-4 /* section end is actually the start of the next section */
 800000d8:	0003b597          	auipc	a1,0x3b
 800000dc:	b3058593          	addi	a1,a1,-1232 # 8003ac08 <errno>
+    li	a2, 0x0
 800000e0:	00000613          	li	a2,0
+    jal	fill_block
 800000e4:	19c000ef          	jal	ra,80000280 <fill_block>
 
 800000e8 <init_sbss>:
+
+init_sbss:
+    /* init bss section */
+    la	a0, __sbss_start
 800000e8:	00021517          	auipc	a0,0x21
 800000ec:	dfc50513          	addi	a0,a0,-516 # 80020ee4 <pxCurrentTCB>
+    la	a1, __sbss_end-4 /* section end is actually the start of the next section */
 800000f0:	00021597          	auipc	a1,0x21
 800000f4:	e0458593          	addi	a1,a1,-508 # 80020ef4 <__malloc_top_pad>
+    li	a2, 0x0
 800000f8:	00000613          	li	a2,0
+    jal	fill_block
 800000fc:	184000ef          	jal	ra,80000280 <fill_block>
 
 80000100 <write_stack_pattern>:
+
+write_stack_pattern:
+    /* init bss section */
+    la	a0, _stack_end  /* note the stack grows from top to bottom */
 80000100:	0003c517          	auipc	a0,0x3c
 80000104:	b0c50513          	addi	a0,a0,-1268 # 8003bc0c <_heap_end>
+    la	a1, __stack-4   /* section end is actually the start of the next section */
 80000108:	0003d597          	auipc	a1,0x3d
 8000010c:	b0058593          	addi	a1,a1,-1280 # 8003cc08 <_heap_end+0xffc>
+    li	a2, 0xABABABAB
 80000110:	ababb637          	lui	a2,0xababb
 80000114:	bab60613          	addi	a2,a2,-1109 # abababab <__stack+0x2ba7df9f>
+    jal	fill_block
 80000118:	168000ef          	jal	ra,80000280 <fill_block>
 
 8000011c <init_stack>:
+
+init_stack:
+    /* set stack pointer */
+    la	sp, _stack
 8000011c:	0003d117          	auipc	sp,0x3d
 80000120:	af010113          	addi	sp,sp,-1296 # 8003cc0c <__stack>
+
+	j	main
 80000124:	0980706f          	j	800071bc <main>
 
 80000128 <interrupt>:
+
+/* When trap is an interrupt, this function is called */
+interrupt:
+	slli    t0,t0,1
 80000128:	00129293          	slli	t0,t0,0x1
+	srli    t0,t0,1
 8000012c:	0012d293          	srli	t0,t0,0x1
+	addi    t0,t0,-3
 80000130:	ffd28293          	addi	t0,t0,-3
+	beq		t0,x0,softwareInterrupt
 80000134:	00028a63          	beqz	t0,80000148 <softwareInterrupt>
+	LOAD	t0, 0x0(sp)
 80000138:	00012283          	lw	t0,0(sp)
+	addi	sp, sp, REGBYTES
 8000013c:	00410113          	addi	sp,sp,4
+
+	/* Interupt is timer interrupt */
+	j		TIMER_CMP_INT
 80000140:	1740006f          	j	800002b4 <TIMER_CMP_INT>
+	mret
 80000144:	30200073          	mret
 
 80000148 <softwareInterrupt>:
+
+softwareInterrupt:
+	/* Interupt is software interrupt */
+	LOAD  t0, 0x0(sp)
 80000148:	00012283          	lw	t0,0(sp)
+	addi  sp, sp, REGBYTES
 8000014c:	00410113          	addi	sp,sp,4
+	mret
 80000150:	30200073          	mret
 
 80000154 <trap_entry>:
+
+/* For when a trap is fired */
+.align 2
+trap_entry:
+	/* Check for interrupt */
+	addi	sp, sp, -REGBYTES
 80000154:	ffc10113          	addi	sp,sp,-4
+	STORE	t0, 0x0(sp)
 80000158:	00512023          	sw	t0,0(sp)
+	csrr	t0, mcause
 8000015c:	342022f3          	csrr	t0,mcause
+	blt	t0,x0,interrupt
 80000160:	fc02c4e3          	bltz	t0,80000128 <interrupt>
+	LOAD	t0, 0x0(sp)
 80000164:	00012283          	lw	t0,0(sp)
+	addi	sp, sp, REGBYTES
 80000168:	00410113          	addi	sp,sp,4
+
+	/* System call and other traps */
+	addi sp, sp, -REGBYTES*32
 8000016c:	f8010113          	addi	sp,sp,-128
+	STORE x1, 1*REGBYTES(sp)
 80000170:	00112223          	sw	ra,4(sp)
+	STORE x2, 2*REGBYTES(sp)
 80000174:	00212423          	sw	sp,8(sp)
+	STORE x3, 3*REGBYTES(sp)
 80000178:	00312623          	sw	gp,12(sp)
+	STORE x4, 4*REGBYTES(sp)
 8000017c:	00412823          	sw	tp,16(sp)
+	STORE x5, 5*REGBYTES(sp)
 80000180:	00512a23          	sw	t0,20(sp)
+	STORE x6, 6*REGBYTES(sp)
 80000184:	00612c23          	sw	t1,24(sp)
+	STORE x7, 7*REGBYTES(sp)
 80000188:	00712e23          	sw	t2,28(sp)
+	STORE x8, 8*REGBYTES(sp)
 8000018c:	02812023          	sw	s0,32(sp)
+	STORE x9, 9*REGBYTES(sp)
 80000190:	02912223          	sw	s1,36(sp)
+	STORE x10, 10*REGBYTES(sp)
 80000194:	02a12423          	sw	a0,40(sp)
+	STORE x11, 11*REGBYTES(sp)
 80000198:	02b12623          	sw	a1,44(sp)
+	STORE x12, 12*REGBYTES(sp)
 8000019c:	02c12823          	sw	a2,48(sp)
+	STORE x13, 13*REGBYTES(sp)
 800001a0:	02d12a23          	sw	a3,52(sp)
+	STORE x14, 14*REGBYTES(sp)
 800001a4:	02e12c23          	sw	a4,56(sp)
+	STORE x15, 15*REGBYTES(sp)
 800001a8:	02f12e23          	sw	a5,60(sp)
+	STORE x16, 16*REGBYTES(sp)
 800001ac:	05012023          	sw	a6,64(sp)
+	STORE x17, 17*REGBYTES(sp)
 800001b0:	05112223          	sw	a7,68(sp)
+	STORE x18, 18*REGBYTES(sp)
 800001b4:	05212423          	sw	s2,72(sp)
+	STORE x19, 19*REGBYTES(sp)
 800001b8:	05312623          	sw	s3,76(sp)
+	STORE x20, 20*REGBYTES(sp)
 800001bc:	05412823          	sw	s4,80(sp)
+	STORE x21, 21*REGBYTES(sp)
 800001c0:	05512a23          	sw	s5,84(sp)
+	STORE x22, 22*REGBYTES(sp)
 800001c4:	05612c23          	sw	s6,88(sp)
+	STORE x23, 23*REGBYTES(sp)
 800001c8:	05712e23          	sw	s7,92(sp)
+	STORE x24, 24*REGBYTES(sp)
 800001cc:	07812023          	sw	s8,96(sp)
+	STORE x25, 25*REGBYTES(sp)
 800001d0:	07912223          	sw	s9,100(sp)
+	STORE x26, 26*REGBYTES(sp)
 800001d4:	07a12423          	sw	s10,104(sp)
+	STORE x27, 27*REGBYTES(sp)
 800001d8:	07b12623          	sw	s11,108(sp)
+	STORE x28, 28*REGBYTES(sp)
 800001dc:	07c12823          	sw	t3,112(sp)
+	STORE x29, 29*REGBYTES(sp)
 800001e0:	07d12a23          	sw	t4,116(sp)
+	STORE x30, 30*REGBYTES(sp)
 800001e4:	07e12c23          	sw	t5,120(sp)
+	STORE x31, 31*REGBYTES(sp)
 800001e8:	07f12e23          	sw	t6,124(sp)
+
+	csrr a0, mcause
 800001ec:	34202573          	csrr	a0,mcause
+	csrr a1, mepc
 800001f0:	341025f3          	csrr	a1,mepc
+
+
+	mv a2, sp
 800001f4:	00010613          	mv	a2,sp
+  /* FIXME */
+	// jal ulSyscallTrap
+
+	csrw mepc, a0
 800001f8:	34151073          	csrw	mepc,a0
+
+	LOAD x1, 1*REGBYTES(sp)
 800001fc:	00412083          	lw	ra,4(sp)
+	LOAD x2, 2*REGBYTES(sp)
 80000200:	00812103          	lw	sp,8(sp)
+	LOAD x3, 3*REGBYTES(sp)
 80000204:	00c12183          	lw	gp,12(sp)
+	LOAD x4, 4*REGBYTES(sp)
 80000208:	01012203          	lw	tp,16(sp)
+	LOAD x5, 5*REGBYTES(sp)
 8000020c:	01412283          	lw	t0,20(sp)
+	LOAD x6, 6*REGBYTES(sp)
 80000210:	01812303          	lw	t1,24(sp)
+	LOAD x7, 7*REGBYTES(sp)
 80000214:	01c12383          	lw	t2,28(sp)
+	LOAD x8, 8*REGBYTES(sp)
 80000218:	02012403          	lw	s0,32(sp)
+	LOAD x9, 9*REGBYTES(sp)
 8000021c:	02412483          	lw	s1,36(sp)
+	LOAD x10, 10*REGBYTES(sp)
 80000220:	02812503          	lw	a0,40(sp)
+	LOAD x11, 11*REGBYTES(sp)
 80000224:	02c12583          	lw	a1,44(sp)
+	LOAD x12, 12*REGBYTES(sp)
 80000228:	03012603          	lw	a2,48(sp)
+	LOAD x13, 13*REGBYTES(sp)
 8000022c:	03412683          	lw	a3,52(sp)
+	LOAD x14, 14*REGBYTES(sp)
 80000230:	03812703          	lw	a4,56(sp)
+	LOAD x15, 15*REGBYTES(sp)
 80000234:	03c12783          	lw	a5,60(sp)
+	LOAD x16, 16*REGBYTES(sp)
 80000238:	04012803          	lw	a6,64(sp)
+	LOAD x17, 17*REGBYTES(sp)
 8000023c:	04412883          	lw	a7,68(sp)
+	LOAD x18, 18*REGBYTES(sp)
 80000240:	04812903          	lw	s2,72(sp)
+	LOAD x19, 19*REGBYTES(sp)
 80000244:	04c12983          	lw	s3,76(sp)
+	LOAD x20, 20*REGBYTES(sp)
 80000248:	05012a03          	lw	s4,80(sp)
+	LOAD x21, 21*REGBYTES(sp)
 8000024c:	05412a83          	lw	s5,84(sp)
+	LOAD x22, 22*REGBYTES(sp)
 80000250:	05812b03          	lw	s6,88(sp)
+	LOAD x23, 23*REGBYTES(sp)
 80000254:	05c12b83          	lw	s7,92(sp)
+	LOAD x24, 24*REGBYTES(sp)
 80000258:	06012c03          	lw	s8,96(sp)
+	LOAD x25, 25*REGBYTES(sp)
 8000025c:	06412c83          	lw	s9,100(sp)
+	LOAD x26, 26*REGBYTES(sp)
 80000260:	06812d03          	lw	s10,104(sp)
+	LOAD x27, 27*REGBYTES(sp)
 80000264:	06c12d83          	lw	s11,108(sp)
+	LOAD x28, 28*REGBYTES(sp)
 80000268:	07012e03          	lw	t3,112(sp)
+	LOAD x29, 29*REGBYTES(sp)
 8000026c:	07412e83          	lw	t4,116(sp)
+	LOAD x30, 30*REGBYTES(sp)
 80000270:	07812f03          	lw	t5,120(sp)
+	LOAD x31, 31*REGBYTES(sp)
 80000274:	07c12f83          	lw	t6,124(sp)
+
+	addi sp, sp, REGBYTES*32
 80000278:	08010113          	addi	sp,sp,128
+	mret
 8000027c:	30200073          	mret
 
 80000280 <fill_block>:
+
+/* Fills memory blocks */
+fill_block:
+    sw		a2, 0(a0)
 80000280:	00c52023          	sw	a2,0(a0)
+    bgeu	a0, a1, fb_end
 80000284:	00b57663          	bleu	a1,a0,80000290 <fb_end>
+    addi	a0, a0, 4
 80000288:	00450513          	addi	a0,a0,4
+    j		fill_block
 8000028c:	ff5ff06f          	j	80000280 <fill_block>
 
 80000290 <fb_end>:
+fb_end:
+    ret
 80000290:	00008067          	ret
 	...
 
 800002b4 <TIMER_CMP_INT>:
+	mret
+	.endm
+
+/* Macro for restoring task context */
+TIMER_CMP_INT:
+	portSAVE_CONTEXT
 800002b4:	f8010113          	addi	sp,sp,-128
 800002b8:	00112023          	sw	ra,0(sp)
 800002bc:	00212223          	sw	sp,4(sp)
@@ -228,9 +428,12 @@ Disassembly of section .text:
 80000334:	00021297          	auipc	t0,0x21
 80000338:	bb02a283          	lw	t0,-1104(t0) # 80020ee4 <pxCurrentTCB>
 8000033c:	0022a023          	sw	sp,0(t0)
+	portSAVE_EPC
 80000340:	341022f3          	csrr	t0,mepc
 80000344:	06512e23          	sw	t0,124(sp)
+	jal	vPortSysTickHandler
 80000348:	504000ef          	jal	ra,8000084c <vPortSysTickHandler>
+	portRESTORE_CONTEXT
 8000034c:	00021117          	auipc	sp,0x21
 80000350:	b9812103          	lw	sp,-1128(sp) # 80020ee4 <pxCurrentTCB>
 80000354:	00012103          	lw	sp,0(sp)
@@ -272,40 +475,80 @@ Disassembly of section .text:
 800003e4:	30200073          	mret
 
 800003e8 <xPortStartScheduler>:
+#ifdef __gracefulExit
+	/* Stores context when starting the scheduler in xStartContext.
+	   This is used for when you want to gracefully exit the scheduler.
+	   For example if you want to test multiple instances after each other in one test suite.
+     */
+	la		t0, xStartContext
 800003e8:	00021297          	auipc	t0,0x21
 800003ec:	51828293          	addi	t0,t0,1304 # 80021900 <xStartContext>
+	STORE	x1, 0x0(t0)
 800003f0:	0012a023          	sw	ra,0(t0)
+	STORE	x2, 1 * REGBYTES(t0)
 800003f4:	0022a223          	sw	sp,4(t0)
+	STORE	x3, 2 * REGBYTES(t0)
 800003f8:	0032a423          	sw	gp,8(t0)
+	STORE	x4, 3 * REGBYTES(t0)
 800003fc:	0042a623          	sw	tp,12(t0)
+	STORE	x5, 4 * REGBYTES(t0)
 80000400:	0052a823          	sw	t0,16(t0)
+	STORE	x6, 5 * REGBYTES(t0)
 80000404:	0062aa23          	sw	t1,20(t0)
+	STORE	x7, 6 * REGBYTES(t0)
 80000408:	0072ac23          	sw	t2,24(t0)
+	STORE	x8, 7 * REGBYTES(t0)
 8000040c:	0082ae23          	sw	s0,28(t0)
+	STORE	x9, 8 * REGBYTES(t0)
 80000410:	0292a023          	sw	s1,32(t0)
+	STORE	x10, 9 * REGBYTES(t0)
 80000414:	02a2a223          	sw	a0,36(t0)
+	STORE	x11, 10 * REGBYTES(t0)
 80000418:	02b2a423          	sw	a1,40(t0)
+	STORE	x12, 11 * REGBYTES(t0)
 8000041c:	02c2a623          	sw	a2,44(t0)
+	STORE	x13, 12 * REGBYTES(t0)
 80000420:	02d2a823          	sw	a3,48(t0)
+	STORE	x14, 13 * REGBYTES(t0)
 80000424:	02e2aa23          	sw	a4,52(t0)
+	STORE	x15, 14 * REGBYTES(t0)
 80000428:	02f2ac23          	sw	a5,56(t0)
+	STORE	x16, 15 * REGBYTES(t0)
 8000042c:	0302ae23          	sw	a6,60(t0)
+	STORE	x17, 16 * REGBYTES(t0)
 80000430:	0512a023          	sw	a7,64(t0)
+	STORE	x18, 17 * REGBYTES(t0)
 80000434:	0522a223          	sw	s2,68(t0)
+	STORE	x19, 18 * REGBYTES(t0)
 80000438:	0532a423          	sw	s3,72(t0)
+	STORE	x20, 19 * REGBYTES(t0)
 8000043c:	0542a623          	sw	s4,76(t0)
+	STORE	x21, 20 * REGBYTES(t0)
 80000440:	0552a823          	sw	s5,80(t0)
+	STORE	x22, 21 * REGBYTES(t0)
 80000444:	0562aa23          	sw	s6,84(t0)
+	STORE	x23, 22 * REGBYTES(t0)
 80000448:	0572ac23          	sw	s7,88(t0)
+	STORE	x24, 23 * REGBYTES(t0)
 8000044c:	0582ae23          	sw	s8,92(t0)
+	STORE	x25, 24 * REGBYTES(t0)
 80000450:	0792a023          	sw	s9,96(t0)
+	STORE	x26, 25 * REGBYTES(t0)
 80000454:	07a2a223          	sw	s10,100(t0)
+	STORE	x27, 26 * REGBYTES(t0)
 80000458:	07b2a423          	sw	s11,104(t0)
+	STORE	x28, 27 * REGBYTES(t0)
 8000045c:	07c2a623          	sw	t3,108(t0)
+	STORE	x29, 28 * REGBYTES(t0)
 80000460:	07d2a823          	sw	t4,112(t0)
+	STORE	x30, 29 * REGBYTES(t0)
 80000464:	07e2aa23          	sw	t5,116(t0)
+	STORE	x31, 30 * REGBYTES(t0)
 80000468:	07f2ac23          	sw	t6,120(t0)
+#endif
+	jal		vPortSetupTimer
 8000046c:	2d4000ef          	jal	ra,80000740 <vPortSetupTimer>
+	portRESTORE_CONTEXT
 80000470:	00021117          	auipc	sp,0x21
 80000474:	a7412103          	lw	sp,-1420(sp) # 80020ee4 <pxCurrentTCB>
 80000478:	00012103          	lw	sp,0(sp)
@@ -347,43 +590,89 @@ Disassembly of section .text:
 80000508:	30200073          	mret
 
 8000050c <vPortEndScheduler>:
+
+vPortEndScheduler:
+#ifdef __gracefulExit
+	/* Load current context from xStartContext */
+	la		t0, xStartContext
 8000050c:	00021297          	auipc	t0,0x21
 80000510:	3f428293          	addi	t0,t0,1012 # 80021900 <xStartContext>
+	LOAD	x1, 0x0(t0)
 80000514:	0002a083          	lw	ra,0(t0)
+	LOAD	x2, 1 * REGBYTES(t0)
 80000518:	0042a103          	lw	sp,4(t0)
+	LOAD	x3, 2 * REGBYTES(t0)
 8000051c:	0082a183          	lw	gp,8(t0)
+	LOAD	x4, 3 * REGBYTES(t0)
 80000520:	00c2a203          	lw	tp,12(t0)
+	LOAD	x5, 4 * REGBYTES(t0)
 80000524:	0102a283          	lw	t0,16(t0)
+	LOAD	x6, 5 * REGBYTES(t0)
 80000528:	0142a303          	lw	t1,20(t0)
+	LOAD	x7, 6 * REGBYTES(t0)
 8000052c:	0182a383          	lw	t2,24(t0)
+	LOAD	x8, 7 * REGBYTES(t0)
 80000530:	01c2a403          	lw	s0,28(t0)
+	LOAD	x9, 8 * REGBYTES(t0)
 80000534:	0202a483          	lw	s1,32(t0)
+	LOAD	x10, 9 * REGBYTES(t0)
 80000538:	0242a503          	lw	a0,36(t0)
+	LOAD	x11, 10 * REGBYTES(t0)
 8000053c:	0282a583          	lw	a1,40(t0)
+	LOAD	x12, 11 * REGBYTES(t0)
 80000540:	02c2a603          	lw	a2,44(t0)
+	LOAD	x13, 12 * REGBYTES(t0)
 80000544:	0302a683          	lw	a3,48(t0)
+	LOAD	x14, 13 * REGBYTES(t0)
 80000548:	0342a703          	lw	a4,52(t0)
+	LOAD	x15, 14 * REGBYTES(t0)
 8000054c:	0382a783          	lw	a5,56(t0)
+	LOAD	x16, 15 * REGBYTES(t0)
 80000550:	03c2a803          	lw	a6,60(t0)
+	LOAD	x17, 16 * REGBYTES(t0)
 80000554:	0402a883          	lw	a7,64(t0)
+	LOAD	x18, 17 * REGBYTES(t0)
 80000558:	0442a903          	lw	s2,68(t0)
+	LOAD	x19, 18 * REGBYTES(t0)
 8000055c:	0482a983          	lw	s3,72(t0)
+	LOAD	x20, 19 * REGBYTES(t0)
 80000560:	04c2aa03          	lw	s4,76(t0)
+	LOAD	x21, 20 * REGBYTES(t0)
 80000564:	0502aa83          	lw	s5,80(t0)
+	LOAD	x22, 21 * REGBYTES(t0)
 80000568:	0542ab03          	lw	s6,84(t0)
+	LOAD	x23, 22 * REGBYTES(t0)
 8000056c:	0582ab83          	lw	s7,88(t0)
+	LOAD	x24, 23 * REGBYTES(t0)
 80000570:	05c2ac03          	lw	s8,92(t0)
+	LOAD	x25, 24 * REGBYTES(t0)
 80000574:	0602ac83          	lw	s9,96(t0)
+	LOAD	x26, 25 * REGBYTES(t0)
 80000578:	0642ad03          	lw	s10,100(t0)
+	LOAD	x27, 26 * REGBYTES(t0)
 8000057c:	0682ad83          	lw	s11,104(t0)
+	LOAD	x28, 27 * REGBYTES(t0)
 80000580:	06c2ae03          	lw	t3,108(t0)
+	LOAD	x29, 28 * REGBYTES(t0)
 80000584:	0702ae83          	lw	t4,112(t0)
+	LOAD	x30, 39 * REGBYTES(t0)
 80000588:	09c2af03          	lw	t5,156(t0)
+	LOAD	x31, 30 * REGBYTES(t0)
 8000058c:	0782af83          	lw	t6,120(t0)
+#endif
+	ret
 80000590:	00008067          	ret
 
 80000594 <vPortYield>:
+	*  stack. However, "mepc" will be overwritten by the interrupt handler if a timer
+	*  interrupt happens during the yield. To avoid this, prevent interrupts before starting.
+	*  The write to mstatus in the restore context routine will enable interrupts after the
+	*  mret. A more fine-grain lock may be possible.
+	*/  
+	csrci mstatus, 8
 80000594:	30047073          	csrci	mstatus,8
+
+	portSAVE_CONTEXT
 80000598:	f8010113          	addi	sp,sp,-128
 8000059c:	00112023          	sw	ra,0(sp)
 800005a0:	00212223          	sw	sp,4(sp)
@@ -419,8 +708,11 @@ Disassembly of section .text:
 80000618:	00021297          	auipc	t0,0x21
 8000061c:	8cc2a283          	lw	t0,-1844(t0) # 80020ee4 <pxCurrentTCB>
 80000620:	0022a023          	sw	sp,0(t0)
+	portSAVE_RA
 80000624:	06112e23          	sw	ra,124(sp)
+	jal	vTaskSwitchContext
 80000628:	605020ef          	jal	ra,8000342c <vTaskSwitchContext>
+	portRESTORE_CONTEXT
 8000062c:	00021117          	auipc	sp,0x21
 80000630:	8b812103          	lw	sp,-1864(sp) # 80020ee4 <pxCurrentTCB>
 80000634:	00012103          	lw	sp,0(sp)
@@ -462,6 +754,12 @@ Disassembly of section .text:
 800006c4:	30200073          	mret
 
 800006c8 <prvSetNextTimerInterrupt>:
+ * tickrate may already be behind current timer and prevent correctly programming
+ * the 2nd interrupt
+ */
+static void prvSetNextTimerInterrupt(void)
+{
+    if (mtime && timecmp) 
 800006c8:	00021797          	auipc	a5,0x21
 800006cc:	84c78793          	addi	a5,a5,-1972 # 80020f14 <mtime>
 800006d0:	0007a783          	lw	a5,0(a5)
@@ -470,6 +768,7 @@ Disassembly of section .text:
 800006dc:	84078793          	addi	a5,a5,-1984 # 80020f18 <timecmp>
 800006e0:	0007a783          	lw	a5,0(a5)
 800006e4:	04078a63          	beqz	a5,80000738 <prvSetNextTimerInterrupt+0x70>
+        *timecmp = *mtime + (configTICK_CLOCK_HZ / configTICK_RATE_HZ);
 800006e8:	00021797          	auipc	a5,0x21
 800006ec:	82c78793          	addi	a5,a5,-2004 # 80020f14 <mtime>
 800006f0:	0007a783          	lw	a5,0(a5)
@@ -490,179 +789,332 @@ Disassembly of section .text:
 8000072c:	00070813          	mv	a6,a4
 80000730:	00f52023          	sw	a5,0(a0)
 80000734:	01052223          	sw	a6,4(a0)
+}
 80000738:	00000013          	nop
 8000073c:	00008067          	ret
 
 80000740 <vPortSetupTimer>:
+/*-----------------------------------------------------------*/
+
+/* Sets and enable the timer interrupt */
+void vPortSetupTimer(void)
+{
 80000740:	ff010113          	addi	sp,sp,-16
 80000744:	00112623          	sw	ra,12(sp)
+    /* reuse existing routine */
+    prvSetNextTimerInterrupt();
 80000748:	f81ff0ef          	jal	ra,800006c8 <prvSetNextTimerInterrupt>
+
+	/* Enable timer interupt */
+	__asm volatile("csrs mie,%0"::"r"(0x80));
 8000074c:	08000793          	li	a5,128
 80000750:	3047a073          	csrs	mie,a5
+}
 80000754:	00000013          	nop
 80000758:	00c12083          	lw	ra,12(sp)
 8000075c:	01010113          	addi	sp,sp,16
 80000760:	00008067          	ret
 
 80000764 <prvTaskExitError>:
+	its caller as there is nothing to return to.  If a task wants to exit it
+	should instead call vTaskDelete( NULL ).
+
+	Artificially force an assert() to be triggered if configASSERT() is
+	defined, then stop here so application writers can catch the error. */
+	configASSERT( uxCriticalNesting == ~0UL );
 80000764:	00020797          	auipc	a5,0x20
 80000768:	7ac78793          	addi	a5,a5,1964 # 80020f10 <uxCriticalNesting>
 8000076c:	0007a703          	lw	a4,0(a5)
 80000770:	fff00793          	li	a5,-1
 80000774:	00f70663          	beq	a4,a5,80000780 <prvTaskExitError+0x1c>
-80000778:	30047073          	csrci	mstatus,8
+80000778:	30007073          	csrci	mstatus,0
 8000077c:	0000006f          	j	8000077c <prvTaskExitError+0x18>
-80000780:	30047073          	csrci	mstatus,8
+	portDISABLE_INTERRUPTS();
+80000780:	30007073          	csrci	mstatus,0
+	for( ;; );
 80000784:	0000006f          	j	80000784 <prvTaskExitError+0x20>
 
 80000788 <vPortClearInterruptMask>:
+}
+/*-----------------------------------------------------------*/
+
+/* Clear current interrupt mask and set given mask */
+void vPortClearInterruptMask(int mask)
+{
 80000788:	ff010113          	addi	sp,sp,-16
 8000078c:	00a12623          	sw	a0,12(sp)
+	__asm volatile("csrw mie, %0"::"r"(mask));
 80000790:	00c12783          	lw	a5,12(sp)
 80000794:	30479073          	csrw	mie,a5
+}
 80000798:	00000013          	nop
 8000079c:	01010113          	addi	sp,sp,16
 800007a0:	00008067          	ret
 
 800007a4 <vPortSetInterruptMask>:
+/*-----------------------------------------------------------*/
+
+/* Set interrupt mask and return current interrupt enable register */
+int vPortSetInterruptMask(void)
+{
 800007a4:	ff010113          	addi	sp,sp,-16
+	int ret;
+	__asm volatile("csrr %0,mie":"=r"(ret));
 800007a8:	304027f3          	csrr	a5,mie
 800007ac:	00f12623          	sw	a5,12(sp)
+	__asm volatile("csrc mie,%0"::"i"(7));
 800007b0:	3043f073          	csrci	mie,7
+	return ret;
 800007b4:	00c12783          	lw	a5,12(sp)
+}
 800007b8:	00078513          	mv	a0,a5
 800007bc:	01010113          	addi	sp,sp,16
 800007c0:	00008067          	ret
 
 800007c4 <pxPortInitialiseStack>:
+
+/*
+ * See header file for description.
+ */
+StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t pxCode, void *pvParameters )
+{
 800007c4:	ff010113          	addi	sp,sp,-16
 800007c8:	00a12623          	sw	a0,12(sp)
 800007cc:	00b12423          	sw	a1,8(sp)
 800007d0:	00c12223          	sw	a2,4(sp)
+	/* Simulate the stack frame as it would be created by a context switch
+	interrupt. */
+	register int *tp asm("x3");
+	pxTopOfStack--;
 800007d4:	00c12783          	lw	a5,12(sp)
 800007d8:	ffc78793          	addi	a5,a5,-4
 800007dc:	00f12623          	sw	a5,12(sp)
+	*pxTopOfStack = (portSTACK_TYPE)pxCode;			/* Start address */
 800007e0:	00812703          	lw	a4,8(sp)
 800007e4:	00c12783          	lw	a5,12(sp)
 800007e8:	00e7a023          	sw	a4,0(a5)
+	pxTopOfStack -= 22;
 800007ec:	00c12783          	lw	a5,12(sp)
 800007f0:	fa878793          	addi	a5,a5,-88
 800007f4:	00f12623          	sw	a5,12(sp)
+	*pxTopOfStack = (portSTACK_TYPE)pvParameters;	/* Register a0 */
 800007f8:	00412703          	lw	a4,4(sp)
 800007fc:	00c12783          	lw	a5,12(sp)
 80000800:	00e7a023          	sw	a4,0(a5)
+	pxTopOfStack -= 6;
 80000804:	00c12783          	lw	a5,12(sp)
 80000808:	fe878793          	addi	a5,a5,-24
 8000080c:	00f12623          	sw	a5,12(sp)
+	*pxTopOfStack = (portSTACK_TYPE)tp; /* Register thread pointer */
 80000810:	00018793          	mv	a5,gp
 80000814:	00078713          	mv	a4,a5
 80000818:	00c12783          	lw	a5,12(sp)
 8000081c:	00e7a023          	sw	a4,0(a5)
+	pxTopOfStack -= 3;
 80000820:	00c12783          	lw	a5,12(sp)
 80000824:	ff478793          	addi	a5,a5,-12
 80000828:	00f12623          	sw	a5,12(sp)
+	*pxTopOfStack = (portSTACK_TYPE)prvTaskExitError; /* Register ra */
 8000082c:	00000717          	auipc	a4,0x0
 80000830:	f3870713          	addi	a4,a4,-200 # 80000764 <prvTaskExitError>
 80000834:	00c12783          	lw	a5,12(sp)
 80000838:	00e7a023          	sw	a4,0(a5)
+	
+	return pxTopOfStack;
 8000083c:	00c12783          	lw	a5,12(sp)
+}
 80000840:	00078513          	mv	a0,a5
 80000844:	01010113          	addi	sp,sp,16
 80000848:	00008067          	ret
 
 8000084c <vPortSysTickHandler>:
+/*-----------------------------------------------------------*/
+
+void vPortSysTickHandler( void )
+{
 8000084c:	ff010113          	addi	sp,sp,-16
 80000850:	00112623          	sw	ra,12(sp)
+	prvSetNextTimerInterrupt();
 80000854:	e75ff0ef          	jal	ra,800006c8 <prvSetNextTimerInterrupt>
+
+	/* Increment the RTOS tick. */
+	if( xTaskIncrementTick() != pdFALSE )
 80000858:	13d020ef          	jal	ra,80003194 <xTaskIncrementTick>
 8000085c:	00050793          	mv	a5,a0
 80000860:	00078463          	beqz	a5,80000868 <vPortSysTickHandler+0x1c>
+	{
+		vTaskSwitchContext();
 80000864:	3c9020ef          	jal	ra,8000342c <vTaskSwitchContext>
+	}
+}
 80000868:	00000013          	nop
 8000086c:	00c12083          	lw	ra,12(sp)
 80000870:	01010113          	addi	sp,sp,16
 80000874:	00008067          	ret
 
 80000878 <vListInitialise>:
+/*-----------------------------------------------------------
+ * PUBLIC LIST API documented in list.h
+ *----------------------------------------------------------*/
+
+void vListInitialise( List_t * const pxList )
+{
 80000878:	ff010113          	addi	sp,sp,-16
 8000087c:	00a12623          	sw	a0,12(sp)
+	/* The list structure contains a list item which is used to mark the
+	end of the list.  To initialise the list the list end is inserted
+	as the only list entry. */
+	pxList->pxIndex = ( ListItem_t * ) &( pxList->xListEnd );			/*lint !e826 !e740 The mini list structure is used as the list end to save RAM.  This is checked and valid. */
 80000880:	00c12783          	lw	a5,12(sp)
 80000884:	00878713          	addi	a4,a5,8
 80000888:	00c12783          	lw	a5,12(sp)
 8000088c:	00e7a223          	sw	a4,4(a5)
+
+	/* The list end value is the highest possible value in the list to
+	ensure it remains at the end of the list. */
+	pxList->xListEnd.xItemValue = portMAX_DELAY;
 80000890:	00c12783          	lw	a5,12(sp)
 80000894:	fff00713          	li	a4,-1
 80000898:	00e7a423          	sw	a4,8(a5)
+
+	/* The list end next and previous pointers point to itself so we know
+	when the list is empty. */
+	pxList->xListEnd.pxNext = ( ListItem_t * ) &( pxList->xListEnd );	/*lint !e826 !e740 The mini list structure is used as the list end to save RAM.  This is checked and valid. */
 8000089c:	00c12783          	lw	a5,12(sp)
 800008a0:	00878713          	addi	a4,a5,8
 800008a4:	00c12783          	lw	a5,12(sp)
 800008a8:	00e7a623          	sw	a4,12(a5)
+	pxList->xListEnd.pxPrevious = ( ListItem_t * ) &( pxList->xListEnd );/*lint !e826 !e740 The mini list structure is used as the list end to save RAM.  This is checked and valid. */
 800008ac:	00c12783          	lw	a5,12(sp)
 800008b0:	00878713          	addi	a4,a5,8
 800008b4:	00c12783          	lw	a5,12(sp)
 800008b8:	00e7a823          	sw	a4,16(a5)
+
+	pxList->uxNumberOfItems = ( UBaseType_t ) 0U;
 800008bc:	00c12783          	lw	a5,12(sp)
 800008c0:	0007a023          	sw	zero,0(a5)
+
+	/* Write known values into the list if
+	configUSE_LIST_DATA_INTEGRITY_CHECK_BYTES is set to 1. */
+	listSET_LIST_INTEGRITY_CHECK_1_VALUE( pxList );
+	listSET_LIST_INTEGRITY_CHECK_2_VALUE( pxList );
+}
 800008c4:	00000013          	nop
 800008c8:	01010113          	addi	sp,sp,16
 800008cc:	00008067          	ret
 
 800008d0 <vListInitialiseItem>:
+/*-----------------------------------------------------------*/
+
+void vListInitialiseItem( ListItem_t * const pxItem )
+{
 800008d0:	ff010113          	addi	sp,sp,-16
 800008d4:	00a12623          	sw	a0,12(sp)
+	/* Make sure the list item is not recorded as being on a list. */
+	pxItem->pvContainer = NULL;
 800008d8:	00c12783          	lw	a5,12(sp)
 800008dc:	0007a823          	sw	zero,16(a5)
+
+	/* Write known values into the list item if
+	configUSE_LIST_DATA_INTEGRITY_CHECK_BYTES is set to 1. */
+	listSET_FIRST_LIST_ITEM_INTEGRITY_CHECK_VALUE( pxItem );
+	listSET_SECOND_LIST_ITEM_INTEGRITY_CHECK_VALUE( pxItem );
+}
 800008e0:	00000013          	nop
 800008e4:	01010113          	addi	sp,sp,16
 800008e8:	00008067          	ret
 
 800008ec <vListInsertEnd>:
+/*-----------------------------------------------------------*/
+
+void vListInsertEnd( List_t * const pxList, ListItem_t * const pxNewListItem )
+{
 800008ec:	fe010113          	addi	sp,sp,-32
 800008f0:	00a12623          	sw	a0,12(sp)
 800008f4:	00b12423          	sw	a1,8(sp)
+ListItem_t * const pxIndex = pxList->pxIndex;
 800008f8:	00c12783          	lw	a5,12(sp)
 800008fc:	0047a783          	lw	a5,4(a5)
 80000900:	00f12e23          	sw	a5,28(sp)
+	listTEST_LIST_ITEM_INTEGRITY( pxNewListItem );
+
+	/* Insert a new list item into pxList, but rather than sort the list,
+	makes the new list item the last item to be removed by a call to
+	listGET_OWNER_OF_NEXT_ENTRY(). */
+	pxNewListItem->pxNext = pxIndex;
 80000904:	00812783          	lw	a5,8(sp)
 80000908:	01c12703          	lw	a4,28(sp)
 8000090c:	00e7a223          	sw	a4,4(a5)
+	pxNewListItem->pxPrevious = pxIndex->pxPrevious;
 80000910:	01c12783          	lw	a5,28(sp)
 80000914:	0087a703          	lw	a4,8(a5)
 80000918:	00812783          	lw	a5,8(sp)
 8000091c:	00e7a423          	sw	a4,8(a5)
+
+	/* Only used during decision coverage testing. */
+	mtCOVERAGE_TEST_DELAY();
+
+	pxIndex->pxPrevious->pxNext = pxNewListItem;
 80000920:	01c12783          	lw	a5,28(sp)
 80000924:	0087a783          	lw	a5,8(a5)
 80000928:	00812703          	lw	a4,8(sp)
 8000092c:	00e7a223          	sw	a4,4(a5)
+	pxIndex->pxPrevious = pxNewListItem;
 80000930:	01c12783          	lw	a5,28(sp)
 80000934:	00812703          	lw	a4,8(sp)
 80000938:	00e7a423          	sw	a4,8(a5)
+
+	/* Remember which list the item is in. */
+	pxNewListItem->pvContainer = ( void * ) pxList;
 8000093c:	00812783          	lw	a5,8(sp)
 80000940:	00c12703          	lw	a4,12(sp)
 80000944:	00e7a823          	sw	a4,16(a5)
+
+	( pxList->uxNumberOfItems )++;
 80000948:	00c12783          	lw	a5,12(sp)
 8000094c:	0007a783          	lw	a5,0(a5)
 80000950:	00178713          	addi	a4,a5,1
 80000954:	00c12783          	lw	a5,12(sp)
 80000958:	00e7a023          	sw	a4,0(a5)
+}
 8000095c:	00000013          	nop
 80000960:	02010113          	addi	sp,sp,32
 80000964:	00008067          	ret
 
 80000968 <vListInsert>:
+/*-----------------------------------------------------------*/
+
+void vListInsert( List_t * const pxList, ListItem_t * const pxNewListItem )
+{
 80000968:	fe010113          	addi	sp,sp,-32
 8000096c:	00a12623          	sw	a0,12(sp)
 80000970:	00b12423          	sw	a1,8(sp)
+ListItem_t *pxIterator;
+const TickType_t xValueOfInsertion = pxNewListItem->xItemValue;
 80000974:	00812783          	lw	a5,8(sp)
 80000978:	0007a783          	lw	a5,0(a5)
 8000097c:	00f12c23          	sw	a5,24(sp)
+	new list item should be placed after it.  This ensures that TCB's which are
+	stored in ready lists (all of which have the same xItemValue value) get a
+	share of the CPU.  However, if the xItemValue is the same as the back marker
+	the iteration loop below will not end.  Therefore the value is checked
+	first, and the algorithm slightly modified if necessary. */
+	if( xValueOfInsertion == portMAX_DELAY )
 80000980:	01812703          	lw	a4,24(sp)
 80000984:	fff00793          	li	a5,-1
 80000988:	00f71a63          	bne	a4,a5,8000099c <vListInsert+0x34>
+	{
+		pxIterator = pxList->xListEnd.pxPrevious;
 8000098c:	00c12783          	lw	a5,12(sp)
 80000990:	0107a783          	lw	a5,16(a5)
 80000994:	00f12e23          	sw	a5,28(sp)
 80000998:	0340006f          	j	800009cc <vListInsert+0x64>
+			4) Using a queue or semaphore before it has been initialised or
+			   before the scheduler has been started (are interrupts firing
+			   before vTaskStartScheduler() has been called?).
+		**********************************************************************/
+
+		for( pxIterator = ( ListItem_t * ) &( pxList->xListEnd ); pxIterator->pxNext->xItemValue <= xValueOfInsertion; pxIterator = pxIterator->pxNext ) /*lint !e826 !e740 The mini list structure is used as the list end to save RAM.  This is checked and valid. */
 8000099c:	00c12783          	lw	a5,12(sp)
 800009a0:	00878793          	addi	a5,a5,8
 800009a4:	00f12e23          	sw	a5,28(sp)
@@ -675,81 +1127,138 @@ Disassembly of section .text:
 800009c0:	0007a783          	lw	a5,0(a5)
 800009c4:	01812703          	lw	a4,24(sp)
 800009c8:	fef772e3          	bleu	a5,a4,800009ac <vListInsert+0x44>
+			/* There is nothing to do here, just iterating to the wanted
+			insertion position. */
+		}
+	}
+
+	pxNewListItem->pxNext = pxIterator->pxNext;
 800009cc:	01c12783          	lw	a5,28(sp)
 800009d0:	0047a703          	lw	a4,4(a5)
 800009d4:	00812783          	lw	a5,8(sp)
 800009d8:	00e7a223          	sw	a4,4(a5)
+	pxNewListItem->pxNext->pxPrevious = pxNewListItem;
 800009dc:	00812783          	lw	a5,8(sp)
 800009e0:	0047a783          	lw	a5,4(a5)
 800009e4:	00812703          	lw	a4,8(sp)
 800009e8:	00e7a423          	sw	a4,8(a5)
+	pxNewListItem->pxPrevious = pxIterator;
 800009ec:	00812783          	lw	a5,8(sp)
 800009f0:	01c12703          	lw	a4,28(sp)
 800009f4:	00e7a423          	sw	a4,8(a5)
+	pxIterator->pxNext = pxNewListItem;
 800009f8:	01c12783          	lw	a5,28(sp)
 800009fc:	00812703          	lw	a4,8(sp)
 80000a00:	00e7a223          	sw	a4,4(a5)
+
+	/* Remember which list the item is in.  This allows fast removal of the
+	item later. */
+	pxNewListItem->pvContainer = ( void * ) pxList;
 80000a04:	00812783          	lw	a5,8(sp)
 80000a08:	00c12703          	lw	a4,12(sp)
 80000a0c:	00e7a823          	sw	a4,16(a5)
+
+	( pxList->uxNumberOfItems )++;
 80000a10:	00c12783          	lw	a5,12(sp)
 80000a14:	0007a783          	lw	a5,0(a5)
 80000a18:	00178713          	addi	a4,a5,1
 80000a1c:	00c12783          	lw	a5,12(sp)
 80000a20:	00e7a023          	sw	a4,0(a5)
+}
 80000a24:	00000013          	nop
 80000a28:	02010113          	addi	sp,sp,32
 80000a2c:	00008067          	ret
 
 80000a30 <uxListRemove>:
+/*-----------------------------------------------------------*/
+
+UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove )
+{
 80000a30:	fe010113          	addi	sp,sp,-32
 80000a34:	00a12623          	sw	a0,12(sp)
+/* The list item knows which list it is in.  Obtain the list from the list
+item. */
+List_t * const pxList = ( List_t * ) pxItemToRemove->pvContainer;
 80000a38:	00c12783          	lw	a5,12(sp)
 80000a3c:	0107a783          	lw	a5,16(a5)
 80000a40:	00f12e23          	sw	a5,28(sp)
+
+	pxItemToRemove->pxNext->pxPrevious = pxItemToRemove->pxPrevious;
 80000a44:	00c12783          	lw	a5,12(sp)
 80000a48:	0047a783          	lw	a5,4(a5)
 80000a4c:	00c12703          	lw	a4,12(sp)
 80000a50:	00872703          	lw	a4,8(a4)
 80000a54:	00e7a423          	sw	a4,8(a5)
+	pxItemToRemove->pxPrevious->pxNext = pxItemToRemove->pxNext;
 80000a58:	00c12783          	lw	a5,12(sp)
 80000a5c:	0087a783          	lw	a5,8(a5)
 80000a60:	00c12703          	lw	a4,12(sp)
 80000a64:	00472703          	lw	a4,4(a4)
 80000a68:	00e7a223          	sw	a4,4(a5)
+
+	/* Only used during decision coverage testing. */
+	mtCOVERAGE_TEST_DELAY();
+
+	/* Make sure the index is left pointing to a valid item. */
+	if( pxList->pxIndex == pxItemToRemove )
 80000a6c:	01c12783          	lw	a5,28(sp)
 80000a70:	0047a783          	lw	a5,4(a5)
 80000a74:	00c12703          	lw	a4,12(sp)
 80000a78:	00f71a63          	bne	a4,a5,80000a8c <uxListRemove+0x5c>
+	{
+		pxList->pxIndex = pxItemToRemove->pxPrevious;
 80000a7c:	00c12783          	lw	a5,12(sp)
 80000a80:	0087a703          	lw	a4,8(a5)
 80000a84:	01c12783          	lw	a5,28(sp)
 80000a88:	00e7a223          	sw	a4,4(a5)
+	else
+	{
+		mtCOVERAGE_TEST_MARKER();
+	}
+
+	pxItemToRemove->pvContainer = NULL;
 80000a8c:	00c12783          	lw	a5,12(sp)
 80000a90:	0007a823          	sw	zero,16(a5)
+	( pxList->uxNumberOfItems )--;
 80000a94:	01c12783          	lw	a5,28(sp)
 80000a98:	0007a783          	lw	a5,0(a5)
 80000a9c:	fff78713          	addi	a4,a5,-1
 80000aa0:	01c12783          	lw	a5,28(sp)
 80000aa4:	00e7a023          	sw	a4,0(a5)
+
+	return pxList->uxNumberOfItems;
 80000aa8:	01c12783          	lw	a5,28(sp)
 80000aac:	0007a783          	lw	a5,0(a5)
+}
 80000ab0:	00078513          	mv	a0,a5
 80000ab4:	02010113          	addi	sp,sp,32
 80000ab8:	00008067          	ret
 
 80000abc <xQueueGenericReset>:
+	}														\
+	taskEXIT_CRITICAL()
+/*-----------------------------------------------------------*/
+
+BaseType_t xQueueGenericReset( QueueHandle_t xQueue, BaseType_t xNewQueue )
+{
 80000abc:	fd010113          	addi	sp,sp,-48
 80000ac0:	02112623          	sw	ra,44(sp)
 80000ac4:	00a12623          	sw	a0,12(sp)
 80000ac8:	00b12423          	sw	a1,8(sp)
+Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 80000acc:	00c12783          	lw	a5,12(sp)
 80000ad0:	00f12e23          	sw	a5,28(sp)
+
+	configASSERT( pxQueue );
 80000ad4:	01c12783          	lw	a5,28(sp)
 80000ad8:	00079663          	bnez	a5,80000ae4 <xQueueGenericReset+0x28>
-80000adc:	30047073          	csrci	mstatus,8
+80000adc:	30007073          	csrci	mstatus,0
 80000ae0:	0000006f          	j	80000ae0 <xQueueGenericReset+0x24>
+
+	taskENTER_CRITICAL();
 80000ae4:	3f1030ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		pxQueue->pcTail = pxQueue->pcHead + ( pxQueue->uxLength * pxQueue->uxItemSize );
 80000ae8:	01c12783          	lw	a5,28(sp)
 80000aec:	0007a703          	lw	a4,0(a5)
 80000af0:	01c12783          	lw	a5,28(sp)
@@ -760,12 +1269,15 @@ Disassembly of section .text:
 80000b04:	00f70733          	add	a4,a4,a5
 80000b08:	01c12783          	lw	a5,28(sp)
 80000b0c:	00e7a223          	sw	a4,4(a5)
+		pxQueue->uxMessagesWaiting = ( UBaseType_t ) 0U;
 80000b10:	01c12783          	lw	a5,28(sp)
 80000b14:	0207ac23          	sw	zero,56(a5)
+		pxQueue->pcWriteTo = pxQueue->pcHead;
 80000b18:	01c12783          	lw	a5,28(sp)
 80000b1c:	0007a703          	lw	a4,0(a5)
 80000b20:	01c12783          	lw	a5,28(sp)
 80000b24:	00e7a423          	sw	a4,8(a5)
+		pxQueue->u.pcReadFrom = pxQueue->pcHead + ( ( pxQueue->uxLength - ( UBaseType_t ) 1U ) * pxQueue->uxItemSize );
 80000b28:	01c12783          	lw	a5,28(sp)
 80000b2c:	0007a703          	lw	a4,0(a5)
 80000b30:	01c12783          	lw	a5,28(sp)
@@ -777,17 +1289,29 @@ Disassembly of section .text:
 80000b48:	00f70733          	add	a4,a4,a5
 80000b4c:	01c12783          	lw	a5,28(sp)
 80000b50:	00e7a623          	sw	a4,12(a5)
+		pxQueue->xRxLock = queueUNLOCKED;
 80000b54:	01c12783          	lw	a5,28(sp)
 80000b58:	fff00713          	li	a4,-1
 80000b5c:	04e7a223          	sw	a4,68(a5)
+		pxQueue->xTxLock = queueUNLOCKED;
 80000b60:	01c12783          	lw	a5,28(sp)
 80000b64:	fff00713          	li	a4,-1
 80000b68:	04e7a423          	sw	a4,72(a5)
+
+		if( xNewQueue == pdFALSE )
 80000b6c:	00812783          	lw	a5,8(sp)
 80000b70:	02079a63          	bnez	a5,80000ba4 <xQueueGenericReset+0xe8>
+			/* If there are tasks blocked waiting to read from the queue, then
+			the tasks will remain blocked as after this function exits the queue
+			will still be empty.  If there are tasks blocked waiting to write to
+			the queue, then one should be unblocked as after this function exits
+			it will be possible to write to it. */
+			if( listLIST_IS_EMPTY( &( pxQueue->xTasksWaitingToSend ) ) == pdFALSE )
 80000b74:	01c12783          	lw	a5,28(sp)
 80000b78:	0107a783          	lw	a5,16(a5)
 80000b7c:	04078463          	beqz	a5,80000bc4 <xQueueGenericReset+0x108>
+			{
+				if( xTaskRemoveFromEventList( &( pxQueue->xTasksWaitingToSend ) ) == pdTRUE )
 80000b80:	01c12783          	lw	a5,28(sp)
 80000b84:	01078793          	addi	a5,a5,16
 80000b88:	00078513          	mv	a0,a5
@@ -795,172 +1319,360 @@ Disassembly of section .text:
 80000b90:	00050713          	mv	a4,a0
 80000b94:	00100793          	li	a5,1
 80000b98:	02f71663          	bne	a4,a5,80000bc4 <xQueueGenericReset+0x108>
+				{
+					queueYIELD_IF_USING_PREEMPTION();
 80000b9c:	9f9ff0ef          	jal	ra,80000594 <vPortYield>
 80000ba0:	0240006f          	j	80000bc4 <xQueueGenericReset+0x108>
+			}
+		}
+		else
+		{
+			/* Ensure the event queues start in the correct state. */
+			vListInitialise( &( pxQueue->xTasksWaitingToSend ) );
 80000ba4:	01c12783          	lw	a5,28(sp)
 80000ba8:	01078793          	addi	a5,a5,16
 80000bac:	00078513          	mv	a0,a5
 80000bb0:	cc9ff0ef          	jal	ra,80000878 <vListInitialise>
+			vListInitialise( &( pxQueue->xTasksWaitingToReceive ) );
 80000bb4:	01c12783          	lw	a5,28(sp)
 80000bb8:	02478793          	addi	a5,a5,36
 80000bbc:	00078513          	mv	a0,a5
 80000bc0:	cb9ff0ef          	jal	ra,80000878 <vListInitialise>
+		}
+	}
+	taskEXIT_CRITICAL();
 80000bc4:	351030ef          	jal	ra,80004714 <vTaskExitCritical>
+
+	/* A value is returned for calling semantic consistency with previous
+	versions. */
+	return pdPASS;
 80000bc8:	00100793          	li	a5,1
+}
 80000bcc:	00078513          	mv	a0,a5
 80000bd0:	02c12083          	lw	ra,44(sp)
 80000bd4:	03010113          	addi	sp,sp,48
 80000bd8:	00008067          	ret
 
 80000bdc <xQueueGenericCreate>:
+/*-----------------------------------------------------------*/
+
+QueueHandle_t xQueueGenericCreate( const UBaseType_t uxQueueLength, const UBaseType_t uxItemSize, const uint8_t ucQueueType )
+{
 80000bdc:	fd010113          	addi	sp,sp,-48
 80000be0:	02112623          	sw	ra,44(sp)
 80000be4:	00a12623          	sw	a0,12(sp)
 80000be8:	00b12423          	sw	a1,8(sp)
 80000bec:	00060793          	mv	a5,a2
 80000bf0:	00f103a3          	sb	a5,7(sp)
+Queue_t *pxNewQueue;
+size_t xQueueSizeInBytes;
+QueueHandle_t xReturn = NULL;
 80000bf4:	00012c23          	sw	zero,24(sp)
+
+	/* Remove compiler warnings about unused parameters should
+	configUSE_TRACE_FACILITY not be set to 1. */
+	( void ) ucQueueType;
+
+	configASSERT( uxQueueLength > ( UBaseType_t ) 0 );
 80000bf8:	00c12783          	lw	a5,12(sp)
 80000bfc:	00079663          	bnez	a5,80000c08 <xQueueGenericCreate+0x2c>
-80000c00:	30047073          	csrci	mstatus,8
+80000c00:	30007073          	csrci	mstatus,0
 80000c04:	0000006f          	j	80000c04 <xQueueGenericCreate+0x28>
+
+	if( uxItemSize == ( UBaseType_t ) 0 )
 80000c08:	00812783          	lw	a5,8(sp)
 80000c0c:	00079663          	bnez	a5,80000c18 <xQueueGenericCreate+0x3c>
+	{
+		/* There is not going to be a queue storage area. */
+		xQueueSizeInBytes = ( size_t ) 0;
 80000c10:	00012e23          	sw	zero,28(sp)
 80000c14:	0180006f          	j	80000c2c <xQueueGenericCreate+0x50>
+	}
+	else
+	{
+		/* The queue is one byte longer than asked for to make wrap checking
+		easier/faster. */
+		xQueueSizeInBytes = ( size_t ) ( uxQueueLength * uxItemSize ) + ( size_t ) 1; /*lint !e961 MISRA exception as the casts are only redundant for some ports. */
 80000c18:	00c12703          	lw	a4,12(sp)
 80000c1c:	00812783          	lw	a5,8(sp)
 80000c20:	02f707b3          	mul	a5,a4,a5
 80000c24:	00178793          	addi	a5,a5,1
 80000c28:	00f12e23          	sw	a5,28(sp)
+	}
+
+	/* Allocate the new queue structure and storage area. */
+	pxNewQueue = ( Queue_t * ) pvPortMalloc( sizeof( Queue_t ) + xQueueSizeInBytes );
 80000c2c:	01c12783          	lw	a5,28(sp)
 80000c30:	05478793          	addi	a5,a5,84
 80000c34:	00078513          	mv	a0,a5
 80000c38:	6e0050ef          	jal	ra,80006318 <pvPortMalloc>
 80000c3c:	00a12a23          	sw	a0,20(sp)
+
+	if( pxNewQueue != NULL )
 80000c40:	01412783          	lw	a5,20(sp)
 80000c44:	06078263          	beqz	a5,80000ca8 <xQueueGenericCreate+0xcc>
+	{
+		if( uxItemSize == ( UBaseType_t ) 0 )
 80000c48:	00812783          	lw	a5,8(sp)
 80000c4c:	00079a63          	bnez	a5,80000c60 <xQueueGenericCreate+0x84>
+		{
+			/* No RAM was allocated for the queue storage area, but PC head
+			cannot be set to NULL because NULL is used as a key to say the queue
+			is used as a mutex.  Therefore just set pcHead to point to the queue
+			as a benign value that is known to be within the memory map. */
+			pxNewQueue->pcHead = ( int8_t * ) pxNewQueue;
 80000c50:	01412783          	lw	a5,20(sp)
 80000c54:	01412703          	lw	a4,20(sp)
 80000c58:	00e7a023          	sw	a4,0(a5)
 80000c5c:	0140006f          	j	80000c70 <xQueueGenericCreate+0x94>
+		}
+		else
+		{
+			/* Jump past the queue structure to find the location of the queue
+			storage area. */
+			pxNewQueue->pcHead = ( ( int8_t * ) pxNewQueue ) + sizeof( Queue_t );
 80000c60:	01412783          	lw	a5,20(sp)
 80000c64:	05478713          	addi	a4,a5,84
 80000c68:	01412783          	lw	a5,20(sp)
 80000c6c:	00e7a023          	sw	a4,0(a5)
+		}
+
+		/* Initialise the queue members as described above where the queue type
+		is defined. */
+		pxNewQueue->uxLength = uxQueueLength;
 80000c70:	01412783          	lw	a5,20(sp)
 80000c74:	00c12703          	lw	a4,12(sp)
 80000c78:	02e7ae23          	sw	a4,60(a5)
+		pxNewQueue->uxItemSize = uxItemSize;
 80000c7c:	01412783          	lw	a5,20(sp)
 80000c80:	00812703          	lw	a4,8(sp)
 80000c84:	04e7a023          	sw	a4,64(a5)
+		( void ) xQueueGenericReset( pxNewQueue, pdTRUE );
 80000c88:	00100593          	li	a1,1
 80000c8c:	01412503          	lw	a0,20(sp)
 80000c90:	e2dff0ef          	jal	ra,80000abc <xQueueGenericReset>
+
+		#if ( configUSE_TRACE_FACILITY == 1 )
+		{
+			pxNewQueue->ucQueueType = ucQueueType;
 80000c94:	01412783          	lw	a5,20(sp)
 80000c98:	00714703          	lbu	a4,7(sp)
 80000c9c:	04e78823          	sb	a4,80(a5)
+			pxNewQueue->pxQueueSetContainer = NULL;
+		}
+		#endif /* configUSE_QUEUE_SETS */
+
+		traceQUEUE_CREATE( pxNewQueue );
+		xReturn = pxNewQueue;
 80000ca0:	01412783          	lw	a5,20(sp)
 80000ca4:	00f12c23          	sw	a5,24(sp)
+	else
+	{
+		mtCOVERAGE_TEST_MARKER();
+	}
+
+	configASSERT( xReturn );
 80000ca8:	01812783          	lw	a5,24(sp)
 80000cac:	00079663          	bnez	a5,80000cb8 <xQueueGenericCreate+0xdc>
-80000cb0:	30047073          	csrci	mstatus,8
+80000cb0:	30007073          	csrci	mstatus,0
 80000cb4:	0000006f          	j	80000cb4 <xQueueGenericCreate+0xd8>
+
+	return xReturn;
 80000cb8:	01812783          	lw	a5,24(sp)
+}
 80000cbc:	00078513          	mv	a0,a5
 80000cc0:	02c12083          	lw	ra,44(sp)
 80000cc4:	03010113          	addi	sp,sp,48
 80000cc8:	00008067          	ret
 
 80000ccc <xQueueCreateMutex>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_MUTEXES == 1 )
+
+	QueueHandle_t xQueueCreateMutex( const uint8_t ucQueueType )
+	{
 80000ccc:	fd010113          	addi	sp,sp,-48
 80000cd0:	02112623          	sw	ra,44(sp)
 80000cd4:	00050793          	mv	a5,a0
 80000cd8:	00f107a3          	sb	a5,15(sp)
+		/* Prevent compiler warnings about unused parameters if
+		configUSE_TRACE_FACILITY does not equal 1. */
+		( void ) ucQueueType;
+
+		/* Allocate the new queue structure. */
+		pxNewQueue = ( Queue_t * ) pvPortMalloc( sizeof( Queue_t ) );
 80000cdc:	05400513          	li	a0,84
 80000ce0:	638050ef          	jal	ra,80006318 <pvPortMalloc>
 80000ce4:	00a12e23          	sw	a0,28(sp)
+		if( pxNewQueue != NULL )
 80000ce8:	01c12783          	lw	a5,28(sp)
 80000cec:	08078c63          	beqz	a5,80000d84 <xQueueCreateMutex+0xb8>
+		{
+			/* Information required for priority inheritance. */
+			pxNewQueue->pxMutexHolder = NULL;
 80000cf0:	01c12783          	lw	a5,28(sp)
 80000cf4:	0007a223          	sw	zero,4(a5)
+			pxNewQueue->uxQueueType = queueQUEUE_IS_MUTEX;
 80000cf8:	01c12783          	lw	a5,28(sp)
 80000cfc:	0007a023          	sw	zero,0(a5)
+
+			/* Queues used as a mutex no data is actually copied into or out
+			of the queue. */
+			pxNewQueue->pcWriteTo = NULL;
 80000d00:	01c12783          	lw	a5,28(sp)
 80000d04:	0007a423          	sw	zero,8(a5)
+			pxNewQueue->u.pcReadFrom = NULL;
 80000d08:	01c12783          	lw	a5,28(sp)
 80000d0c:	0007a623          	sw	zero,12(a5)
+
+			/* Each mutex has a length of 1 (like a binary semaphore) and
+			an item size of 0 as nothing is actually copied into or out
+			of the mutex. */
+			pxNewQueue->uxMessagesWaiting = ( UBaseType_t ) 0U;
 80000d10:	01c12783          	lw	a5,28(sp)
 80000d14:	0207ac23          	sw	zero,56(a5)
+			pxNewQueue->uxLength = ( UBaseType_t ) 1U;
 80000d18:	01c12783          	lw	a5,28(sp)
 80000d1c:	00100713          	li	a4,1
 80000d20:	02e7ae23          	sw	a4,60(a5)
+			pxNewQueue->uxItemSize = ( UBaseType_t ) 0U;
 80000d24:	01c12783          	lw	a5,28(sp)
 80000d28:	0407a023          	sw	zero,64(a5)
+			pxNewQueue->xRxLock = queueUNLOCKED;
 80000d2c:	01c12783          	lw	a5,28(sp)
 80000d30:	fff00713          	li	a4,-1
 80000d34:	04e7a223          	sw	a4,68(a5)
+			pxNewQueue->xTxLock = queueUNLOCKED;
 80000d38:	01c12783          	lw	a5,28(sp)
 80000d3c:	fff00713          	li	a4,-1
 80000d40:	04e7a423          	sw	a4,72(a5)
+
+			#if ( configUSE_TRACE_FACILITY == 1 )
+			{
+				pxNewQueue->ucQueueType = ucQueueType;
 80000d44:	01c12783          	lw	a5,28(sp)
 80000d48:	00f14703          	lbu	a4,15(sp)
 80000d4c:	04e78823          	sb	a4,80(a5)
+				pxNewQueue->pxQueueSetContainer = NULL;
+			}
+			#endif
+
+			/* Ensure the event queues start with the correct state. */
+			vListInitialise( &( pxNewQueue->xTasksWaitingToSend ) );
 80000d50:	01c12783          	lw	a5,28(sp)
 80000d54:	01078793          	addi	a5,a5,16
 80000d58:	00078513          	mv	a0,a5
 80000d5c:	b1dff0ef          	jal	ra,80000878 <vListInitialise>
+			vListInitialise( &( pxNewQueue->xTasksWaitingToReceive ) );
 80000d60:	01c12783          	lw	a5,28(sp)
 80000d64:	02478793          	addi	a5,a5,36
 80000d68:	00078513          	mv	a0,a5
 80000d6c:	b0dff0ef          	jal	ra,80000878 <vListInitialise>
+
+			traceCREATE_MUTEX( pxNewQueue );
+
+			/* Start with the semaphore in the expected state. */
+			( void ) xQueueGenericSend( pxNewQueue, NULL, ( TickType_t ) 0U, queueSEND_TO_BACK );
 80000d70:	00000693          	li	a3,0
 80000d74:	00000613          	li	a2,0
 80000d78:	00000593          	li	a1,0
 80000d7c:	01c12503          	lw	a0,28(sp)
 80000d80:	1e0000ef          	jal	ra,80000f60 <xQueueGenericSend>
+		else
+		{
+			traceCREATE_MUTEX_FAILED();
+		}
+
+		return pxNewQueue;
 80000d84:	01c12783          	lw	a5,28(sp)
+	}
 80000d88:	00078513          	mv	a0,a5
 80000d8c:	02c12083          	lw	ra,44(sp)
 80000d90:	03010113          	addi	sp,sp,48
 80000d94:	00008067          	ret
 
 80000d98 <xQueueGiveMutexRecursive>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_RECURSIVE_MUTEXES == 1 )
+
+	BaseType_t xQueueGiveMutexRecursive( QueueHandle_t xMutex )
+	{
 80000d98:	fd010113          	addi	sp,sp,-48
 80000d9c:	02112623          	sw	ra,44(sp)
 80000da0:	02812423          	sw	s0,40(sp)
 80000da4:	00a12623          	sw	a0,12(sp)
+	BaseType_t xReturn;
+	Queue_t * const pxMutex = ( Queue_t * ) xMutex;
 80000da8:	00c12783          	lw	a5,12(sp)
 80000dac:	00f12c23          	sw	a5,24(sp)
+
+		configASSERT( pxMutex );
 80000db0:	01812783          	lw	a5,24(sp)
 80000db4:	00079663          	bnez	a5,80000dc0 <xQueueGiveMutexRecursive+0x28>
-80000db8:	30047073          	csrci	mstatus,8
+80000db8:	30007073          	csrci	mstatus,0
 80000dbc:	0000006f          	j	80000dbc <xQueueGiveMutexRecursive+0x24>
+		change outside of this task.  If this task does not hold the mutex then
+		pxMutexHolder can never coincidentally equal the tasks handle, and as
+		this is the only condition we are interested in it does not matter if
+		pxMutexHolder is accessed simultaneously by another task.  Therefore no
+		mutual exclusion is required to test the pxMutexHolder variable. */
+		if( pxMutex->pxMutexHolder == ( void * ) xTaskGetCurrentTaskHandle() ) /*lint !e961 Not a redundant cast as TaskHandle_t is a typedef. */
 80000dc0:	01812783          	lw	a5,24(sp)
 80000dc4:	0047a403          	lw	s0,4(a5)
 80000dc8:	600030ef          	jal	ra,800043c8 <xTaskGetCurrentTaskHandle>
 80000dcc:	00050793          	mv	a5,a0
 80000dd0:	04f41263          	bne	s0,a5,80000e14 <xQueueGiveMutexRecursive+0x7c>
+			/* uxRecursiveCallCount cannot be zero if pxMutexHolder is equal to
+			the task handle, therefore no underflow check is required.  Also,
+			uxRecursiveCallCount is only modified by the mutex holder, and as
+			there can only be one, no mutual exclusion is required to modify the
+			uxRecursiveCallCount member. */
+			( pxMutex->u.uxRecursiveCallCount )--;
 80000dd4:	01812783          	lw	a5,24(sp)
 80000dd8:	00c7a783          	lw	a5,12(a5)
 80000ddc:	fff78713          	addi	a4,a5,-1
 80000de0:	01812783          	lw	a5,24(sp)
 80000de4:	00e7a623          	sw	a4,12(a5)
+
+			/* Have we unwound the call count? */
+			if( pxMutex->u.uxRecursiveCallCount == ( UBaseType_t ) 0 )
 80000de8:	01812783          	lw	a5,24(sp)
 80000dec:	00c7a783          	lw	a5,12(a5)
 80000df0:	00079c63          	bnez	a5,80000e08 <xQueueGiveMutexRecursive+0x70>
+			{
+				/* Return the mutex.  This will automatically unblock any other
+				task that might be waiting to access the mutex. */
+				( void ) xQueueGenericSend( pxMutex, NULL, queueMUTEX_GIVE_BLOCK_TIME, queueSEND_TO_BACK );
 80000df4:	00000693          	li	a3,0
 80000df8:	00000613          	li	a2,0
 80000dfc:	00000593          	li	a1,0
 80000e00:	01812503          	lw	a0,24(sp)
 80000e04:	15c000ef          	jal	ra,80000f60 <xQueueGenericSend>
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+
+			xReturn = pdPASS;
 80000e08:	00100793          	li	a5,1
 80000e0c:	00f12e23          	sw	a5,28(sp)
 80000e10:	0080006f          	j	80000e18 <xQueueGiveMutexRecursive+0x80>
+		}
+		else
+		{
+			/* The mutex cannot be given because the calling task is not the
+			holder. */
+			xReturn = pdFAIL;
 80000e14:	00012e23          	sw	zero,28(sp)
+
+			traceGIVE_MUTEX_RECURSIVE_FAILED( pxMutex );
+		}
+
+		return xReturn;
 80000e18:	01c12783          	lw	a5,28(sp)
+	}
 80000e1c:	00078513          	mv	a0,a5
 80000e20:	02c12083          	lw	ra,44(sp)
 80000e24:	02812403          	lw	s0,40(sp)
@@ -968,45 +1680,82 @@ Disassembly of section .text:
 80000e2c:	00008067          	ret
 
 80000e30 <xQueueTakeMutexRecursive>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_RECURSIVE_MUTEXES == 1 )
+
+	BaseType_t xQueueTakeMutexRecursive( QueueHandle_t xMutex, TickType_t xTicksToWait )
+	{
 80000e30:	fd010113          	addi	sp,sp,-48
 80000e34:	02112623          	sw	ra,44(sp)
 80000e38:	02812423          	sw	s0,40(sp)
 80000e3c:	00a12623          	sw	a0,12(sp)
 80000e40:	00b12423          	sw	a1,8(sp)
+	BaseType_t xReturn;
+	Queue_t * const pxMutex = ( Queue_t * ) xMutex;
 80000e44:	00c12783          	lw	a5,12(sp)
 80000e48:	00f12c23          	sw	a5,24(sp)
+
+		configASSERT( pxMutex );
 80000e4c:	01812783          	lw	a5,24(sp)
 80000e50:	00079663          	bnez	a5,80000e5c <xQueueTakeMutexRecursive+0x2c>
-80000e54:	30047073          	csrci	mstatus,8
+80000e54:	30007073          	csrci	mstatus,0
 80000e58:	0000006f          	j	80000e58 <xQueueTakeMutexRecursive+0x28>
+		/* Comments regarding mutual exclusion as per those within
+		xQueueGiveMutexRecursive(). */
+
+		traceTAKE_MUTEX_RECURSIVE( pxMutex );
+
+		if( pxMutex->pxMutexHolder == ( void * ) xTaskGetCurrentTaskHandle() ) /*lint !e961 Cast is not redundant as TaskHandle_t is a typedef. */
 80000e5c:	01812783          	lw	a5,24(sp)
 80000e60:	0047a403          	lw	s0,4(a5)
 80000e64:	564030ef          	jal	ra,800043c8 <xTaskGetCurrentTaskHandle>
 80000e68:	00050793          	mv	a5,a0
 80000e6c:	02f41263          	bne	s0,a5,80000e90 <xQueueTakeMutexRecursive+0x60>
+		{
+			( pxMutex->u.uxRecursiveCallCount )++;
 80000e70:	01812783          	lw	a5,24(sp)
 80000e74:	00c7a783          	lw	a5,12(a5)
 80000e78:	00178713          	addi	a4,a5,1
 80000e7c:	01812783          	lw	a5,24(sp)
 80000e80:	00e7a623          	sw	a4,12(a5)
+			xReturn = pdPASS;
 80000e84:	00100793          	li	a5,1
 80000e88:	00f12e23          	sw	a5,28(sp)
 80000e8c:	03c0006f          	j	80000ec8 <xQueueTakeMutexRecursive+0x98>
+		}
+		else
+		{
+			xReturn = xQueueGenericReceive( pxMutex, NULL, xTicksToWait, pdFALSE );
 80000e90:	00000693          	li	a3,0
 80000e94:	00812603          	lw	a2,8(sp)
 80000e98:	00000593          	li	a1,0
 80000e9c:	01812503          	lw	a0,24(sp)
 80000ea0:	58c000ef          	jal	ra,8000142c <xQueueGenericReceive>
 80000ea4:	00a12e23          	sw	a0,28(sp)
+
+			/* pdPASS will only be returned if the mutex was successfully
+			obtained.  The calling task may have entered the Blocked state
+			before reaching here. */
+			if( xReturn == pdPASS )
 80000ea8:	01c12703          	lw	a4,28(sp)
 80000eac:	00100793          	li	a5,1
 80000eb0:	00f71c63          	bne	a4,a5,80000ec8 <xQueueTakeMutexRecursive+0x98>
+			{
+				( pxMutex->u.uxRecursiveCallCount )++;
 80000eb4:	01812783          	lw	a5,24(sp)
 80000eb8:	00c7a783          	lw	a5,12(a5)
 80000ebc:	00178713          	addi	a4,a5,1
 80000ec0:	01812783          	lw	a5,24(sp)
 80000ec4:	00e7a623          	sw	a4,12(a5)
+			{
+				traceTAKE_MUTEX_RECURSIVE_FAILED( pxMutex );
+			}
+		}
+
+		return xReturn;
 80000ec8:	01c12783          	lw	a5,28(sp)
+	}
 80000ecc:	00078513          	mv	a0,a5
 80000ed0:	02c12083          	lw	ra,44(sp)
 80000ed4:	02812403          	lw	s0,40(sp)
@@ -1014,53 +1763,89 @@ Disassembly of section .text:
 80000edc:	00008067          	ret
 
 80000ee0 <xQueueCreateCountingSemaphore>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_COUNTING_SEMAPHORES == 1 )
+
+	QueueHandle_t xQueueCreateCountingSemaphore( const UBaseType_t uxMaxCount, const UBaseType_t uxInitialCount )
+	{
 80000ee0:	fd010113          	addi	sp,sp,-48
 80000ee4:	02112623          	sw	ra,44(sp)
 80000ee8:	00a12623          	sw	a0,12(sp)
 80000eec:	00b12423          	sw	a1,8(sp)
+	QueueHandle_t xHandle;
+
+		configASSERT( uxMaxCount != 0 );
 80000ef0:	00c12783          	lw	a5,12(sp)
 80000ef4:	00079663          	bnez	a5,80000f00 <xQueueCreateCountingSemaphore+0x20>
-80000ef8:	30047073          	csrci	mstatus,8
+80000ef8:	30007073          	csrci	mstatus,0
 80000efc:	0000006f          	j	80000efc <xQueueCreateCountingSemaphore+0x1c>
+		configASSERT( uxInitialCount <= uxMaxCount );
 80000f00:	00812703          	lw	a4,8(sp)
 80000f04:	00c12783          	lw	a5,12(sp)
 80000f08:	00e7f663          	bleu	a4,a5,80000f14 <xQueueCreateCountingSemaphore+0x34>
-80000f0c:	30047073          	csrci	mstatus,8
+80000f0c:	30007073          	csrci	mstatus,0
 80000f10:	0000006f          	j	80000f10 <xQueueCreateCountingSemaphore+0x30>
+
+		xHandle = xQueueGenericCreate( uxMaxCount, queueSEMAPHORE_QUEUE_ITEM_LENGTH, queueQUEUE_TYPE_COUNTING_SEMAPHORE );
 80000f14:	00200613          	li	a2,2
 80000f18:	00000593          	li	a1,0
 80000f1c:	00c12503          	lw	a0,12(sp)
 80000f20:	cbdff0ef          	jal	ra,80000bdc <xQueueGenericCreate>
 80000f24:	00a12e23          	sw	a0,28(sp)
+
+		if( xHandle != NULL )
 80000f28:	01c12783          	lw	a5,28(sp)
 80000f2c:	00078863          	beqz	a5,80000f3c <xQueueCreateCountingSemaphore+0x5c>
+		{
+			( ( Queue_t * ) xHandle )->uxMessagesWaiting = uxInitialCount;
 80000f30:	01c12783          	lw	a5,28(sp)
 80000f34:	00812703          	lw	a4,8(sp)
 80000f38:	02e7ac23          	sw	a4,56(a5)
+		else
+		{
+			traceCREATE_COUNTING_SEMAPHORE_FAILED();
+		}
+
+		configASSERT( xHandle );
 80000f3c:	01c12783          	lw	a5,28(sp)
 80000f40:	00079663          	bnez	a5,80000f4c <xQueueCreateCountingSemaphore+0x6c>
-80000f44:	30047073          	csrci	mstatus,8
+80000f44:	30007073          	csrci	mstatus,0
 80000f48:	0000006f          	j	80000f48 <xQueueCreateCountingSemaphore+0x68>
+		return xHandle;
 80000f4c:	01c12783          	lw	a5,28(sp)
+	}
 80000f50:	00078513          	mv	a0,a5
 80000f54:	02c12083          	lw	ra,44(sp)
 80000f58:	03010113          	addi	sp,sp,48
 80000f5c:	00008067          	ret
 
 80000f60 <xQueueGenericSend>:
+
+#endif /* configUSE_COUNTING_SEMAPHORES */
+/*-----------------------------------------------------------*/
+
+BaseType_t xQueueGenericSend( QueueHandle_t xQueue, const void * const pvItemToQueue, TickType_t xTicksToWait, const BaseType_t xCopyPosition )
+{
 80000f60:	fc010113          	addi	sp,sp,-64
 80000f64:	02112e23          	sw	ra,60(sp)
 80000f68:	00a12623          	sw	a0,12(sp)
 80000f6c:	00b12423          	sw	a1,8(sp)
 80000f70:	00c12223          	sw	a2,4(sp)
 80000f74:	00d12023          	sw	a3,0(sp)
+BaseType_t xEntryTimeSet = pdFALSE, xYieldRequired;
 80000f78:	02012623          	sw	zero,44(sp)
+TimeOut_t xTimeOut;
+Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 80000f7c:	00c12783          	lw	a5,12(sp)
 80000f80:	02f12423          	sw	a5,40(sp)
+
+	configASSERT( pxQueue );
 80000f84:	02812783          	lw	a5,40(sp)
 80000f88:	00079663          	bnez	a5,80000f94 <xQueueGenericSend+0x34>
-80000f8c:	30047073          	csrci	mstatus,8
+80000f8c:	30007073          	csrci	mstatus,0
 80000f90:	0000006f          	j	80000f90 <xQueueGenericSend+0x30>
+	configASSERT( !( ( pvItemToQueue == NULL ) && ( pxQueue->uxItemSize != ( UBaseType_t ) 0U ) ) );
 80000f94:	00812783          	lw	a5,8(sp)
 80000f98:	00079863          	bnez	a5,80000fa8 <xQueueGenericSend+0x48>
 80000f9c:	02812783          	lw	a5,40(sp)
@@ -1070,8 +1855,9 @@ Disassembly of section .text:
 80000fac:	0080006f          	j	80000fb4 <xQueueGenericSend+0x54>
 80000fb0:	00000793          	li	a5,0
 80000fb4:	00079663          	bnez	a5,80000fc0 <xQueueGenericSend+0x60>
-80000fb8:	30047073          	csrci	mstatus,8
+80000fb8:	30007073          	csrci	mstatus,0
 80000fbc:	0000006f          	j	80000fbc <xQueueGenericSend+0x5c>
+	configASSERT( !( ( xCopyPosition == queueOVERWRITE ) && ( pxQueue->uxLength != 1 ) ) );
 80000fc0:	00012703          	lw	a4,0(sp)
 80000fc4:	00200793          	li	a5,2
 80000fc8:	00f71a63          	bne	a4,a5,80000fdc <xQueueGenericSend+0x7c>
@@ -1083,8 +1869,11 @@ Disassembly of section .text:
 80000fe0:	0080006f          	j	80000fe8 <xQueueGenericSend+0x88>
 80000fe4:	00000793          	li	a5,0
 80000fe8:	00079663          	bnez	a5,80000ff4 <xQueueGenericSend+0x94>
-80000fec:	30047073          	csrci	mstatus,8
+80000fec:	30007073          	csrci	mstatus,0
 80000ff0:	0000006f          	j	80000ff0 <xQueueGenericSend+0x90>
+	#if ( ( INCLUDE_xTaskGetSchedulerState == 1 ) || ( configUSE_TIMERS == 1 ) )
+	{
+		configASSERT( !( ( xTaskGetSchedulerState() == taskSCHEDULER_SUSPENDED ) && ( xTicksToWait != 0 ) ) );
 80000ff4:	3f8030ef          	jal	ra,800043ec <xTaskGetSchedulerState>
 80000ff8:	00050793          	mv	a5,a0
 80000ffc:	00079663          	bnez	a5,80001008 <xQueueGenericSend+0xa8>
@@ -1094,9 +1883,21 @@ Disassembly of section .text:
 8000100c:	0080006f          	j	80001014 <xQueueGenericSend+0xb4>
 80001010:	00000793          	li	a5,0
 80001014:	00079663          	bnez	a5,80001020 <xQueueGenericSend+0xc0>
-80001018:	30047073          	csrci	mstatus,8
+80001018:	30007073          	csrci	mstatus,0
 8000101c:	0000006f          	j	8000101c <xQueueGenericSend+0xbc>
+	/* This function relaxes the coding standard somewhat to allow return
+	statements within the function itself.  This is done in the interest
+	of execution time efficiency. */
+	for( ;; )
+	{
+		taskENTER_CRITICAL();
 80001020:	6b4030ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			/* Is there room on the queue now?  The running task must be the
+			highest priority task wanting to access the queue.  If the head item
+			in the queue is to be overwritten then it does not matter if the
+			queue is full. */
+			if( ( pxQueue->uxMessagesWaiting < pxQueue->uxLength ) || ( xCopyPosition == queueOVERWRITE ) )
 80001024:	02812783          	lw	a5,40(sp)
 80001028:	0387a703          	lw	a4,56(a5)
 8000102c:	02812783          	lw	a5,40(sp)
@@ -1105,14 +1906,25 @@ Disassembly of section .text:
 80001038:	00012703          	lw	a4,0(sp)
 8000103c:	00200793          	li	a5,2
 80001040:	06f71063          	bne	a4,a5,800010a0 <xQueueGenericSend+0x140>
+			{
+				traceQUEUE_SEND( pxQueue );
+				xYieldRequired = prvCopyDataToQueue( pxQueue, pvItemToQueue, xCopyPosition );
 80001044:	00012603          	lw	a2,0(sp)
 80001048:	00812583          	lw	a1,8(sp)
 8000104c:	02812503          	lw	a0,40(sp)
 80001050:	1c1000ef          	jal	ra,80001a10 <prvCopyDataToQueue>
 80001054:	02a12223          	sw	a0,36(sp)
+				}
+				#else /* configUSE_QUEUE_SETS */
+				{
+					/* If there was a task waiting for data to arrive on the
+					queue then unblock it now. */
+					if( listLIST_IS_EMPTY( &( pxQueue->xTasksWaitingToReceive ) ) == pdFALSE )
 80001058:	02812783          	lw	a5,40(sp)
 8000105c:	0247a783          	lw	a5,36(a5)
 80001060:	02078463          	beqz	a5,80001088 <xQueueGenericSend+0x128>
+					{
+						if( xTaskRemoveFromEventList( &( pxQueue->xTasksWaitingToReceive ) ) == pdTRUE )
 80001064:	02812783          	lw	a5,40(sp)
 80001068:	02478793          	addi	a5,a5,36
 8000106c:	00078513          	mv	a0,a5
@@ -1120,28 +1932,85 @@ Disassembly of section .text:
 80001074:	00050713          	mv	a4,a0
 80001078:	00100793          	li	a5,1
 8000107c:	00f71c63          	bne	a4,a5,80001094 <xQueueGenericSend+0x134>
+						{
+							/* The unblocked task has a priority higher than
+							our own so yield immediately.  Yes it is ok to do
+							this from within the critical section - the kernel
+							takes care of that. */
+							queueYIELD_IF_USING_PREEMPTION();
 80001080:	d14ff0ef          	jal	ra,80000594 <vPortYield>
 80001084:	0100006f          	j	80001094 <xQueueGenericSend+0x134>
+						else
+						{
+							mtCOVERAGE_TEST_MARKER();
+						}
+					}
+					else if( xYieldRequired != pdFALSE )
 80001088:	02412783          	lw	a5,36(sp)
 8000108c:	00078463          	beqz	a5,80001094 <xQueueGenericSend+0x134>
+					{
+						/* This path is a special case that will only get
+						executed if the task was holding multiple mutexes and
+						the mutexes were given back in an order that is
+						different to that in which they were taken. */
+						queueYIELD_IF_USING_PREEMPTION();
 80001090:	d04ff0ef          	jal	ra,80000594 <vPortYield>
+						mtCOVERAGE_TEST_MARKER();
+					}
+				}
+				#endif /* configUSE_QUEUE_SETS */
+
+				taskEXIT_CRITICAL();
 80001094:	680030ef          	jal	ra,80004714 <vTaskExitCritical>
+				return pdPASS;
 80001098:	00100793          	li	a5,1
 8000109c:	0f40006f          	j	80001190 <xQueueGenericSend+0x230>
+			}
+			else
+			{
+				if( xTicksToWait == ( TickType_t ) 0 )
 800010a0:	00412783          	lw	a5,4(sp)
 800010a4:	00079863          	bnez	a5,800010b4 <xQueueGenericSend+0x154>
+				{
+					/* The queue was full and no block time is specified (or
+					the block time has expired) so leave now. */
+					taskEXIT_CRITICAL();
 800010a8:	66c030ef          	jal	ra,80004714 <vTaskExitCritical>
+
+					/* Return to the original privilege level before exiting
+					the function. */
+					traceQUEUE_SEND_FAILED( pxQueue );
+					return errQUEUE_FULL;
 800010ac:	00000793          	li	a5,0
 800010b0:	0e00006f          	j	80001190 <xQueueGenericSend+0x230>
+				}
+				else if( xEntryTimeSet == pdFALSE )
 800010b4:	02c12783          	lw	a5,44(sp)
 800010b8:	00079c63          	bnez	a5,800010d0 <xQueueGenericSend+0x170>
+				{
+					/* The queue was full and a block time was specified so
+					configure the timeout structure. */
+					vTaskSetTimeOutState( &xTimeOut );
 800010bc:	01c10793          	addi	a5,sp,28
 800010c0:	00078513          	mv	a0,a5
 800010c4:	1d5020ef          	jal	ra,80003a98 <vTaskSetTimeOutState>
+					xEntryTimeSet = pdTRUE;
 800010c8:	00100793          	li	a5,1
 800010cc:	02f12623          	sw	a5,44(sp)
+					/* Entry time was already set. */
+					mtCOVERAGE_TEST_MARKER();
+				}
+			}
+		}
+		taskEXIT_CRITICAL();
 800010d0:	644030ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		/* Interrupts and other tasks can send to and receive from the queue
+		now the critical section has been exited. */
+
+		vTaskSuspendAll();
 800010d4:	49d010ef          	jal	ra,80002d70 <vTaskSuspendAll>
+		prvLockQueue( pxQueue );
 800010d8:	5fc030ef          	jal	ra,800046d4 <vTaskEnterCritical>
 800010dc:	02812783          	lw	a5,40(sp)
 800010e0:	0447a703          	lw	a4,68(a5)
@@ -1156,6 +2025,9 @@ Disassembly of section .text:
 80001104:	02812783          	lw	a5,40(sp)
 80001108:	0407a423          	sw	zero,72(a5)
 8000110c:	608030ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		/* Update the timeout state to see if it has expired yet. */
+		if( xTaskCheckForTimeOut( &xTimeOut, &xTicksToWait ) == pdFALSE )
 80001110:	00410713          	addi	a4,sp,4
 80001114:	01c10793          	addi	a5,sp,28
 80001118:	00070593          	mv	a1,a4
@@ -1163,49 +2035,102 @@ Disassembly of section .text:
 80001120:	1c5020ef          	jal	ra,80003ae4 <xTaskCheckForTimeOut>
 80001124:	00050793          	mv	a5,a0
 80001128:	04079c63          	bnez	a5,80001180 <xQueueGenericSend+0x220>
+		{
+			if( prvIsQueueFull( pxQueue ) != pdFALSE )
 8000112c:	02812503          	lw	a0,40(sp)
 80001130:	465000ef          	jal	ra,80001d94 <prvIsQueueFull>
 80001134:	00050793          	mv	a5,a0
 80001138:	02078c63          	beqz	a5,80001170 <xQueueGenericSend+0x210>
+			{
+				traceBLOCKING_ON_QUEUE_SEND( pxQueue );
+				vTaskPlaceOnEventList( &( pxQueue->xTasksWaitingToSend ), xTicksToWait );
 8000113c:	02812783          	lw	a5,40(sp)
 80001140:	01078793          	addi	a5,a5,16
 80001144:	00412703          	lw	a4,4(sp)
 80001148:	00070593          	mv	a1,a4
 8000114c:	00078513          	mv	a0,a5
 80001150:	4a0020ef          	jal	ra,800035f0 <vTaskPlaceOnEventList>
+				/* Unlocking the queue means queue events can effect the
+				event list.  It is possible	that interrupts occurring now
+				remove this task from the event	list again - but as the
+				scheduler is suspended the task will go onto the pending
+				ready last instead of the actual ready list. */
+				prvUnlockQueue( pxQueue );
 80001154:	02812503          	lw	a0,40(sp)
 80001158:	2c9000ef          	jal	ra,80001c20 <prvUnlockQueue>
+				/* Resuming the scheduler will move tasks from the pending
+				ready list into the ready list - so it is feasible that this
+				task is already in a ready list before it yields - in which
+				case the yield will not cause a context switch unless there
+				is also a higher priority task in the pending ready list. */
+				if( xTaskResumeAll() == pdFALSE )
 8000115c:	439010ef          	jal	ra,80002d94 <xTaskResumeAll>
 80001160:	00050793          	mv	a5,a0
 80001164:	ea079ee3          	bnez	a5,80001020 <xQueueGenericSend+0xc0>
+				{
+					portYIELD_WITHIN_API();
 80001168:	c2cff0ef          	jal	ra,80000594 <vPortYield>
 8000116c:	eb5ff06f          	j	80001020 <xQueueGenericSend+0xc0>
+				}
+			}
+			else
+			{
+				/* Try again. */
+				prvUnlockQueue( pxQueue );
 80001170:	02812503          	lw	a0,40(sp)
 80001174:	2ad000ef          	jal	ra,80001c20 <prvUnlockQueue>
+				( void ) xTaskResumeAll();
 80001178:	41d010ef          	jal	ra,80002d94 <xTaskResumeAll>
 8000117c:	ea5ff06f          	j	80001020 <xQueueGenericSend+0xc0>
+			}
+		}
+		else
+		{
+			/* The timeout has expired. */
+			prvUnlockQueue( pxQueue );
 80001180:	02812503          	lw	a0,40(sp)
 80001184:	29d000ef          	jal	ra,80001c20 <prvUnlockQueue>
+			( void ) xTaskResumeAll();
 80001188:	40d010ef          	jal	ra,80002d94 <xTaskResumeAll>
+
+			/* Return to the original privilege level before exiting the
+			function. */
+			traceQUEUE_SEND_FAILED( pxQueue );
+			return errQUEUE_FULL;
 8000118c:	00000793          	li	a5,0
+		}
+	}
+}
 80001190:	00078513          	mv	a0,a5
 80001194:	03c12083          	lw	ra,60(sp)
 80001198:	04010113          	addi	sp,sp,64
 8000119c:	00008067          	ret
 
 800011a0 <xQueueGenericSendFromISR>:
+
+#endif /* configUSE_ALTERNATIVE_API */
+/*-----------------------------------------------------------*/
+
+BaseType_t xQueueGenericSendFromISR( QueueHandle_t xQueue, const void * const pvItemToQueue, BaseType_t * const pxHigherPriorityTaskWoken, const BaseType_t xCopyPosition )
+{
 800011a0:	fd010113          	addi	sp,sp,-48
 800011a4:	02112623          	sw	ra,44(sp)
 800011a8:	00a12623          	sw	a0,12(sp)
 800011ac:	00b12423          	sw	a1,8(sp)
 800011b0:	00c12223          	sw	a2,4(sp)
 800011b4:	00d12023          	sw	a3,0(sp)
+BaseType_t xReturn;
+UBaseType_t uxSavedInterruptStatus;
+Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 800011b8:	00c12783          	lw	a5,12(sp)
 800011bc:	00f12c23          	sw	a5,24(sp)
+
+	configASSERT( pxQueue );
 800011c0:	01812783          	lw	a5,24(sp)
 800011c4:	00079663          	bnez	a5,800011d0 <xQueueGenericSendFromISR+0x30>
-800011c8:	30047073          	csrci	mstatus,8
+800011c8:	30007073          	csrci	mstatus,0
 800011cc:	0000006f          	j	800011cc <xQueueGenericSendFromISR+0x2c>
+	configASSERT( !( ( pvItemToQueue == NULL ) && ( pxQueue->uxItemSize != ( UBaseType_t ) 0U ) ) );
 800011d0:	00812783          	lw	a5,8(sp)
 800011d4:	00079863          	bnez	a5,800011e4 <xQueueGenericSendFromISR+0x44>
 800011d8:	01812783          	lw	a5,24(sp)
@@ -1215,8 +2140,9 @@ Disassembly of section .text:
 800011e8:	0080006f          	j	800011f0 <xQueueGenericSendFromISR+0x50>
 800011ec:	00000793          	li	a5,0
 800011f0:	00079663          	bnez	a5,800011fc <xQueueGenericSendFromISR+0x5c>
-800011f4:	30047073          	csrci	mstatus,8
+800011f4:	30007073          	csrci	mstatus,0
 800011f8:	0000006f          	j	800011f8 <xQueueGenericSendFromISR+0x58>
+	configASSERT( !( ( xCopyPosition == queueOVERWRITE ) && ( pxQueue->uxLength != 1 ) ) );
 800011fc:	00012703          	lw	a4,0(sp)
 80001200:	00200793          	li	a5,2
 80001204:	00f71a63          	bne	a4,a5,80001218 <xQueueGenericSendFromISR+0x78>
@@ -1228,11 +2154,19 @@ Disassembly of section .text:
 8000121c:	0080006f          	j	80001224 <xQueueGenericSendFromISR+0x84>
 80001220:	00000793          	li	a5,0
 80001224:	00079663          	bnez	a5,80001230 <xQueueGenericSendFromISR+0x90>
-80001228:	30047073          	csrci	mstatus,8
+80001228:	30007073          	csrci	mstatus,0
 8000122c:	0000006f          	j	8000122c <xQueueGenericSendFromISR+0x8c>
+	/* Similar to xQueueGenericSend, except without blocking if there is no room
+	in the queue.  Also don't directly wake a task that was blocked on a queue
+	read, instead return a flag to say whether a context switch is required or
+	not (i.e. has a task with a higher priority than us been woken by this
+	post). */
+	uxSavedInterruptStatus = portSET_INTERRUPT_MASK_FROM_ISR();
 80001230:	d74ff0ef          	jal	ra,800007a4 <vPortSetInterruptMask>
 80001234:	00050793          	mv	a5,a0
 80001238:	00f12a23          	sw	a5,20(sp)
+	{
+		if( ( pxQueue->uxMessagesWaiting < pxQueue->uxLength ) || ( xCopyPosition == queueOVERWRITE ) )
 8000123c:	01812783          	lw	a5,24(sp)
 80001240:	0387a703          	lw	a4,56(a5)
 80001244:	01812783          	lw	a5,24(sp)
@@ -1241,63 +2175,129 @@ Disassembly of section .text:
 80001250:	00012703          	lw	a4,0(sp)
 80001254:	00200793          	li	a5,2
 80001258:	08f71063          	bne	a4,a5,800012d8 <xQueueGenericSendFromISR+0x138>
+			/* Semaphores use xQueueGiveFromISR(), so pxQueue will not be a
+			semaphore or mutex.  That means prvCopyDataToQueue() cannot result
+			in a task disinheriting a priority and prvCopyDataToQueue() can be
+			called here even though the disinherit function does not check if
+			the scheduler is suspended before accessing the ready lists. */
+			( void ) prvCopyDataToQueue( pxQueue, pvItemToQueue, xCopyPosition );
 8000125c:	00012603          	lw	a2,0(sp)
 80001260:	00812583          	lw	a1,8(sp)
 80001264:	01812503          	lw	a0,24(sp)
 80001268:	7a8000ef          	jal	ra,80001a10 <prvCopyDataToQueue>
+
+			/* The event list is not altered if the queue is locked.  This will
+			be done when the queue is unlocked later. */
+			if( pxQueue->xTxLock == queueUNLOCKED )
 8000126c:	01812783          	lw	a5,24(sp)
 80001270:	0487a703          	lw	a4,72(a5)
 80001274:	fff00793          	li	a5,-1
 80001278:	04f71063          	bne	a4,a5,800012b8 <xQueueGenericSendFromISR+0x118>
+						}
+					}
+				}
+				#else /* configUSE_QUEUE_SETS */
+				{
+					if( listLIST_IS_EMPTY( &( pxQueue->xTasksWaitingToReceive ) ) == pdFALSE )
 8000127c:	01812783          	lw	a5,24(sp)
 80001280:	0247a783          	lw	a5,36(a5)
 80001284:	04078463          	beqz	a5,800012cc <xQueueGenericSendFromISR+0x12c>
+					{
+						if( xTaskRemoveFromEventList( &( pxQueue->xTasksWaitingToReceive ) ) != pdFALSE )
 80001288:	01812783          	lw	a5,24(sp)
 8000128c:	02478793          	addi	a5,a5,36
 80001290:	00078513          	mv	a0,a5
 80001294:	5b4020ef          	jal	ra,80003848 <xTaskRemoveFromEventList>
 80001298:	00050793          	mv	a5,a0
 8000129c:	02078863          	beqz	a5,800012cc <xQueueGenericSendFromISR+0x12c>
+						{
+							/* The task waiting has a higher priority so record that a
+							context	switch is required. */
+							if( pxHigherPriorityTaskWoken != NULL )
 800012a0:	00412783          	lw	a5,4(sp)
 800012a4:	02078463          	beqz	a5,800012cc <xQueueGenericSendFromISR+0x12c>
+							{
+								*pxHigherPriorityTaskWoken = pdTRUE;
 800012a8:	00412783          	lw	a5,4(sp)
 800012ac:	00100713          	li	a4,1
 800012b0:	00e7a023          	sw	a4,0(a5)
 800012b4:	0180006f          	j	800012cc <xQueueGenericSendFromISR+0x12c>
+			}
+			else
+			{
+				/* Increment the lock count so the task that unlocks the queue
+				knows that data was posted while it was locked. */
+				++( pxQueue->xTxLock );
 800012b8:	01812783          	lw	a5,24(sp)
 800012bc:	0487a783          	lw	a5,72(a5)
 800012c0:	00178713          	addi	a4,a5,1
 800012c4:	01812783          	lw	a5,24(sp)
 800012c8:	04e7a423          	sw	a4,72(a5)
+			}
+
+			xReturn = pdPASS;
 800012cc:	00100793          	li	a5,1
 800012d0:	00f12e23          	sw	a5,28(sp)
 800012d4:	0080006f          	j	800012dc <xQueueGenericSendFromISR+0x13c>
+		}
+		else
+		{
+			traceQUEUE_SEND_FROM_ISR_FAILED( pxQueue );
+			xReturn = errQUEUE_FULL;
 800012d8:	00012e23          	sw	zero,28(sp)
+		}
+	}
+	portCLEAR_INTERRUPT_MASK_FROM_ISR( uxSavedInterruptStatus );
 800012dc:	01412783          	lw	a5,20(sp)
 800012e0:	00078513          	mv	a0,a5
 800012e4:	ca4ff0ef          	jal	ra,80000788 <vPortClearInterruptMask>
+
+	return xReturn;
 800012e8:	01c12783          	lw	a5,28(sp)
+}
 800012ec:	00078513          	mv	a0,a5
 800012f0:	02c12083          	lw	ra,44(sp)
 800012f4:	03010113          	addi	sp,sp,48
 800012f8:	00008067          	ret
 
 800012fc <xQueueGiveFromISR>:
+/*-----------------------------------------------------------*/
+
+BaseType_t xQueueGiveFromISR( QueueHandle_t xQueue, BaseType_t * const pxHigherPriorityTaskWoken )
+{
 800012fc:	fd010113          	addi	sp,sp,-48
 80001300:	02112623          	sw	ra,44(sp)
 80001304:	00a12623          	sw	a0,12(sp)
 80001308:	00b12423          	sw	a1,8(sp)
+BaseType_t xReturn;
+UBaseType_t uxSavedInterruptStatus;
+Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 8000130c:	00c12783          	lw	a5,12(sp)
 80001310:	00f12c23          	sw	a5,24(sp)
+	item size is 0.  Don't directly wake a task that was blocked on a queue
+	read, instead return a flag to say whether a context switch is required or
+	not (i.e. has a task with a higher priority than us been woken by this
+	post). */
+
+	configASSERT( pxQueue );
 80001314:	01812783          	lw	a5,24(sp)
 80001318:	00079663          	bnez	a5,80001324 <xQueueGiveFromISR+0x28>
-8000131c:	30047073          	csrci	mstatus,8
+8000131c:	30007073          	csrci	mstatus,0
 80001320:	0000006f          	j	80001320 <xQueueGiveFromISR+0x24>
+
+	/* xQueueGenericSendFromISR() should be used instead of xQueueGiveFromISR()
+	if the item size is not 0. */
+	configASSERT( pxQueue->uxItemSize == 0 );
 80001324:	01812783          	lw	a5,24(sp)
 80001328:	0407a783          	lw	a5,64(a5)
 8000132c:	00078663          	beqz	a5,80001338 <xQueueGiveFromISR+0x3c>
-80001330:	30047073          	csrci	mstatus,8
+80001330:	30007073          	csrci	mstatus,0
 80001334:	0000006f          	j	80001334 <xQueueGiveFromISR+0x38>
+
+	/* Normally a mutex would not be given from an interrupt, especially if
+	there is a mutex holder, as priority inheritance makes no sense for an
+	interrupts, only tasks. */
+	configASSERT( !( ( pxQueue->uxQueueType == queueQUEUE_IS_MUTEX ) && ( pxQueue->pxMutexHolder != NULL ) ) );
 80001338:	01812783          	lw	a5,24(sp)
 8000133c:	0007a783          	lw	a5,0(a5)
 80001340:	00079863          	bnez	a5,80001350 <xQueueGiveFromISR+0x54>
@@ -1308,72 +2308,138 @@ Disassembly of section .text:
 80001354:	0080006f          	j	8000135c <xQueueGiveFromISR+0x60>
 80001358:	00000793          	li	a5,0
 8000135c:	00079663          	bnez	a5,80001368 <xQueueGiveFromISR+0x6c>
-80001360:	30047073          	csrci	mstatus,8
+80001360:	30007073          	csrci	mstatus,0
 80001364:	0000006f          	j	80001364 <xQueueGiveFromISR+0x68>
+	safe API to ensure interrupt entry is as fast and as simple as possible.
+	More information (albeit Cortex-M specific) is provided on the following
+	link: http://www.freertos.org/RTOS-Cortex-M3-M4.html */
+	portASSERT_IF_INTERRUPT_PRIORITY_INVALID();
+
+	uxSavedInterruptStatus = portSET_INTERRUPT_MASK_FROM_ISR();
 80001368:	c3cff0ef          	jal	ra,800007a4 <vPortSetInterruptMask>
 8000136c:	00050793          	mv	a5,a0
 80001370:	00f12a23          	sw	a5,20(sp)
+	{
+		/* When the queue is used to implement a semaphore no data is ever
+		moved through the queue but it is still valid to see if the queue 'has
+		space'. */
+		if( pxQueue->uxMessagesWaiting < pxQueue->uxLength )
 80001374:	01812783          	lw	a5,24(sp)
 80001378:	0387a703          	lw	a4,56(a5)
 8000137c:	01812783          	lw	a5,24(sp)
 80001380:	03c7a783          	lw	a5,60(a5)
 80001384:	08f77263          	bleu	a5,a4,80001408 <xQueueGiveFromISR+0x10c>
+			holder - and if there is a mutex holder then the mutex cannot be
+			given from an ISR.  As this is the ISR version of the function it
+			can be assumed there is no mutex holder and no need to determine if
+			priority disinheritance is needed.  Simply increase the count of
+			messages (semaphores) available. */
+			++( pxQueue->uxMessagesWaiting );
 80001388:	01812783          	lw	a5,24(sp)
 8000138c:	0387a783          	lw	a5,56(a5)
 80001390:	00178713          	addi	a4,a5,1
 80001394:	01812783          	lw	a5,24(sp)
 80001398:	02e7ac23          	sw	a4,56(a5)
+
+			/* The event list is not altered if the queue is locked.  This will
+			be done when the queue is unlocked later. */
+			if( pxQueue->xTxLock == queueUNLOCKED )
 8000139c:	01812783          	lw	a5,24(sp)
 800013a0:	0487a703          	lw	a4,72(a5)
 800013a4:	fff00793          	li	a5,-1
 800013a8:	04f71063          	bne	a4,a5,800013e8 <xQueueGiveFromISR+0xec>
+						}
+					}
+				}
+				#else /* configUSE_QUEUE_SETS */
+				{
+					if( listLIST_IS_EMPTY( &( pxQueue->xTasksWaitingToReceive ) ) == pdFALSE )
 800013ac:	01812783          	lw	a5,24(sp)
 800013b0:	0247a783          	lw	a5,36(a5)
 800013b4:	04078463          	beqz	a5,800013fc <xQueueGiveFromISR+0x100>
+					{
+						if( xTaskRemoveFromEventList( &( pxQueue->xTasksWaitingToReceive ) ) != pdFALSE )
 800013b8:	01812783          	lw	a5,24(sp)
 800013bc:	02478793          	addi	a5,a5,36
 800013c0:	00078513          	mv	a0,a5
 800013c4:	484020ef          	jal	ra,80003848 <xTaskRemoveFromEventList>
 800013c8:	00050793          	mv	a5,a0
 800013cc:	02078863          	beqz	a5,800013fc <xQueueGiveFromISR+0x100>
+						{
+							/* The task waiting has a higher priority so record that a
+							context	switch is required. */
+							if( pxHigherPriorityTaskWoken != NULL )
 800013d0:	00812783          	lw	a5,8(sp)
 800013d4:	02078463          	beqz	a5,800013fc <xQueueGiveFromISR+0x100>
+							{
+								*pxHigherPriorityTaskWoken = pdTRUE;
 800013d8:	00812783          	lw	a5,8(sp)
 800013dc:	00100713          	li	a4,1
 800013e0:	00e7a023          	sw	a4,0(a5)
 800013e4:	0180006f          	j	800013fc <xQueueGiveFromISR+0x100>
+			}
+			else
+			{
+				/* Increment the lock count so the task that unlocks the queue
+				knows that data was posted while it was locked. */
+				++( pxQueue->xTxLock );
 800013e8:	01812783          	lw	a5,24(sp)
 800013ec:	0487a783          	lw	a5,72(a5)
 800013f0:	00178713          	addi	a4,a5,1
 800013f4:	01812783          	lw	a5,24(sp)
 800013f8:	04e7a423          	sw	a4,72(a5)
+			}
+
+			xReturn = pdPASS;
 800013fc:	00100793          	li	a5,1
 80001400:	00f12e23          	sw	a5,28(sp)
 80001404:	0080006f          	j	8000140c <xQueueGiveFromISR+0x110>
+		}
+		else
+		{
+			traceQUEUE_SEND_FROM_ISR_FAILED( pxQueue );
+			xReturn = errQUEUE_FULL;
 80001408:	00012e23          	sw	zero,28(sp)
+		}
+	}
+	portCLEAR_INTERRUPT_MASK_FROM_ISR( uxSavedInterruptStatus );
 8000140c:	01412783          	lw	a5,20(sp)
 80001410:	00078513          	mv	a0,a5
 80001414:	b74ff0ef          	jal	ra,80000788 <vPortClearInterruptMask>
+
+	return xReturn;
 80001418:	01c12783          	lw	a5,28(sp)
+}
 8000141c:	00078513          	mv	a0,a5
 80001420:	02c12083          	lw	ra,44(sp)
 80001424:	03010113          	addi	sp,sp,48
 80001428:	00008067          	ret
 
 8000142c <xQueueGenericReceive>:
+/*-----------------------------------------------------------*/
+
+BaseType_t xQueueGenericReceive( QueueHandle_t xQueue, void * const pvBuffer, TickType_t xTicksToWait, const BaseType_t xJustPeeking )
+{
 8000142c:	fc010113          	addi	sp,sp,-64
 80001430:	02112e23          	sw	ra,60(sp)
 80001434:	00a12623          	sw	a0,12(sp)
 80001438:	00b12423          	sw	a1,8(sp)
 8000143c:	00c12223          	sw	a2,4(sp)
 80001440:	00d12023          	sw	a3,0(sp)
+BaseType_t xEntryTimeSet = pdFALSE;
 80001444:	02012623          	sw	zero,44(sp)
+TimeOut_t xTimeOut;
+int8_t *pcOriginalReadPosition;
+Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 80001448:	00c12783          	lw	a5,12(sp)
 8000144c:	02f12423          	sw	a5,40(sp)
+
+	configASSERT( pxQueue );
 80001450:	02812783          	lw	a5,40(sp)
 80001454:	00079663          	bnez	a5,80001460 <xQueueGenericReceive+0x34>
-80001458:	30047073          	csrci	mstatus,8
+80001458:	30007073          	csrci	mstatus,0
 8000145c:	0000006f          	j	8000145c <xQueueGenericReceive+0x30>
+	configASSERT( !( ( pvBuffer == NULL ) && ( pxQueue->uxItemSize != ( UBaseType_t ) 0U ) ) );
 80001460:	00812783          	lw	a5,8(sp)
 80001464:	00079863          	bnez	a5,80001474 <xQueueGenericReceive+0x48>
 80001468:	02812783          	lw	a5,40(sp)
@@ -1383,8 +2449,11 @@ Disassembly of section .text:
 80001478:	0080006f          	j	80001480 <xQueueGenericReceive+0x54>
 8000147c:	00000793          	li	a5,0
 80001480:	00079663          	bnez	a5,8000148c <xQueueGenericReceive+0x60>
-80001484:	30047073          	csrci	mstatus,8
+80001484:	30007073          	csrci	mstatus,0
 80001488:	0000006f          	j	80001488 <xQueueGenericReceive+0x5c>
+	#if ( ( INCLUDE_xTaskGetSchedulerState == 1 ) || ( configUSE_TIMERS == 1 ) )
+	{
+		configASSERT( !( ( xTaskGetSchedulerState() == taskSCHEDULER_SUSPENDED ) && ( xTicksToWait != 0 ) ) );
 8000148c:	761020ef          	jal	ra,800043ec <xTaskGetSchedulerState>
 80001490:	00050793          	mv	a5,a0
 80001494:	00079663          	bnez	a5,800014a0 <xQueueGenericReceive+0x74>
@@ -1394,35 +2463,74 @@ Disassembly of section .text:
 800014a4:	0080006f          	j	800014ac <xQueueGenericReceive+0x80>
 800014a8:	00000793          	li	a5,0
 800014ac:	00079663          	bnez	a5,800014b8 <xQueueGenericReceive+0x8c>
-800014b0:	30047073          	csrci	mstatus,8
+800014b0:	30007073          	csrci	mstatus,0
 800014b4:	0000006f          	j	800014b4 <xQueueGenericReceive+0x88>
+	statements within the function itself.  This is done in the interest
+	of execution time efficiency. */
+
+	for( ;; )
+	{
+		taskENTER_CRITICAL();
 800014b8:	21c030ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			/* Is there data in the queue now?  To be running the calling task
+			must be	the highest priority task wanting to access the queue. */
+			if( pxQueue->uxMessagesWaiting > ( UBaseType_t ) 0 )
 800014bc:	02812783          	lw	a5,40(sp)
 800014c0:	0387a783          	lw	a5,56(a5)
 800014c4:	0c078263          	beqz	a5,80001588 <xQueueGenericReceive+0x15c>
+			{
+				/* Remember the read position in case the queue is only being
+				peeked. */
+				pcOriginalReadPosition = pxQueue->u.pcReadFrom;
 800014c8:	02812783          	lw	a5,40(sp)
 800014cc:	00c7a783          	lw	a5,12(a5)
 800014d0:	02f12223          	sw	a5,36(sp)
+
+				prvCopyDataFromQueue( pxQueue, pvBuffer );
 800014d4:	00812583          	lw	a1,8(sp)
 800014d8:	02812503          	lw	a0,40(sp)
 800014dc:	6b8000ef          	jal	ra,80001b94 <prvCopyDataFromQueue>
+
+				if( xJustPeeking == pdFALSE )
 800014e0:	00012783          	lw	a5,0(sp)
 800014e4:	06079263          	bnez	a5,80001548 <xQueueGenericReceive+0x11c>
+				{
+					traceQUEUE_RECEIVE( pxQueue );
+
+					/* Actually removing data, not just peeking. */
+					--( pxQueue->uxMessagesWaiting );
 800014e8:	02812783          	lw	a5,40(sp)
 800014ec:	0387a783          	lw	a5,56(a5)
 800014f0:	fff78713          	addi	a4,a5,-1
 800014f4:	02812783          	lw	a5,40(sp)
 800014f8:	02e7ac23          	sw	a4,56(a5)
+
+					#if ( configUSE_MUTEXES == 1 )
+					{
+						if( pxQueue->uxQueueType == queueQUEUE_IS_MUTEX )
 800014fc:	02812783          	lw	a5,40(sp)
 80001500:	0007a783          	lw	a5,0(a5)
 80001504:	00079a63          	bnez	a5,80001518 <xQueueGenericReceive+0xec>
+						{
+							/* Record the information required to implement
+							priority inheritance should it become necessary. */
+							pxQueue->pxMutexHolder = ( int8_t * ) pvTaskIncrementMutexHeldCount(); /*lint !e961 Cast is not redundant as TaskHandle_t is a typedef. */
 80001508:	2b8030ef          	jal	ra,800047c0 <pvTaskIncrementMutexHeldCount>
 8000150c:	00050713          	mv	a4,a0
 80001510:	02812783          	lw	a5,40(sp)
 80001514:	00e7a223          	sw	a4,4(a5)
+							mtCOVERAGE_TEST_MARKER();
+						}
+					}
+					#endif /* configUSE_MUTEXES */
+
+					if( listLIST_IS_EMPTY( &( pxQueue->xTasksWaitingToSend ) ) == pdFALSE )
 80001518:	02812783          	lw	a5,40(sp)
 8000151c:	0107a783          	lw	a5,16(a5)
 80001520:	04078e63          	beqz	a5,8000157c <xQueueGenericReceive+0x150>
+					{
+						if( xTaskRemoveFromEventList( &( pxQueue->xTasksWaitingToSend ) ) == pdTRUE )
 80001524:	02812783          	lw	a5,40(sp)
 80001528:	01078793          	addi	a5,a5,16
 8000152c:	00078513          	mv	a0,a5
@@ -1430,38 +2538,91 @@ Disassembly of section .text:
 80001534:	00050713          	mv	a4,a0
 80001538:	00100793          	li	a5,1
 8000153c:	04f71063          	bne	a4,a5,8000157c <xQueueGenericReceive+0x150>
+						{
+							queueYIELD_IF_USING_PREEMPTION();
 80001540:	854ff0ef          	jal	ra,80000594 <vPortYield>
 80001544:	0380006f          	j	8000157c <xQueueGenericReceive+0x150>
+				{
+					traceQUEUE_PEEK( pxQueue );
+
+					/* The data is not being removed, so reset the read
+					pointer. */
+					pxQueue->u.pcReadFrom = pcOriginalReadPosition;
 80001548:	02812783          	lw	a5,40(sp)
 8000154c:	02412703          	lw	a4,36(sp)
 80001550:	00e7a623          	sw	a4,12(a5)
+
+					/* The data is being left in the queue, so see if there are
+					any other tasks waiting for the data. */
+					if( listLIST_IS_EMPTY( &( pxQueue->xTasksWaitingToReceive ) ) == pdFALSE )
 80001554:	02812783          	lw	a5,40(sp)
 80001558:	0247a783          	lw	a5,36(a5)
 8000155c:	02078063          	beqz	a5,8000157c <xQueueGenericReceive+0x150>
+					{
+						if( xTaskRemoveFromEventList( &( pxQueue->xTasksWaitingToReceive ) ) != pdFALSE )
 80001560:	02812783          	lw	a5,40(sp)
 80001564:	02478793          	addi	a5,a5,36
 80001568:	00078513          	mv	a0,a5
 8000156c:	2dc020ef          	jal	ra,80003848 <xTaskRemoveFromEventList>
 80001570:	00050793          	mv	a5,a0
 80001574:	00078463          	beqz	a5,8000157c <xQueueGenericReceive+0x150>
+						{
+							/* The task waiting has a higher priority than this task. */
+							queueYIELD_IF_USING_PREEMPTION();
 80001578:	81cff0ef          	jal	ra,80000594 <vPortYield>
+					{
+						mtCOVERAGE_TEST_MARKER();
+					}
+				}
+
+				taskEXIT_CRITICAL();
 8000157c:	198030ef          	jal	ra,80004714 <vTaskExitCritical>
+				return pdPASS;
 80001580:	00100793          	li	a5,1
 80001584:	1180006f          	j	8000169c <xQueueGenericReceive+0x270>
+			}
+			else
+			{
+				if( xTicksToWait == ( TickType_t ) 0 )
 80001588:	00412783          	lw	a5,4(sp)
 8000158c:	00079863          	bnez	a5,8000159c <xQueueGenericReceive+0x170>
+				{
+					/* The queue was empty and no block time is specified (or
+					the block time has expired) so leave now. */
+					taskEXIT_CRITICAL();
 80001590:	184030ef          	jal	ra,80004714 <vTaskExitCritical>
+					traceQUEUE_RECEIVE_FAILED( pxQueue );
+					return errQUEUE_EMPTY;
 80001594:	00000793          	li	a5,0
 80001598:	1040006f          	j	8000169c <xQueueGenericReceive+0x270>
+				}
+				else if( xEntryTimeSet == pdFALSE )
 8000159c:	02c12783          	lw	a5,44(sp)
 800015a0:	00079c63          	bnez	a5,800015b8 <xQueueGenericReceive+0x18c>
+				{
+					/* The queue was empty and a block time was specified so
+					configure the timeout structure. */
+					vTaskSetTimeOutState( &xTimeOut );
 800015a4:	01c10793          	addi	a5,sp,28
 800015a8:	00078513          	mv	a0,a5
 800015ac:	4ec020ef          	jal	ra,80003a98 <vTaskSetTimeOutState>
+					xEntryTimeSet = pdTRUE;
 800015b0:	00100793          	li	a5,1
 800015b4:	02f12623          	sw	a5,44(sp)
+					/* Entry time was already set. */
+					mtCOVERAGE_TEST_MARKER();
+				}
+			}
+		}
+		taskEXIT_CRITICAL();
 800015b8:	15c030ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		/* Interrupts and other tasks can send to and receive from the queue
+		now the critical section has been exited. */
+
+		vTaskSuspendAll();
 800015bc:	7b4010ef          	jal	ra,80002d70 <vTaskSuspendAll>
+		prvLockQueue( pxQueue );
 800015c0:	114030ef          	jal	ra,800046d4 <vTaskEnterCritical>
 800015c4:	02812783          	lw	a5,40(sp)
 800015c8:	0447a703          	lw	a4,68(a5)
@@ -1476,6 +2637,9 @@ Disassembly of section .text:
 800015ec:	02812783          	lw	a5,40(sp)
 800015f0:	0407a423          	sw	zero,72(a5)
 800015f4:	120030ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		/* Update the timeout state to see if it has expired yet. */
+		if( xTaskCheckForTimeOut( &xTimeOut, &xTicksToWait ) == pdFALSE )
 800015f8:	00410713          	addi	a4,sp,4
 800015fc:	01c10793          	addi	a5,sp,28
 80001600:	00070593          	mv	a1,a4
@@ -1483,57 +2647,109 @@ Disassembly of section .text:
 80001608:	4dc020ef          	jal	ra,80003ae4 <xTaskCheckForTimeOut>
 8000160c:	00050793          	mv	a5,a0
 80001610:	06079e63          	bnez	a5,8000168c <xQueueGenericReceive+0x260>
+		{
+			if( prvIsQueueEmpty( pxQueue ) != pdFALSE )
 80001614:	02812503          	lw	a0,40(sp)
 80001618:	6f4000ef          	jal	ra,80001d0c <prvIsQueueEmpty>
 8000161c:	00050793          	mv	a5,a0
 80001620:	04078e63          	beqz	a5,8000167c <xQueueGenericReceive+0x250>
+			{
+				traceBLOCKING_ON_QUEUE_RECEIVE( pxQueue );
+
+				#if ( configUSE_MUTEXES == 1 )
+				{
+					if( pxQueue->uxQueueType == queueQUEUE_IS_MUTEX )
 80001624:	02812783          	lw	a5,40(sp)
 80001628:	0007a783          	lw	a5,0(a5)
 8000162c:	00079e63          	bnez	a5,80001648 <xQueueGenericReceive+0x21c>
+					{
+						taskENTER_CRITICAL();
 80001630:	0a4030ef          	jal	ra,800046d4 <vTaskEnterCritical>
+						{
+							vTaskPriorityInherit( ( void * ) pxQueue->pxMutexHolder );
 80001634:	02812783          	lw	a5,40(sp)
 80001638:	0047a783          	lw	a5,4(a5)
 8000163c:	00078513          	mv	a0,a5
 80001640:	5fd020ef          	jal	ra,8000443c <vTaskPriorityInherit>
+						}
+						taskEXIT_CRITICAL();
 80001644:	0d0030ef          	jal	ra,80004714 <vTaskExitCritical>
+						mtCOVERAGE_TEST_MARKER();
+					}
+				}
+				#endif
+
+				vTaskPlaceOnEventList( &( pxQueue->xTasksWaitingToReceive ), xTicksToWait );
 80001648:	02812783          	lw	a5,40(sp)
 8000164c:	02478793          	addi	a5,a5,36
 80001650:	00412703          	lw	a4,4(sp)
 80001654:	00070593          	mv	a1,a4
 80001658:	00078513          	mv	a0,a5
 8000165c:	795010ef          	jal	ra,800035f0 <vTaskPlaceOnEventList>
+				prvUnlockQueue( pxQueue );
 80001660:	02812503          	lw	a0,40(sp)
 80001664:	5bc000ef          	jal	ra,80001c20 <prvUnlockQueue>
+				if( xTaskResumeAll() == pdFALSE )
 80001668:	72c010ef          	jal	ra,80002d94 <xTaskResumeAll>
 8000166c:	00050793          	mv	a5,a0
 80001670:	e40794e3          	bnez	a5,800014b8 <xQueueGenericReceive+0x8c>
+				{
+					portYIELD_WITHIN_API();
 80001674:	f21fe0ef          	jal	ra,80000594 <vPortYield>
 80001678:	e41ff06f          	j	800014b8 <xQueueGenericReceive+0x8c>
+				}
+			}
+			else
+			{
+				/* Try again. */
+				prvUnlockQueue( pxQueue );
 8000167c:	02812503          	lw	a0,40(sp)
 80001680:	5a0000ef          	jal	ra,80001c20 <prvUnlockQueue>
+				( void ) xTaskResumeAll();
 80001684:	710010ef          	jal	ra,80002d94 <xTaskResumeAll>
 80001688:	e31ff06f          	j	800014b8 <xQueueGenericReceive+0x8c>
+			}
+		}
+		else
+		{
+			prvUnlockQueue( pxQueue );
 8000168c:	02812503          	lw	a0,40(sp)
 80001690:	590000ef          	jal	ra,80001c20 <prvUnlockQueue>
+			( void ) xTaskResumeAll();
 80001694:	700010ef          	jal	ra,80002d94 <xTaskResumeAll>
+			traceQUEUE_RECEIVE_FAILED( pxQueue );
+			return errQUEUE_EMPTY;
 80001698:	00000793          	li	a5,0
+		}
+	}
+}
 8000169c:	00078513          	mv	a0,a5
 800016a0:	03c12083          	lw	ra,60(sp)
 800016a4:	04010113          	addi	sp,sp,64
 800016a8:	00008067          	ret
 
 800016ac <xQueueReceiveFromISR>:
+/*-----------------------------------------------------------*/
+
+BaseType_t xQueueReceiveFromISR( QueueHandle_t xQueue, void * const pvBuffer, BaseType_t * const pxHigherPriorityTaskWoken )
+{
 800016ac:	fd010113          	addi	sp,sp,-48
 800016b0:	02112623          	sw	ra,44(sp)
 800016b4:	00a12623          	sw	a0,12(sp)
 800016b8:	00b12423          	sw	a1,8(sp)
 800016bc:	00c12223          	sw	a2,4(sp)
+BaseType_t xReturn;
+UBaseType_t uxSavedInterruptStatus;
+Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 800016c0:	00c12783          	lw	a5,12(sp)
 800016c4:	00f12c23          	sw	a5,24(sp)
+
+	configASSERT( pxQueue );
 800016c8:	01812783          	lw	a5,24(sp)
 800016cc:	00079663          	bnez	a5,800016d8 <xQueueReceiveFromISR+0x2c>
-800016d0:	30047073          	csrci	mstatus,8
+800016d0:	30007073          	csrci	mstatus,0
 800016d4:	0000006f          	j	800016d4 <xQueueReceiveFromISR+0x28>
+	configASSERT( !( ( pvBuffer == NULL ) && ( pxQueue->uxItemSize != ( UBaseType_t ) 0U ) ) );
 800016d8:	00812783          	lw	a5,8(sp)
 800016dc:	00079863          	bnez	a5,800016ec <xQueueReceiveFromISR+0x40>
 800016e0:	01812783          	lw	a5,24(sp)
@@ -1543,70 +2759,131 @@ Disassembly of section .text:
 800016f0:	0080006f          	j	800016f8 <xQueueReceiveFromISR+0x4c>
 800016f4:	00000793          	li	a5,0
 800016f8:	00079663          	bnez	a5,80001704 <xQueueReceiveFromISR+0x58>
-800016fc:	30047073          	csrci	mstatus,8
+800016fc:	30007073          	csrci	mstatus,0
 80001700:	0000006f          	j	80001700 <xQueueReceiveFromISR+0x54>
+	safe API to ensure interrupt entry is as fast and as simple as possible.
+	More information (albeit Cortex-M specific) is provided on the following
+	link: http://www.freertos.org/RTOS-Cortex-M3-M4.html */
+	portASSERT_IF_INTERRUPT_PRIORITY_INVALID();
+
+	uxSavedInterruptStatus = portSET_INTERRUPT_MASK_FROM_ISR();
 80001704:	8a0ff0ef          	jal	ra,800007a4 <vPortSetInterruptMask>
 80001708:	00050793          	mv	a5,a0
 8000170c:	00f12a23          	sw	a5,20(sp)
+	{
+		/* Cannot block in an ISR, so check there is data available. */
+		if( pxQueue->uxMessagesWaiting > ( UBaseType_t ) 0 )
 80001710:	01812783          	lw	a5,24(sp)
 80001714:	0387a783          	lw	a5,56(a5)
 80001718:	08078863          	beqz	a5,800017a8 <xQueueReceiveFromISR+0xfc>
+		{
+			traceQUEUE_RECEIVE_FROM_ISR( pxQueue );
+
+			prvCopyDataFromQueue( pxQueue, pvBuffer );
 8000171c:	00812583          	lw	a1,8(sp)
 80001720:	01812503          	lw	a0,24(sp)
 80001724:	470000ef          	jal	ra,80001b94 <prvCopyDataFromQueue>
+			--( pxQueue->uxMessagesWaiting );
 80001728:	01812783          	lw	a5,24(sp)
 8000172c:	0387a783          	lw	a5,56(a5)
 80001730:	fff78713          	addi	a4,a5,-1
 80001734:	01812783          	lw	a5,24(sp)
 80001738:	02e7ac23          	sw	a4,56(a5)
+
+			/* If the queue is locked the event list will not be modified.
+			Instead update the lock count so the task that unlocks the queue
+			will know that an ISR has removed data while the queue was
+			locked. */
+			if( pxQueue->xRxLock == queueUNLOCKED )
 8000173c:	01812783          	lw	a5,24(sp)
 80001740:	0447a703          	lw	a4,68(a5)
 80001744:	fff00793          	li	a5,-1
 80001748:	04f71063          	bne	a4,a5,80001788 <xQueueReceiveFromISR+0xdc>
+			{
+				if( listLIST_IS_EMPTY( &( pxQueue->xTasksWaitingToSend ) ) == pdFALSE )
 8000174c:	01812783          	lw	a5,24(sp)
 80001750:	0107a783          	lw	a5,16(a5)
 80001754:	04078463          	beqz	a5,8000179c <xQueueReceiveFromISR+0xf0>
+				{
+					if( xTaskRemoveFromEventList( &( pxQueue->xTasksWaitingToSend ) ) != pdFALSE )
 80001758:	01812783          	lw	a5,24(sp)
 8000175c:	01078793          	addi	a5,a5,16
 80001760:	00078513          	mv	a0,a5
 80001764:	0e4020ef          	jal	ra,80003848 <xTaskRemoveFromEventList>
 80001768:	00050793          	mv	a5,a0
 8000176c:	02078863          	beqz	a5,8000179c <xQueueReceiveFromISR+0xf0>
+					{
+						/* The task waiting has a higher priority than us so
+						force a context switch. */
+						if( pxHigherPriorityTaskWoken != NULL )
 80001770:	00412783          	lw	a5,4(sp)
 80001774:	02078463          	beqz	a5,8000179c <xQueueReceiveFromISR+0xf0>
+						{
+							*pxHigherPriorityTaskWoken = pdTRUE;
 80001778:	00412783          	lw	a5,4(sp)
 8000177c:	00100713          	li	a4,1
 80001780:	00e7a023          	sw	a4,0(a5)
 80001784:	0180006f          	j	8000179c <xQueueReceiveFromISR+0xf0>
+			}
+			else
+			{
+				/* Increment the lock count so the task that unlocks the queue
+				knows that data was removed while it was locked. */
+				++( pxQueue->xRxLock );
 80001788:	01812783          	lw	a5,24(sp)
 8000178c:	0447a783          	lw	a5,68(a5)
 80001790:	00178713          	addi	a4,a5,1
 80001794:	01812783          	lw	a5,24(sp)
 80001798:	04e7a223          	sw	a4,68(a5)
+			}
+
+			xReturn = pdPASS;
 8000179c:	00100793          	li	a5,1
 800017a0:	00f12e23          	sw	a5,28(sp)
 800017a4:	0080006f          	j	800017ac <xQueueReceiveFromISR+0x100>
+		}
+		else
+		{
+			xReturn = pdFAIL;
 800017a8:	00012e23          	sw	zero,28(sp)
+			traceQUEUE_RECEIVE_FROM_ISR_FAILED( pxQueue );
+		}
+	}
+	portCLEAR_INTERRUPT_MASK_FROM_ISR( uxSavedInterruptStatus );
 800017ac:	01412783          	lw	a5,20(sp)
 800017b0:	00078513          	mv	a0,a5
 800017b4:	fd5fe0ef          	jal	ra,80000788 <vPortClearInterruptMask>
+
+	return xReturn;
 800017b8:	01c12783          	lw	a5,28(sp)
+}
 800017bc:	00078513          	mv	a0,a5
 800017c0:	02c12083          	lw	ra,44(sp)
 800017c4:	03010113          	addi	sp,sp,48
 800017c8:	00008067          	ret
 
 800017cc <xQueuePeekFromISR>:
+/*-----------------------------------------------------------*/
+
+BaseType_t xQueuePeekFromISR( QueueHandle_t xQueue,  void * const pvBuffer )
+{
 800017cc:	fd010113          	addi	sp,sp,-48
 800017d0:	02112623          	sw	ra,44(sp)
 800017d4:	00a12623          	sw	a0,12(sp)
 800017d8:	00b12423          	sw	a1,8(sp)
+BaseType_t xReturn;
+UBaseType_t uxSavedInterruptStatus;
+int8_t *pcOriginalReadPosition;
+Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 800017dc:	00c12783          	lw	a5,12(sp)
 800017e0:	00f12c23          	sw	a5,24(sp)
+
+	configASSERT( pxQueue );
 800017e4:	01812783          	lw	a5,24(sp)
 800017e8:	00079663          	bnez	a5,800017f4 <xQueuePeekFromISR+0x28>
-800017ec:	30047073          	csrci	mstatus,8
+800017ec:	30007073          	csrci	mstatus,0
 800017f0:	0000006f          	j	800017f0 <xQueuePeekFromISR+0x24>
+	configASSERT( !( ( pvBuffer == NULL ) && ( pxQueue->uxItemSize != ( UBaseType_t ) 0U ) ) );
 800017f4:	00812783          	lw	a5,8(sp)
 800017f8:	00079863          	bnez	a5,80001808 <xQueuePeekFromISR+0x3c>
 800017fc:	01812783          	lw	a5,24(sp)
@@ -1616,170 +2893,312 @@ Disassembly of section .text:
 8000180c:	0080006f          	j	80001814 <xQueuePeekFromISR+0x48>
 80001810:	00000793          	li	a5,0
 80001814:	00079663          	bnez	a5,80001820 <xQueuePeekFromISR+0x54>
-80001818:	30047073          	csrci	mstatus,8
+80001818:	30007073          	csrci	mstatus,0
 8000181c:	0000006f          	j	8000181c <xQueuePeekFromISR+0x50>
+	configASSERT( pxQueue->uxItemSize != 0 ); /* Can't peek a semaphore. */
 80001820:	01812783          	lw	a5,24(sp)
 80001824:	0407a783          	lw	a5,64(a5)
 80001828:	00079663          	bnez	a5,80001834 <xQueuePeekFromISR+0x68>
-8000182c:	30047073          	csrci	mstatus,8
+8000182c:	30007073          	csrci	mstatus,0
 80001830:	0000006f          	j	80001830 <xQueuePeekFromISR+0x64>
+	safe API to ensure interrupt entry is as fast and as simple as possible.
+	More information (albeit Cortex-M specific) is provided on the following
+	link: http://www.freertos.org/RTOS-Cortex-M3-M4.html */
+	portASSERT_IF_INTERRUPT_PRIORITY_INVALID();
+
+	uxSavedInterruptStatus = portSET_INTERRUPT_MASK_FROM_ISR();
 80001834:	f71fe0ef          	jal	ra,800007a4 <vPortSetInterruptMask>
 80001838:	00050793          	mv	a5,a0
 8000183c:	00f12a23          	sw	a5,20(sp)
+	{
+		/* Cannot block in an ISR, so check there is data available. */
+		if( pxQueue->uxMessagesWaiting > ( UBaseType_t ) 0 )
 80001840:	01812783          	lw	a5,24(sp)
 80001844:	0387a783          	lw	a5,56(a5)
 80001848:	02078a63          	beqz	a5,8000187c <xQueuePeekFromISR+0xb0>
+		{
+			traceQUEUE_PEEK_FROM_ISR( pxQueue );
+
+			/* Remember the read position so it can be reset as nothing is
+			actually being removed from the queue. */
+			pcOriginalReadPosition = pxQueue->u.pcReadFrom;
 8000184c:	01812783          	lw	a5,24(sp)
 80001850:	00c7a783          	lw	a5,12(a5)
 80001854:	00f12823          	sw	a5,16(sp)
+			prvCopyDataFromQueue( pxQueue, pvBuffer );
 80001858:	00812583          	lw	a1,8(sp)
 8000185c:	01812503          	lw	a0,24(sp)
 80001860:	334000ef          	jal	ra,80001b94 <prvCopyDataFromQueue>
+			pxQueue->u.pcReadFrom = pcOriginalReadPosition;
 80001864:	01812783          	lw	a5,24(sp)
 80001868:	01012703          	lw	a4,16(sp)
 8000186c:	00e7a623          	sw	a4,12(a5)
+
+			xReturn = pdPASS;
 80001870:	00100793          	li	a5,1
 80001874:	00f12e23          	sw	a5,28(sp)
 80001878:	0080006f          	j	80001880 <xQueuePeekFromISR+0xb4>
+		}
+		else
+		{
+			xReturn = pdFAIL;
 8000187c:	00012e23          	sw	zero,28(sp)
+			traceQUEUE_PEEK_FROM_ISR_FAILED( pxQueue );
+		}
+	}
+	portCLEAR_INTERRUPT_MASK_FROM_ISR( uxSavedInterruptStatus );
 80001880:	01412783          	lw	a5,20(sp)
 80001884:	00078513          	mv	a0,a5
 80001888:	f01fe0ef          	jal	ra,80000788 <vPortClearInterruptMask>
+
+	return xReturn;
 8000188c:	01c12783          	lw	a5,28(sp)
+}
 80001890:	00078513          	mv	a0,a5
 80001894:	02c12083          	lw	ra,44(sp)
 80001898:	03010113          	addi	sp,sp,48
 8000189c:	00008067          	ret
 
 800018a0 <uxQueueMessagesWaiting>:
+/*-----------------------------------------------------------*/
+
+UBaseType_t uxQueueMessagesWaiting( const QueueHandle_t xQueue )
+{
 800018a0:	fd010113          	addi	sp,sp,-48
 800018a4:	02112623          	sw	ra,44(sp)
 800018a8:	00a12623          	sw	a0,12(sp)
+UBaseType_t uxReturn;
+
+	configASSERT( xQueue );
 800018ac:	00c12783          	lw	a5,12(sp)
 800018b0:	00079663          	bnez	a5,800018bc <uxQueueMessagesWaiting+0x1c>
-800018b4:	30047073          	csrci	mstatus,8
+800018b4:	30007073          	csrci	mstatus,0
 800018b8:	0000006f          	j	800018b8 <uxQueueMessagesWaiting+0x18>
+
+	taskENTER_CRITICAL();
 800018bc:	619020ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		uxReturn = ( ( Queue_t * ) xQueue )->uxMessagesWaiting;
 800018c0:	00c12783          	lw	a5,12(sp)
 800018c4:	0387a783          	lw	a5,56(a5)
 800018c8:	00f12e23          	sw	a5,28(sp)
+	}
+	taskEXIT_CRITICAL();
 800018cc:	649020ef          	jal	ra,80004714 <vTaskExitCritical>
+
+	return uxReturn;
 800018d0:	01c12783          	lw	a5,28(sp)
+} /*lint !e818 Pointer cannot be declared const as xQueue is a typedef not pointer. */
 800018d4:	00078513          	mv	a0,a5
 800018d8:	02c12083          	lw	ra,44(sp)
 800018dc:	03010113          	addi	sp,sp,48
 800018e0:	00008067          	ret
 
 800018e4 <uxQueueSpacesAvailable>:
+/*-----------------------------------------------------------*/
+
+UBaseType_t uxQueueSpacesAvailable( const QueueHandle_t xQueue )
+{
 800018e4:	fd010113          	addi	sp,sp,-48
 800018e8:	02112623          	sw	ra,44(sp)
 800018ec:	00a12623          	sw	a0,12(sp)
+UBaseType_t uxReturn;
+Queue_t *pxQueue;
+
+	pxQueue = ( Queue_t * ) xQueue;
 800018f0:	00c12783          	lw	a5,12(sp)
 800018f4:	00f12e23          	sw	a5,28(sp)
+	configASSERT( pxQueue );
 800018f8:	01c12783          	lw	a5,28(sp)
 800018fc:	00079663          	bnez	a5,80001908 <uxQueueSpacesAvailable+0x24>
-80001900:	30047073          	csrci	mstatus,8
+80001900:	30007073          	csrci	mstatus,0
 80001904:	0000006f          	j	80001904 <uxQueueSpacesAvailable+0x20>
+
+	taskENTER_CRITICAL();
 80001908:	5cd020ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		uxReturn = pxQueue->uxLength - pxQueue->uxMessagesWaiting;
 8000190c:	01c12783          	lw	a5,28(sp)
 80001910:	03c7a703          	lw	a4,60(a5)
 80001914:	01c12783          	lw	a5,28(sp)
 80001918:	0387a783          	lw	a5,56(a5)
 8000191c:	40f707b3          	sub	a5,a4,a5
 80001920:	00f12c23          	sw	a5,24(sp)
+	}
+	taskEXIT_CRITICAL();
 80001924:	5f1020ef          	jal	ra,80004714 <vTaskExitCritical>
+
+	return uxReturn;
 80001928:	01812783          	lw	a5,24(sp)
+} /*lint !e818 Pointer cannot be declared const as xQueue is a typedef not pointer. */
 8000192c:	00078513          	mv	a0,a5
 80001930:	02c12083          	lw	ra,44(sp)
 80001934:	03010113          	addi	sp,sp,48
 80001938:	00008067          	ret
 
 8000193c <uxQueueMessagesWaitingFromISR>:
+/*-----------------------------------------------------------*/
+
+UBaseType_t uxQueueMessagesWaitingFromISR( const QueueHandle_t xQueue )
+{
 8000193c:	fe010113          	addi	sp,sp,-32
 80001940:	00a12623          	sw	a0,12(sp)
+UBaseType_t uxReturn;
+
+	configASSERT( xQueue );
 80001944:	00c12783          	lw	a5,12(sp)
 80001948:	00079663          	bnez	a5,80001954 <uxQueueMessagesWaitingFromISR+0x18>
-8000194c:	30047073          	csrci	mstatus,8
+8000194c:	30007073          	csrci	mstatus,0
 80001950:	0000006f          	j	80001950 <uxQueueMessagesWaitingFromISR+0x14>
+
+	uxReturn = ( ( Queue_t * ) xQueue )->uxMessagesWaiting;
 80001954:	00c12783          	lw	a5,12(sp)
 80001958:	0387a783          	lw	a5,56(a5)
 8000195c:	00f12e23          	sw	a5,28(sp)
+
+	return uxReturn;
 80001960:	01c12783          	lw	a5,28(sp)
+} /*lint !e818 Pointer cannot be declared const as xQueue is a typedef not pointer. */
 80001964:	00078513          	mv	a0,a5
 80001968:	02010113          	addi	sp,sp,32
 8000196c:	00008067          	ret
 
 80001970 <vQueueDelete>:
+/*-----------------------------------------------------------*/
+
+void vQueueDelete( QueueHandle_t xQueue )
+{
 80001970:	fd010113          	addi	sp,sp,-48
 80001974:	02112623          	sw	ra,44(sp)
 80001978:	00a12623          	sw	a0,12(sp)
+Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 8000197c:	00c12783          	lw	a5,12(sp)
 80001980:	00f12e23          	sw	a5,28(sp)
+
+	configASSERT( pxQueue );
 80001984:	01c12783          	lw	a5,28(sp)
 80001988:	00079663          	bnez	a5,80001994 <vQueueDelete+0x24>
-8000198c:	30047073          	csrci	mstatus,8
+8000198c:	30007073          	csrci	mstatus,0
 80001990:	0000006f          	j	80001990 <vQueueDelete+0x20>
+
+	traceQUEUE_DELETE( pxQueue );
+	#if ( configQUEUE_REGISTRY_SIZE > 0 )
+	{
+		vQueueUnregisterQueue( pxQueue );
 80001994:	01c12503          	lw	a0,28(sp)
 80001998:	524000ef          	jal	ra,80001ebc <vQueueUnregisterQueue>
+	}
+	#endif
+	vPortFree( pxQueue );
 8000199c:	01c12503          	lw	a0,28(sp)
 800019a0:	375040ef          	jal	ra,80006514 <vPortFree>
+}
 800019a4:	00000013          	nop
 800019a8:	02c12083          	lw	ra,44(sp)
 800019ac:	03010113          	addi	sp,sp,48
 800019b0:	00008067          	ret
 
 800019b4 <uxQueueGetQueueNumber>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_TRACE_FACILITY == 1 )
+
+	UBaseType_t uxQueueGetQueueNumber( QueueHandle_t xQueue )
+	{
 800019b4:	ff010113          	addi	sp,sp,-16
 800019b8:	00a12623          	sw	a0,12(sp)
+		return ( ( Queue_t * ) xQueue )->uxQueueNumber;
 800019bc:	00c12783          	lw	a5,12(sp)
 800019c0:	04c7a783          	lw	a5,76(a5)
+	}
 800019c4:	00078513          	mv	a0,a5
 800019c8:	01010113          	addi	sp,sp,16
 800019cc:	00008067          	ret
 
 800019d0 <vQueueSetQueueNumber>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_TRACE_FACILITY == 1 )
+
+	void vQueueSetQueueNumber( QueueHandle_t xQueue, UBaseType_t uxQueueNumber )
+	{
 800019d0:	ff010113          	addi	sp,sp,-16
 800019d4:	00a12623          	sw	a0,12(sp)
 800019d8:	00b12423          	sw	a1,8(sp)
+		( ( Queue_t * ) xQueue )->uxQueueNumber = uxQueueNumber;
 800019dc:	00c12783          	lw	a5,12(sp)
 800019e0:	00812703          	lw	a4,8(sp)
 800019e4:	04e7a623          	sw	a4,76(a5)
+	}
 800019e8:	00000013          	nop
 800019ec:	01010113          	addi	sp,sp,16
 800019f0:	00008067          	ret
 
 800019f4 <ucQueueGetQueueType>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_TRACE_FACILITY == 1 )
+
+	uint8_t ucQueueGetQueueType( QueueHandle_t xQueue )
+	{
 800019f4:	ff010113          	addi	sp,sp,-16
 800019f8:	00a12623          	sw	a0,12(sp)
+		return ( ( Queue_t * ) xQueue )->ucQueueType;
 800019fc:	00c12783          	lw	a5,12(sp)
 80001a00:	0507c783          	lbu	a5,80(a5)
+	}
 80001a04:	00078513          	mv	a0,a5
 80001a08:	01010113          	addi	sp,sp,16
 80001a0c:	00008067          	ret
 
 80001a10 <prvCopyDataToQueue>:
+
+#endif /* configUSE_TRACE_FACILITY */
+/*-----------------------------------------------------------*/
+
+static BaseType_t prvCopyDataToQueue( Queue_t * const pxQueue, const void *pvItemToQueue, const BaseType_t xPosition )
+{
 80001a10:	fd010113          	addi	sp,sp,-48
 80001a14:	02112623          	sw	ra,44(sp)
 80001a18:	00a12623          	sw	a0,12(sp)
 80001a1c:	00b12423          	sw	a1,8(sp)
 80001a20:	00c12223          	sw	a2,4(sp)
+BaseType_t xReturn = pdFALSE;
 80001a24:	00012e23          	sw	zero,28(sp)
+
+	if( pxQueue->uxItemSize == ( UBaseType_t ) 0 )
 80001a28:	00c12783          	lw	a5,12(sp)
 80001a2c:	0407a783          	lw	a5,64(a5)
 80001a30:	02079863          	bnez	a5,80001a60 <prvCopyDataToQueue+0x50>
+	{
+		#if ( configUSE_MUTEXES == 1 )
+		{
+			if( pxQueue->uxQueueType == queueQUEUE_IS_MUTEX )
 80001a34:	00c12783          	lw	a5,12(sp)
 80001a38:	0007a783          	lw	a5,0(a5)
 80001a3c:	12079863          	bnez	a5,80001b6c <prvCopyDataToQueue+0x15c>
+			{
+				/* The mutex is no longer being held. */
+				xReturn = xTaskPriorityDisinherit( ( void * ) pxQueue->pxMutexHolder );
 80001a40:	00c12783          	lw	a5,12(sp)
 80001a44:	0047a783          	lw	a5,4(a5)
 80001a48:	00078513          	mv	a0,a5
 80001a4c:	34d020ef          	jal	ra,80004598 <xTaskPriorityDisinherit>
 80001a50:	00a12e23          	sw	a0,28(sp)
+				pxQueue->pxMutexHolder = NULL;
 80001a54:	00c12783          	lw	a5,12(sp)
 80001a58:	0007a223          	sw	zero,4(a5)
 80001a5c:	1100006f          	j	80001b6c <prvCopyDataToQueue+0x15c>
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+		#endif /* configUSE_MUTEXES */
+	}
+	else if( xPosition == queueSEND_TO_BACK )
 80001a60:	00412783          	lw	a5,4(sp)
 80001a64:	06079463          	bnez	a5,80001acc <prvCopyDataToQueue+0xbc>
+	{
+		( void ) memcpy( ( void * ) pxQueue->pcWriteTo, pvItemToQueue, ( size_t ) pxQueue->uxItemSize ); /*lint !e961 !e418 MISRA exception as the casts are only redundant for some ports, plus previous logic ensures a null pointer can only be passed to memcpy() if the copy size is 0. */
 80001a68:	00c12783          	lw	a5,12(sp)
 80001a6c:	0087a703          	lw	a4,8(a5)
 80001a70:	00c12783          	lw	a5,12(sp)
@@ -1788,6 +3207,7 @@ Disassembly of section .text:
 80001a7c:	00812583          	lw	a1,8(sp)
 80001a80:	00070513          	mv	a0,a4
 80001a84:	3fd040ef          	jal	ra,80006680 <memcpy>
+		pxQueue->pcWriteTo += pxQueue->uxItemSize;
 80001a88:	00c12783          	lw	a5,12(sp)
 80001a8c:	0087a703          	lw	a4,8(a5)
 80001a90:	00c12783          	lw	a5,12(sp)
@@ -1795,16 +3215,25 @@ Disassembly of section .text:
 80001a98:	00f70733          	add	a4,a4,a5
 80001a9c:	00c12783          	lw	a5,12(sp)
 80001aa0:	00e7a423          	sw	a4,8(a5)
+		if( pxQueue->pcWriteTo >= pxQueue->pcTail ) /*lint !e946 MISRA exception justified as comparison of pointers is the cleanest solution. */
 80001aa4:	00c12783          	lw	a5,12(sp)
 80001aa8:	0087a703          	lw	a4,8(a5)
 80001aac:	00c12783          	lw	a5,12(sp)
 80001ab0:	0047a783          	lw	a5,4(a5)
 80001ab4:	0af76c63          	bltu	a4,a5,80001b6c <prvCopyDataToQueue+0x15c>
+		{
+			pxQueue->pcWriteTo = pxQueue->pcHead;
 80001ab8:	00c12783          	lw	a5,12(sp)
 80001abc:	0007a703          	lw	a4,0(a5)
 80001ac0:	00c12783          	lw	a5,12(sp)
 80001ac4:	00e7a423          	sw	a4,8(a5)
 80001ac8:	0a40006f          	j	80001b6c <prvCopyDataToQueue+0x15c>
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
+	else
+	{
+		( void ) memcpy( ( void * ) pxQueue->u.pcReadFrom, pvItemToQueue, ( size_t ) pxQueue->uxItemSize ); /*lint !e961 MISRA exception as the casts are only redundant for some ports. */
 80001acc:	00c12783          	lw	a5,12(sp)
 80001ad0:	00c7a703          	lw	a4,12(a5)
 80001ad4:	00c12783          	lw	a5,12(sp)
@@ -1813,6 +3242,7 @@ Disassembly of section .text:
 80001ae0:	00812583          	lw	a1,8(sp)
 80001ae4:	00070513          	mv	a0,a4
 80001ae8:	399040ef          	jal	ra,80006680 <memcpy>
+		pxQueue->u.pcReadFrom -= pxQueue->uxItemSize;
 80001aec:	00c12783          	lw	a5,12(sp)
 80001af0:	00c7a703          	lw	a4,12(a5)
 80001af4:	00c12783          	lw	a5,12(sp)
@@ -1821,11 +3251,14 @@ Disassembly of section .text:
 80001b00:	00f70733          	add	a4,a4,a5
 80001b04:	00c12783          	lw	a5,12(sp)
 80001b08:	00e7a623          	sw	a4,12(a5)
+		if( pxQueue->u.pcReadFrom < pxQueue->pcHead ) /*lint !e946 MISRA exception justified as comparison of pointers is the cleanest solution. */
 80001b0c:	00c12783          	lw	a5,12(sp)
 80001b10:	00c7a703          	lw	a4,12(a5)
 80001b14:	00c12783          	lw	a5,12(sp)
 80001b18:	0007a783          	lw	a5,0(a5)
 80001b1c:	02f77263          	bleu	a5,a4,80001b40 <prvCopyDataToQueue+0x130>
+		{
+			pxQueue->u.pcReadFrom = ( pxQueue->pcTail - pxQueue->uxItemSize );
 80001b20:	00c12783          	lw	a5,12(sp)
 80001b24:	0047a703          	lw	a4,4(a5)
 80001b28:	00c12783          	lw	a5,12(sp)
@@ -1834,36 +3267,66 @@ Disassembly of section .text:
 80001b34:	00f70733          	add	a4,a4,a5
 80001b38:	00c12783          	lw	a5,12(sp)
 80001b3c:	00e7a623          	sw	a4,12(a5)
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+
+		if( xPosition == queueOVERWRITE )
 80001b40:	00412703          	lw	a4,4(sp)
 80001b44:	00200793          	li	a5,2
 80001b48:	02f71263          	bne	a4,a5,80001b6c <prvCopyDataToQueue+0x15c>
+		{
+			if( pxQueue->uxMessagesWaiting > ( UBaseType_t ) 0 )
 80001b4c:	00c12783          	lw	a5,12(sp)
 80001b50:	0387a783          	lw	a5,56(a5)
 80001b54:	00078c63          	beqz	a5,80001b6c <prvCopyDataToQueue+0x15c>
+			{
+				/* An item is not being added but overwritten, so subtract
+				one from the recorded number of items in the queue so when
+				one is added again below the number of recorded items remains
+				correct. */
+				--( pxQueue->uxMessagesWaiting );
 80001b58:	00c12783          	lw	a5,12(sp)
 80001b5c:	0387a783          	lw	a5,56(a5)
 80001b60:	fff78713          	addi	a4,a5,-1
 80001b64:	00c12783          	lw	a5,12(sp)
 80001b68:	02e7ac23          	sw	a4,56(a5)
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
+
+	++( pxQueue->uxMessagesWaiting );
 80001b6c:	00c12783          	lw	a5,12(sp)
 80001b70:	0387a783          	lw	a5,56(a5)
 80001b74:	00178713          	addi	a4,a5,1
 80001b78:	00c12783          	lw	a5,12(sp)
 80001b7c:	02e7ac23          	sw	a4,56(a5)
+
+	return xReturn;
 80001b80:	01c12783          	lw	a5,28(sp)
+}
 80001b84:	00078513          	mv	a0,a5
 80001b88:	02c12083          	lw	ra,44(sp)
 80001b8c:	03010113          	addi	sp,sp,48
 80001b90:	00008067          	ret
 
 80001b94 <prvCopyDataFromQueue>:
+/*-----------------------------------------------------------*/
+
+static void prvCopyDataFromQueue( Queue_t * const pxQueue, void * const pvBuffer )
+{
 80001b94:	fe010113          	addi	sp,sp,-32
 80001b98:	00112e23          	sw	ra,28(sp)
 80001b9c:	00a12623          	sw	a0,12(sp)
 80001ba0:	00b12423          	sw	a1,8(sp)
+	if( pxQueue->uxItemSize != ( UBaseType_t ) 0 )
 80001ba4:	00c12783          	lw	a5,12(sp)
 80001ba8:	0407a783          	lw	a5,64(a5)
 80001bac:	06078263          	beqz	a5,80001c10 <prvCopyDataFromQueue+0x7c>
+	{
+		pxQueue->u.pcReadFrom += pxQueue->uxItemSize;
 80001bb0:	00c12783          	lw	a5,12(sp)
 80001bb4:	00c7a703          	lw	a4,12(a5)
 80001bb8:	00c12783          	lw	a5,12(sp)
@@ -1871,15 +3334,24 @@ Disassembly of section .text:
 80001bc0:	00f70733          	add	a4,a4,a5
 80001bc4:	00c12783          	lw	a5,12(sp)
 80001bc8:	00e7a623          	sw	a4,12(a5)
+		if( pxQueue->u.pcReadFrom >= pxQueue->pcTail ) /*lint !e946 MISRA exception justified as use of the relational operator is the cleanest solutions. */
 80001bcc:	00c12783          	lw	a5,12(sp)
 80001bd0:	00c7a703          	lw	a4,12(a5)
 80001bd4:	00c12783          	lw	a5,12(sp)
 80001bd8:	0047a783          	lw	a5,4(a5)
 80001bdc:	00f76a63          	bltu	a4,a5,80001bf0 <prvCopyDataFromQueue+0x5c>
+		{
+			pxQueue->u.pcReadFrom = pxQueue->pcHead;
 80001be0:	00c12783          	lw	a5,12(sp)
 80001be4:	0007a703          	lw	a4,0(a5)
 80001be8:	00c12783          	lw	a5,12(sp)
 80001bec:	00e7a623          	sw	a4,12(a5)
+		}
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+		( void ) memcpy( ( void * ) pvBuffer, ( void * ) pxQueue->u.pcReadFrom, ( size_t ) pxQueue->uxItemSize ); /*lint !e961 !e418 MISRA exception as the casts are only redundant for some ports.  Also previous logic ensures a null pointer can only be passed to memcpy() when the count is 0. */
 80001bf0:	00c12783          	lw	a5,12(sp)
 80001bf4:	00c7a703          	lw	a4,12(a5)
 80001bf8:	00c12783          	lw	a5,12(sp)
@@ -1888,158 +3360,318 @@ Disassembly of section .text:
 80001c04:	00070593          	mv	a1,a4
 80001c08:	00812503          	lw	a0,8(sp)
 80001c0c:	275040ef          	jal	ra,80006680 <memcpy>
+	}
+}
 80001c10:	00000013          	nop
 80001c14:	01c12083          	lw	ra,28(sp)
 80001c18:	02010113          	addi	sp,sp,32
 80001c1c:	00008067          	ret
 
 80001c20 <prvUnlockQueue>:
+/*-----------------------------------------------------------*/
+
+static void prvUnlockQueue( Queue_t * const pxQueue )
+{
 80001c20:	fe010113          	addi	sp,sp,-32
 80001c24:	00112e23          	sw	ra,28(sp)
 80001c28:	00a12623          	sw	a0,12(sp)
+
+	/* The lock counts contains the number of extra data items placed or
+	removed from the queue while the queue was locked.  When a queue is
+	locked items can be added or removed, but the event lists cannot be
+	updated. */
+	taskENTER_CRITICAL();
 80001c2c:	2a9020ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		/* See if data was added to the queue while it was locked. */
+		while( pxQueue->xTxLock > queueLOCKED_UNMODIFIED )
 80001c30:	0400006f          	j	80001c70 <prvUnlockQueue+0x50>
+			}
+			#else /* configUSE_QUEUE_SETS */
+			{
+				/* Tasks that are removed from the event list will get added to
+				the pending ready list as the scheduler is still suspended. */
+				if( listLIST_IS_EMPTY( &( pxQueue->xTasksWaitingToReceive ) ) == pdFALSE )
 80001c34:	00c12783          	lw	a5,12(sp)
 80001c38:	0247a783          	lw	a5,36(a5)
 80001c3c:	04078263          	beqz	a5,80001c80 <prvUnlockQueue+0x60>
+				{
+					if( xTaskRemoveFromEventList( &( pxQueue->xTasksWaitingToReceive ) ) != pdFALSE )
 80001c40:	00c12783          	lw	a5,12(sp)
 80001c44:	02478793          	addi	a5,a5,36
 80001c48:	00078513          	mv	a0,a5
 80001c4c:	3fd010ef          	jal	ra,80003848 <xTaskRemoveFromEventList>
 80001c50:	00050793          	mv	a5,a0
 80001c54:	00078463          	beqz	a5,80001c5c <prvUnlockQueue+0x3c>
+					{
+						/* The task waiting has a higher priority so record that a
+						context	switch is required. */
+						vTaskMissedYield();
 80001c58:	78d010ef          	jal	ra,80003be4 <vTaskMissedYield>
+					break;
+				}
+			}
+			#endif /* configUSE_QUEUE_SETS */
+
+			--( pxQueue->xTxLock );
 80001c5c:	00c12783          	lw	a5,12(sp)
 80001c60:	0487a783          	lw	a5,72(a5)
 80001c64:	fff78713          	addi	a4,a5,-1
 80001c68:	00c12783          	lw	a5,12(sp)
 80001c6c:	04e7a423          	sw	a4,72(a5)
+		while( pxQueue->xTxLock > queueLOCKED_UNMODIFIED )
 80001c70:	00c12783          	lw	a5,12(sp)
 80001c74:	0487a783          	lw	a5,72(a5)
 80001c78:	faf04ee3          	bgtz	a5,80001c34 <prvUnlockQueue+0x14>
 80001c7c:	0080006f          	j	80001c84 <prvUnlockQueue+0x64>
+					break;
 80001c80:	00000013          	nop
+		}
+
+		pxQueue->xTxLock = queueUNLOCKED;
 80001c84:	00c12783          	lw	a5,12(sp)
 80001c88:	fff00713          	li	a4,-1
 80001c8c:	04e7a423          	sw	a4,72(a5)
+	}
+	taskEXIT_CRITICAL();
 80001c90:	285020ef          	jal	ra,80004714 <vTaskExitCritical>
+
+	/* Do the same for the Rx lock. */
+	taskENTER_CRITICAL();
 80001c94:	241020ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		while( pxQueue->xRxLock > queueLOCKED_UNMODIFIED )
 80001c98:	0400006f          	j	80001cd8 <prvUnlockQueue+0xb8>
+		{
+			if( listLIST_IS_EMPTY( &( pxQueue->xTasksWaitingToSend ) ) == pdFALSE )
 80001c9c:	00c12783          	lw	a5,12(sp)
 80001ca0:	0107a783          	lw	a5,16(a5)
 80001ca4:	04078263          	beqz	a5,80001ce8 <prvUnlockQueue+0xc8>
+			{
+				if( xTaskRemoveFromEventList( &( pxQueue->xTasksWaitingToSend ) ) != pdFALSE )
 80001ca8:	00c12783          	lw	a5,12(sp)
 80001cac:	01078793          	addi	a5,a5,16
 80001cb0:	00078513          	mv	a0,a5
 80001cb4:	395010ef          	jal	ra,80003848 <xTaskRemoveFromEventList>
 80001cb8:	00050793          	mv	a5,a0
 80001cbc:	00078463          	beqz	a5,80001cc4 <prvUnlockQueue+0xa4>
+				{
+					vTaskMissedYield();
 80001cc0:	725010ef          	jal	ra,80003be4 <vTaskMissedYield>
+				else
+				{
+					mtCOVERAGE_TEST_MARKER();
+				}
+
+				--( pxQueue->xRxLock );
 80001cc4:	00c12783          	lw	a5,12(sp)
 80001cc8:	0447a783          	lw	a5,68(a5)
 80001ccc:	fff78713          	addi	a4,a5,-1
 80001cd0:	00c12783          	lw	a5,12(sp)
 80001cd4:	04e7a223          	sw	a4,68(a5)
+		while( pxQueue->xRxLock > queueLOCKED_UNMODIFIED )
 80001cd8:	00c12783          	lw	a5,12(sp)
 80001cdc:	0447a783          	lw	a5,68(a5)
 80001ce0:	faf04ee3          	bgtz	a5,80001c9c <prvUnlockQueue+0x7c>
 80001ce4:	0080006f          	j	80001cec <prvUnlockQueue+0xcc>
+			}
+			else
+			{
+				break;
 80001ce8:	00000013          	nop
+			}
+		}
+
+		pxQueue->xRxLock = queueUNLOCKED;
 80001cec:	00c12783          	lw	a5,12(sp)
 80001cf0:	fff00713          	li	a4,-1
 80001cf4:	04e7a223          	sw	a4,68(a5)
+	}
+	taskEXIT_CRITICAL();
 80001cf8:	21d020ef          	jal	ra,80004714 <vTaskExitCritical>
+}
 80001cfc:	00000013          	nop
 80001d00:	01c12083          	lw	ra,28(sp)
 80001d04:	02010113          	addi	sp,sp,32
 80001d08:	00008067          	ret
 
 80001d0c <prvIsQueueEmpty>:
+/*-----------------------------------------------------------*/
+
+static BaseType_t prvIsQueueEmpty( const Queue_t *pxQueue )
+{
 80001d0c:	fd010113          	addi	sp,sp,-48
 80001d10:	02112623          	sw	ra,44(sp)
 80001d14:	00a12623          	sw	a0,12(sp)
+BaseType_t xReturn;
+
+	taskENTER_CRITICAL();
 80001d18:	1bd020ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		if( pxQueue->uxMessagesWaiting == ( UBaseType_t )  0 )
 80001d1c:	00c12783          	lw	a5,12(sp)
 80001d20:	0387a783          	lw	a5,56(a5)
 80001d24:	00079863          	bnez	a5,80001d34 <prvIsQueueEmpty+0x28>
+		{
+			xReturn = pdTRUE;
 80001d28:	00100793          	li	a5,1
 80001d2c:	00f12e23          	sw	a5,28(sp)
 80001d30:	0080006f          	j	80001d38 <prvIsQueueEmpty+0x2c>
+		}
+		else
+		{
+			xReturn = pdFALSE;
 80001d34:	00012e23          	sw	zero,28(sp)
+		}
+	}
+	taskEXIT_CRITICAL();
 80001d38:	1dd020ef          	jal	ra,80004714 <vTaskExitCritical>
+
+	return xReturn;
 80001d3c:	01c12783          	lw	a5,28(sp)
+}
 80001d40:	00078513          	mv	a0,a5
 80001d44:	02c12083          	lw	ra,44(sp)
 80001d48:	03010113          	addi	sp,sp,48
 80001d4c:	00008067          	ret
 
 80001d50 <xQueueIsQueueEmptyFromISR>:
+/*-----------------------------------------------------------*/
+
+BaseType_t xQueueIsQueueEmptyFromISR( const QueueHandle_t xQueue )
+{
 80001d50:	fe010113          	addi	sp,sp,-32
 80001d54:	00a12623          	sw	a0,12(sp)
+BaseType_t xReturn;
+
+	configASSERT( xQueue );
 80001d58:	00c12783          	lw	a5,12(sp)
 80001d5c:	00079663          	bnez	a5,80001d68 <xQueueIsQueueEmptyFromISR+0x18>
-80001d60:	30047073          	csrci	mstatus,8
+80001d60:	30007073          	csrci	mstatus,0
 80001d64:	0000006f          	j	80001d64 <xQueueIsQueueEmptyFromISR+0x14>
+	if( ( ( Queue_t * ) xQueue )->uxMessagesWaiting == ( UBaseType_t ) 0 )
 80001d68:	00c12783          	lw	a5,12(sp)
 80001d6c:	0387a783          	lw	a5,56(a5)
 80001d70:	00079863          	bnez	a5,80001d80 <xQueueIsQueueEmptyFromISR+0x30>
+	{
+		xReturn = pdTRUE;
 80001d74:	00100793          	li	a5,1
 80001d78:	00f12e23          	sw	a5,28(sp)
 80001d7c:	0080006f          	j	80001d84 <xQueueIsQueueEmptyFromISR+0x34>
+	}
+	else
+	{
+		xReturn = pdFALSE;
 80001d80:	00012e23          	sw	zero,28(sp)
+	}
+
+	return xReturn;
 80001d84:	01c12783          	lw	a5,28(sp)
+} /*lint !e818 xQueue could not be pointer to const because it is a typedef. */
 80001d88:	00078513          	mv	a0,a5
 80001d8c:	02010113          	addi	sp,sp,32
 80001d90:	00008067          	ret
 
 80001d94 <prvIsQueueFull>:
+/*-----------------------------------------------------------*/
+
+static BaseType_t prvIsQueueFull( const Queue_t *pxQueue )
+{
 80001d94:	fd010113          	addi	sp,sp,-48
 80001d98:	02112623          	sw	ra,44(sp)
 80001d9c:	00a12623          	sw	a0,12(sp)
+BaseType_t xReturn;
+
+	taskENTER_CRITICAL();
 80001da0:	135020ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		if( pxQueue->uxMessagesWaiting == pxQueue->uxLength )
 80001da4:	00c12783          	lw	a5,12(sp)
 80001da8:	0387a703          	lw	a4,56(a5)
 80001dac:	00c12783          	lw	a5,12(sp)
 80001db0:	03c7a783          	lw	a5,60(a5)
 80001db4:	00f71863          	bne	a4,a5,80001dc4 <prvIsQueueFull+0x30>
+		{
+			xReturn = pdTRUE;
 80001db8:	00100793          	li	a5,1
 80001dbc:	00f12e23          	sw	a5,28(sp)
 80001dc0:	0080006f          	j	80001dc8 <prvIsQueueFull+0x34>
+		}
+		else
+		{
+			xReturn = pdFALSE;
 80001dc4:	00012e23          	sw	zero,28(sp)
+		}
+	}
+	taskEXIT_CRITICAL();
 80001dc8:	14d020ef          	jal	ra,80004714 <vTaskExitCritical>
+
+	return xReturn;
 80001dcc:	01c12783          	lw	a5,28(sp)
+}
 80001dd0:	00078513          	mv	a0,a5
 80001dd4:	02c12083          	lw	ra,44(sp)
 80001dd8:	03010113          	addi	sp,sp,48
 80001ddc:	00008067          	ret
 
 80001de0 <xQueueIsQueueFullFromISR>:
+/*-----------------------------------------------------------*/
+
+BaseType_t xQueueIsQueueFullFromISR( const QueueHandle_t xQueue )
+{
 80001de0:	fe010113          	addi	sp,sp,-32
 80001de4:	00a12623          	sw	a0,12(sp)
+BaseType_t xReturn;
+
+	configASSERT( xQueue );
 80001de8:	00c12783          	lw	a5,12(sp)
 80001dec:	00079663          	bnez	a5,80001df8 <xQueueIsQueueFullFromISR+0x18>
-80001df0:	30047073          	csrci	mstatus,8
+80001df0:	30007073          	csrci	mstatus,0
 80001df4:	0000006f          	j	80001df4 <xQueueIsQueueFullFromISR+0x14>
+	if( ( ( Queue_t * ) xQueue )->uxMessagesWaiting == ( ( Queue_t * ) xQueue )->uxLength )
 80001df8:	00c12783          	lw	a5,12(sp)
 80001dfc:	0387a703          	lw	a4,56(a5)
 80001e00:	00c12783          	lw	a5,12(sp)
 80001e04:	03c7a783          	lw	a5,60(a5)
 80001e08:	00f71863          	bne	a4,a5,80001e18 <xQueueIsQueueFullFromISR+0x38>
+	{
+		xReturn = pdTRUE;
 80001e0c:	00100793          	li	a5,1
 80001e10:	00f12e23          	sw	a5,28(sp)
 80001e14:	0080006f          	j	80001e1c <xQueueIsQueueFullFromISR+0x3c>
+	}
+	else
+	{
+		xReturn = pdFALSE;
 80001e18:	00012e23          	sw	zero,28(sp)
+	}
+
+	return xReturn;
 80001e1c:	01c12783          	lw	a5,28(sp)
+} /*lint !e818 xQueue could not be pointer to const because it is a typedef. */
 80001e20:	00078513          	mv	a0,a5
 80001e24:	02010113          	addi	sp,sp,32
 80001e28:	00008067          	ret
 
 80001e2c <vQueueAddToRegistry>:
+/*-----------------------------------------------------------*/
+
+#if ( configQUEUE_REGISTRY_SIZE > 0 )
+
+	void vQueueAddToRegistry( QueueHandle_t xQueue, const char *pcQueueName ) /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+	{
 80001e2c:	fe010113          	addi	sp,sp,-32
 80001e30:	00a12623          	sw	a0,12(sp)
 80001e34:	00b12423          	sw	a1,8(sp)
+	UBaseType_t ux;
+
+		/* See if there is an empty space in the registry.  A NULL name denotes
+		a free slot. */
+		for( ux = ( UBaseType_t ) 0U; ux < ( UBaseType_t ) configQUEUE_REGISTRY_SIZE; ux++ )
 80001e38:	00012e23          	sw	zero,28(sp)
 80001e3c:	0680006f          	j	80001ea4 <vQueueAddToRegistry+0x78>
+		{
+			if( xQueueRegistry[ ux ].pcQueueName == NULL )
 80001e40:	00039717          	auipc	a4,0x39
 80001e44:	d2470713          	addi	a4,a4,-732 # 8003ab64 <xQueueRegistry>
 80001e48:	01c12783          	lw	a5,28(sp)
@@ -2047,6 +3679,9 @@ Disassembly of section .text:
 80001e50:	00f707b3          	add	a5,a4,a5
 80001e54:	0007a783          	lw	a5,0(a5)
 80001e58:	04079063          	bnez	a5,80001e98 <vQueueAddToRegistry+0x6c>
+			{
+				/* Store the information on this queue. */
+				xQueueRegistry[ ux ].pcQueueName = pcQueueName;
 80001e5c:	00039717          	auipc	a4,0x39
 80001e60:	d0870713          	addi	a4,a4,-760 # 8003ab64 <xQueueRegistry>
 80001e64:	01c12783          	lw	a5,28(sp)
@@ -2054,6 +3689,7 @@ Disassembly of section .text:
 80001e6c:	00f707b3          	add	a5,a4,a5
 80001e70:	00812703          	lw	a4,8(sp)
 80001e74:	00e7a023          	sw	a4,0(a5)
+				xQueueRegistry[ ux ].xHandle = xQueue;
 80001e78:	00039717          	auipc	a4,0x39
 80001e7c:	cec70713          	addi	a4,a4,-788 # 8003ab64 <xQueueRegistry>
 80001e80:	01c12783          	lw	a5,28(sp)
@@ -2061,22 +3697,45 @@ Disassembly of section .text:
 80001e88:	00f707b3          	add	a5,a4,a5
 80001e8c:	00c12703          	lw	a4,12(sp)
 80001e90:	00e7a223          	sw	a4,4(a5)
+
+				traceQUEUE_REGISTRY_ADD( xQueue, pcQueueName );
+				break;
 80001e94:	01c0006f          	j	80001eb0 <vQueueAddToRegistry+0x84>
+		for( ux = ( UBaseType_t ) 0U; ux < ( UBaseType_t ) configQUEUE_REGISTRY_SIZE; ux++ )
 80001e98:	01c12783          	lw	a5,28(sp)
 80001e9c:	00178793          	addi	a5,a5,1
 80001ea0:	00f12e23          	sw	a5,28(sp)
 80001ea4:	01c12703          	lw	a4,28(sp)
 80001ea8:	00700793          	li	a5,7
 80001eac:	f8e7fae3          	bleu	a4,a5,80001e40 <vQueueAddToRegistry+0x14>
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+	}
 80001eb0:	00000013          	nop
 80001eb4:	02010113          	addi	sp,sp,32
 80001eb8:	00008067          	ret
 
 80001ebc <vQueueUnregisterQueue>:
+/*-----------------------------------------------------------*/
+
+#if ( configQUEUE_REGISTRY_SIZE > 0 )
+
+	void vQueueUnregisterQueue( QueueHandle_t xQueue )
+	{
 80001ebc:	fe010113          	addi	sp,sp,-32
 80001ec0:	00a12623          	sw	a0,12(sp)
+	UBaseType_t ux;
+
+		/* See if the handle of the queue being unregistered in actually in the
+		registry. */
+		for( ux = ( UBaseType_t ) 0U; ux < ( UBaseType_t ) configQUEUE_REGISTRY_SIZE; ux++ )
 80001ec4:	00012e23          	sw	zero,28(sp)
 80001ec8:	04c0006f          	j	80001f14 <vQueueUnregisterQueue+0x58>
+		{
+			if( xQueueRegistry[ ux ].xHandle == xQueue )
 80001ecc:	00039717          	auipc	a4,0x39
 80001ed0:	c9870713          	addi	a4,a4,-872 # 8003ab64 <xQueueRegistry>
 80001ed4:	01c12783          	lw	a5,28(sp)
@@ -2085,31 +3744,55 @@ Disassembly of section .text:
 80001ee0:	0047a783          	lw	a5,4(a5)
 80001ee4:	00c12703          	lw	a4,12(sp)
 80001ee8:	02f71063          	bne	a4,a5,80001f08 <vQueueUnregisterQueue+0x4c>
+			{
+				/* Set the name to NULL to show that this slot if free again. */
+				xQueueRegistry[ ux ].pcQueueName = NULL;
 80001eec:	00039717          	auipc	a4,0x39
 80001ef0:	c7870713          	addi	a4,a4,-904 # 8003ab64 <xQueueRegistry>
 80001ef4:	01c12783          	lw	a5,28(sp)
 80001ef8:	00379793          	slli	a5,a5,0x3
 80001efc:	00f707b3          	add	a5,a4,a5
 80001f00:	0007a023          	sw	zero,0(a5)
+				break;
 80001f04:	01c0006f          	j	80001f20 <vQueueUnregisterQueue+0x64>
+		for( ux = ( UBaseType_t ) 0U; ux < ( UBaseType_t ) configQUEUE_REGISTRY_SIZE; ux++ )
 80001f08:	01c12783          	lw	a5,28(sp)
 80001f0c:	00178793          	addi	a5,a5,1
 80001f10:	00f12e23          	sw	a5,28(sp)
 80001f14:	01c12703          	lw	a4,28(sp)
 80001f18:	00700793          	li	a5,7
 80001f1c:	fae7f8e3          	bleu	a4,a5,80001ecc <vQueueUnregisterQueue+0x10>
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+
+	} /*lint !e818 xQueue could not be pointer to const because it is a typedef. */
 80001f20:	00000013          	nop
 80001f24:	02010113          	addi	sp,sp,32
 80001f28:	00008067          	ret
 
 80001f2c <vQueueWaitForMessageRestricted>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_TIMERS == 1 )
+
+	void vQueueWaitForMessageRestricted( QueueHandle_t xQueue, TickType_t xTicksToWait, const BaseType_t xWaitIndefinitely )
+	{
 80001f2c:	fd010113          	addi	sp,sp,-48
 80001f30:	02112623          	sw	ra,44(sp)
 80001f34:	00a12623          	sw	a0,12(sp)
 80001f38:	00b12423          	sw	a1,8(sp)
 80001f3c:	00c12223          	sw	a2,4(sp)
+	Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 80001f40:	00c12783          	lw	a5,12(sp)
 80001f44:	00f12e23          	sw	a5,28(sp)
+		will not actually cause the task to block, just place it on a blocked
+		list.  It will not block until the scheduler is unlocked - at which
+		time a yield will be performed.  If an item is added to the queue while
+		the queue is locked, and the calling task blocks on the queue, then the
+		calling task will be immediately unblocked when the queue is unlocked. */
+		prvLockQueue( pxQueue );
 80001f48:	78c020ef          	jal	ra,800046d4 <vTaskEnterCritical>
 80001f4c:	01c12783          	lw	a5,28(sp)
 80001f50:	0447a703          	lw	a4,68(a5)
@@ -2124,23 +3807,40 @@ Disassembly of section .text:
 80001f74:	01c12783          	lw	a5,28(sp)
 80001f78:	0407a423          	sw	zero,72(a5)
 80001f7c:	798020ef          	jal	ra,80004714 <vTaskExitCritical>
+		if( pxQueue->uxMessagesWaiting == ( UBaseType_t ) 0U )
 80001f80:	01c12783          	lw	a5,28(sp)
 80001f84:	0387a783          	lw	a5,56(a5)
 80001f88:	00079e63          	bnez	a5,80001fa4 <vQueueWaitForMessageRestricted+0x78>
+		{
+			/* There is nothing in the queue, block for the specified period. */
+			vTaskPlaceOnEventListRestricted( &( pxQueue->xTasksWaitingToReceive ), xTicksToWait, xWaitIndefinitely );
 80001f8c:	01c12783          	lw	a5,28(sp)
 80001f90:	02478793          	addi	a5,a5,36
 80001f94:	00412603          	lw	a2,4(sp)
 80001f98:	00812583          	lw	a1,8(sp)
 80001f9c:	00078513          	mv	a0,a5
 80001fa0:	7f0010ef          	jal	ra,80003790 <vTaskPlaceOnEventListRestricted>
+		}
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+		prvUnlockQueue( pxQueue );
 80001fa4:	01c12503          	lw	a0,28(sp)
 80001fa8:	c79ff0ef          	jal	ra,80001c20 <prvUnlockQueue>
+	}
 80001fac:	00000013          	nop
 80001fb0:	02c12083          	lw	ra,44(sp)
 80001fb4:	03010113          	addi	sp,sp,48
 80001fb8:	00008067          	ret
 
 80001fbc <xTaskGenericCreate>:
+
+#endif
+/*-----------------------------------------------------------*/
+
+BaseType_t xTaskGenericCreate( TaskFunction_t pxTaskCode, const char * const pcName, const uint16_t usStackDepth, void * const pvParameters, UBaseType_t uxPriority, TaskHandle_t * const pxCreatedTask, StackType_t * const puxStackBuffer, const MemoryRegion_t * const xRegions ) /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+{
 80001fbc:	fc010113          	addi	sp,sp,-64
 80001fc0:	02112e23          	sw	ra,60(sp)
 80001fc4:	00a12e23          	sw	a0,28(sp)
@@ -2152,22 +3852,39 @@ Disassembly of section .text:
 80001fdc:	01112023          	sw	a7,0(sp)
 80001fe0:	00060793          	mv	a5,a2
 80001fe4:	00f11b23          	sh	a5,22(sp)
+BaseType_t xReturn;
+TCB_t * pxNewTCB;
+StackType_t *pxTopOfStack;
+
+	configASSERT( pxTaskCode );
 80001fe8:	01c12783          	lw	a5,28(sp)
 80001fec:	00079663          	bnez	a5,80001ff8 <xTaskGenericCreate+0x3c>
-80001ff0:	30047073          	csrci	mstatus,8
+80001ff0:	30007073          	csrci	mstatus,0
 80001ff4:	0000006f          	j	80001ff4 <xTaskGenericCreate+0x38>
+	configASSERT( ( ( uxPriority & ( UBaseType_t ) ( ~portPRIVILEGE_BIT ) ) < ( UBaseType_t ) configMAX_PRIORITIES ) );
 80001ff8:	00c12703          	lw	a4,12(sp)
 80001ffc:	00400793          	li	a5,4
 80002000:	00e7f663          	bleu	a4,a5,8000200c <xTaskGenericCreate+0x50>
-80002004:	30047073          	csrci	mstatus,8
+80002004:	30007073          	csrci	mstatus,0
 80002008:	0000006f          	j	80002008 <xTaskGenericCreate+0x4c>
+
+	/* Allocate the memory required by the TCB and stack for the new task,
+	checking that the allocation was successful. */
+	pxNewTCB = prvAllocateTCBAndStack( usStackDepth, puxStackBuffer );
 8000200c:	01615783          	lhu	a5,22(sp)
 80002010:	00412583          	lw	a1,4(sp)
 80002014:	00078513          	mv	a0,a5
 80002018:	7ed010ef          	jal	ra,80004004 <prvAllocateTCBAndStack>
 8000201c:	02a12423          	sw	a0,40(sp)
+	if( pxNewTCB != NULL )
 80002020:	02812783          	lw	a5,40(sp)
 80002024:	1c078663          	beqz	a5,800021f0 <xTaskGenericCreate+0x234>
+		stack grows from high memory to low (as per the 80x86) or vice versa.
+		portSTACK_GROWTH is used to make the result positive or negative as
+		required by the port. */
+		#if( portSTACK_GROWTH < 0 )
+		{
+			pxTopOfStack = pxNewTCB->pxStack + ( usStackDepth - ( uint16_t ) 1 );
 80002028:	02812783          	lw	a5,40(sp)
 8000202c:	0307a703          	lw	a4,48(a5)
 80002030:	01615683          	lhu	a3,22(sp)
@@ -2177,14 +3894,24 @@ Disassembly of section .text:
 80002040:	00279793          	slli	a5,a5,0x2
 80002044:	00f707b3          	add	a5,a4,a5
 80002048:	02f12223          	sw	a5,36(sp)
+			pxTopOfStack = ( StackType_t * ) ( ( ( portPOINTER_SIZE_TYPE ) pxTopOfStack ) & ( ~( ( portPOINTER_SIZE_TYPE ) portBYTE_ALIGNMENT_MASK ) ) ); /*lint !e923 MISRA exception.  Avoiding casts between pointers and integers is not practical.  Size differences accounted for using portPOINTER_SIZE_TYPE type. */
 8000204c:	02412783          	lw	a5,36(sp)
 80002050:	ffc7f793          	andi	a5,a5,-4
 80002054:	02f12223          	sw	a5,36(sp)
+
+			/* Check the alignment of the calculated top of stack is correct. */
+			configASSERT( ( ( ( portPOINTER_SIZE_TYPE ) pxTopOfStack & ( portPOINTER_SIZE_TYPE ) portBYTE_ALIGNMENT_MASK ) == 0UL ) );
 80002058:	02412783          	lw	a5,36(sp)
 8000205c:	0037f793          	andi	a5,a5,3
 80002060:	00078663          	beqz	a5,8000206c <xTaskGenericCreate+0xb0>
-80002064:	30047073          	csrci	mstatus,8
+80002064:	30007073          	csrci	mstatus,0
 80002068:	0000006f          	j	80002068 <xTaskGenericCreate+0xac>
+			pxNewTCB->pxEndOfStack = pxNewTCB->pxStack + ( usStackDepth - 1 );
+		}
+		#endif /* portSTACK_GROWTH */
+
+		/* Setup the newly allocated TCB with the initial state of the task. */
+		prvInitialiseTCBVariables( pxNewTCB, pcName, uxPriority, xRegions, usStackDepth );
 8000206c:	01615783          	lhu	a5,22(sp)
 80002070:	00078713          	mv	a4,a5
 80002074:	00012683          	lw	a3,0(sp)
@@ -2192,6 +3919,12 @@ Disassembly of section .text:
 8000207c:	01812583          	lw	a1,24(sp)
 80002080:	02812503          	lw	a0,40(sp)
 80002084:	415010ef          	jal	ra,80003c98 <prvInitialiseTCBVariables>
+		{
+			pxNewTCB->pxTopOfStack = pxPortInitialiseStack( pxTopOfStack, pxTaskCode, pvParameters, xRunPrivileged );
+		}
+		#else /* portUSING_MPU_WRAPPERS */
+		{
+			pxNewTCB->pxTopOfStack = pxPortInitialiseStack( pxTopOfStack, pxTaskCode, pvParameters );
 80002088:	01012603          	lw	a2,16(sp)
 8000208c:	01c12583          	lw	a1,28(sp)
 80002090:	02412503          	lw	a0,36(sp)
@@ -2199,12 +3932,29 @@ Disassembly of section .text:
 80002098:	00050713          	mv	a4,a0
 8000209c:	02812783          	lw	a5,40(sp)
 800020a0:	00e7a023          	sw	a4,0(a5)
+		}
+		#endif /* portUSING_MPU_WRAPPERS */
+
+		if( ( void * ) pxCreatedTask != NULL )
 800020a4:	00812783          	lw	a5,8(sp)
 800020a8:	00078863          	beqz	a5,800020b8 <xTaskGenericCreate+0xfc>
+		{
+			/* Pass the TCB out - in an anonymous way.  The calling function/
+			task can use this as a handle to delete the task later if
+			required.*/
+			*pxCreatedTask = ( TaskHandle_t ) pxNewTCB;
 800020ac:	00812783          	lw	a5,8(sp)
 800020b0:	02812703          	lw	a4,40(sp)
 800020b4:	00e7a023          	sw	a4,0(a5)
+			mtCOVERAGE_TEST_MARKER();
+		}
+
+		/* Ensure interrupts don't access the task lists while they are being
+		updated. */
+		taskENTER_CRITICAL();
 800020b8:	61c020ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			uxCurrentNumberOfTasks++;
 800020bc:	00020797          	auipc	a5,0x20
 800020c0:	99478793          	addi	a5,a5,-1644 # 80021a50 <uxCurrentNumberOfTasks>
 800020c4:	0007a783          	lw	a5,0(a5)
@@ -2212,35 +3962,63 @@ Disassembly of section .text:
 800020cc:	00020797          	auipc	a5,0x20
 800020d0:	98478793          	addi	a5,a5,-1660 # 80021a50 <uxCurrentNumberOfTasks>
 800020d4:	00e7a023          	sw	a4,0(a5)
+			if( pxCurrentTCB == NULL )
 800020d8:	0001f797          	auipc	a5,0x1f
 800020dc:	e0c78793          	addi	a5,a5,-500 # 80020ee4 <pxCurrentTCB>
 800020e0:	0007a783          	lw	a5,0(a5)
 800020e4:	02079863          	bnez	a5,80002114 <xTaskGenericCreate+0x158>
+			{
+				/* There are no other tasks, or all the other tasks are in
+				the suspended state - make this the current task. */
+				pxCurrentTCB =  pxNewTCB;
 800020e8:	0001f797          	auipc	a5,0x1f
 800020ec:	dfc78793          	addi	a5,a5,-516 # 80020ee4 <pxCurrentTCB>
 800020f0:	02812703          	lw	a4,40(sp)
 800020f4:	00e7a023          	sw	a4,0(a5)
+
+				if( uxCurrentNumberOfTasks == ( UBaseType_t ) 1 )
 800020f8:	00020797          	auipc	a5,0x20
 800020fc:	95878793          	addi	a5,a5,-1704 # 80021a50 <uxCurrentNumberOfTasks>
 80002100:	0007a703          	lw	a4,0(a5)
 80002104:	00100793          	li	a5,1
 80002108:	04f71263          	bne	a4,a5,8000214c <xTaskGenericCreate+0x190>
+				{
+					/* This is the first task to be created so do the preliminary
+					initialisation required.  We will not recover if this call
+					fails, but we will report the failure. */
+					prvInitialiseTaskLists();
 8000210c:	4b9010ef          	jal	ra,80003dc4 <prvInitialiseTaskLists>
 80002110:	03c0006f          	j	8000214c <xTaskGenericCreate+0x190>
+			else
+			{
+				/* If the scheduler is not already running, make this task the
+				current task if it is the highest priority task to be created
+				so far. */
+				if( xSchedulerRunning == pdFALSE )
 80002114:	00020797          	auipc	a5,0x20
 80002118:	94878793          	addi	a5,a5,-1720 # 80021a5c <xSchedulerRunning>
 8000211c:	0007a783          	lw	a5,0(a5)
 80002120:	02079663          	bnez	a5,8000214c <xTaskGenericCreate+0x190>
+				{
+					if( pxCurrentTCB->uxPriority <= uxPriority )
 80002124:	0001f797          	auipc	a5,0x1f
 80002128:	dc078793          	addi	a5,a5,-576 # 80020ee4 <pxCurrentTCB>
 8000212c:	0007a783          	lw	a5,0(a5)
 80002130:	02c7a783          	lw	a5,44(a5)
 80002134:	00c12703          	lw	a4,12(sp)
 80002138:	00f76a63          	bltu	a4,a5,8000214c <xTaskGenericCreate+0x190>
+					{
+						pxCurrentTCB = pxNewTCB;
 8000213c:	0001f797          	auipc	a5,0x1f
 80002140:	da878793          	addi	a5,a5,-600 # 80020ee4 <pxCurrentTCB>
 80002144:	02812703          	lw	a4,40(sp)
 80002148:	00e7a023          	sw	a4,0(a5)
+				{
+					mtCOVERAGE_TEST_MARKER();
+				}
+			}
+
+			uxTaskNumber++;
 8000214c:	00020797          	auipc	a5,0x20
 80002150:	92078793          	addi	a5,a5,-1760 # 80021a6c <uxTaskNumber>
 80002154:	0007a783          	lw	a5,0(a5)
@@ -2248,11 +4026,21 @@ Disassembly of section .text:
 8000215c:	00020797          	auipc	a5,0x20
 80002160:	91078793          	addi	a5,a5,-1776 # 80021a6c <uxTaskNumber>
 80002164:	00e7a023          	sw	a4,0(a5)
+
+			#if ( configUSE_TRACE_FACILITY == 1 )
+			{
+				/* Add a counter into the TCB for tracing only. */
+				pxNewTCB->uxTCBNumber = uxTaskNumber;
 80002168:	00020797          	auipc	a5,0x20
 8000216c:	90478793          	addi	a5,a5,-1788 # 80021a6c <uxTaskNumber>
 80002170:	0007a703          	lw	a4,0(a5)
 80002174:	02812783          	lw	a5,40(sp)
 80002178:	04e7a423          	sw	a4,72(a5)
+			}
+			#endif /* configUSE_TRACE_FACILITY */
+			traceTASK_CREATE( pxNewTCB );
+
+			prvAddTaskToReadyList( pxNewTCB );
 8000217c:	02812783          	lw	a5,40(sp)
 80002180:	02c7a703          	lw	a4,44(a5)
 80002184:	00020797          	auipc	a5,0x20
@@ -2278,37 +4066,78 @@ Disassembly of section .text:
 800021d4:	00078593          	mv	a1,a5
 800021d8:	00070513          	mv	a0,a4
 800021dc:	f10fe0ef          	jal	ra,800008ec <vListInsertEnd>
+
+			xReturn = pdPASS;
 800021e0:	00100793          	li	a5,1
 800021e4:	02f12623          	sw	a5,44(sp)
+			portSETUP_TCB( pxNewTCB );
+		}
+		taskEXIT_CRITICAL();
 800021e8:	52c020ef          	jal	ra,80004714 <vTaskExitCritical>
 800021ec:	00c0006f          	j	800021f8 <xTaskGenericCreate+0x23c>
+	}
+	else
+	{
+		xReturn = errCOULD_NOT_ALLOCATE_REQUIRED_MEMORY;
 800021f0:	fff00793          	li	a5,-1
 800021f4:	02f12623          	sw	a5,44(sp)
+		traceTASK_CREATE_FAILED();
+	}
+
+	if( xReturn == pdPASS )
 800021f8:	02c12703          	lw	a4,44(sp)
 800021fc:	00100793          	li	a5,1
 80002200:	02f71863          	bne	a4,a5,80002230 <xTaskGenericCreate+0x274>
+	{
+		if( xSchedulerRunning != pdFALSE )
 80002204:	00020797          	auipc	a5,0x20
 80002208:	85878793          	addi	a5,a5,-1960 # 80021a5c <xSchedulerRunning>
 8000220c:	0007a783          	lw	a5,0(a5)
 80002210:	02078063          	beqz	a5,80002230 <xTaskGenericCreate+0x274>
+		{
+			/* If the created task is of a higher priority than the current task
+			then it should run now. */
+			if( pxCurrentTCB->uxPriority < uxPriority )
 80002214:	0001f797          	auipc	a5,0x1f
 80002218:	cd078793          	addi	a5,a5,-816 # 80020ee4 <pxCurrentTCB>
 8000221c:	0007a783          	lw	a5,0(a5)
 80002220:	02c7a783          	lw	a5,44(a5)
 80002224:	00c12703          	lw	a4,12(sp)
 80002228:	00e7f463          	bleu	a4,a5,80002230 <xTaskGenericCreate+0x274>
+			{
+				taskYIELD_IF_USING_PREEMPTION();
 8000222c:	b68fe0ef          	jal	ra,80000594 <vPortYield>
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
+
+	return xReturn;
 80002230:	02c12783          	lw	a5,44(sp)
+}
 80002234:	00078513          	mv	a0,a5
 80002238:	03c12083          	lw	ra,60(sp)
 8000223c:	04010113          	addi	sp,sp,64
 80002240:	00008067          	ret
 
 80002244 <vTaskDelete>:
+/*-----------------------------------------------------------*/
+
+#if ( INCLUDE_vTaskDelete == 1 )
+
+	void vTaskDelete( TaskHandle_t xTaskToDelete )
+	{
 80002244:	fd010113          	addi	sp,sp,-48
 80002248:	02112623          	sw	ra,44(sp)
 8000224c:	00a12623          	sw	a0,12(sp)
+	TCB_t *pxTCB;
+
+		taskENTER_CRITICAL();
 80002250:	484020ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			/* If null is passed in here then it is the calling task that is
+			being deleted. */
+			pxTCB = prvGetTCBFromHandle( xTaskToDelete );
 80002254:	00c12783          	lw	a5,12(sp)
 80002258:	00079a63          	bnez	a5,8000226c <vTaskDelete+0x28>
 8000225c:	0001f797          	auipc	a5,0x1f
@@ -2317,23 +4146,48 @@ Disassembly of section .text:
 80002268:	0080006f          	j	80002270 <vTaskDelete+0x2c>
 8000226c:	00c12783          	lw	a5,12(sp)
 80002270:	00f12e23          	sw	a5,28(sp)
+
+			/* Remove task from the ready list and place in the	termination list.
+			This will stop the task from be scheduled.  The idle task will check
+			the termination list and free up any memory allocated by the
+			scheduler for the TCB and stack. */
+			if( uxListRemove( &( pxTCB->xGenericListItem ) ) == ( UBaseType_t ) 0 )
 80002274:	01c12783          	lw	a5,28(sp)
 80002278:	00478793          	addi	a5,a5,4
 8000227c:	00078513          	mv	a0,a5
 80002280:	fb0fe0ef          	jal	ra,80000a30 <uxListRemove>
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+
+			/* Is the task waiting on an event also? */
+			if( listLIST_ITEM_CONTAINER( &( pxTCB->xEventListItem ) ) != NULL )
 80002284:	01c12783          	lw	a5,28(sp)
 80002288:	0287a783          	lw	a5,40(a5)
 8000228c:	00078a63          	beqz	a5,800022a0 <vTaskDelete+0x5c>
+			{
+				( void ) uxListRemove( &( pxTCB->xEventListItem ) );
 80002290:	01c12783          	lw	a5,28(sp)
 80002294:	01878793          	addi	a5,a5,24
 80002298:	00078513          	mv	a0,a5
 8000229c:	f94fe0ef          	jal	ra,80000a30 <uxListRemove>
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+
+			vListInsertEnd( &xTasksWaitingTermination, &( pxTCB->xGenericListItem ) );
 800022a0:	01c12783          	lw	a5,28(sp)
 800022a4:	00478793          	addi	a5,a5,4
 800022a8:	00078593          	mv	a1,a5
 800022ac:	0001f517          	auipc	a0,0x1f
 800022b0:	77850513          	addi	a0,a0,1912 # 80021a24 <xTasksWaitingTermination>
 800022b4:	e38fe0ef          	jal	ra,800008ec <vListInsertEnd>
+
+			/* Increment the ucTasksDeleted variable so the idle task knows
+			there is a task that has been deleted and that it should therefore
+			check the xTasksWaitingTermination list. */
+			++uxTasksDeleted;
 800022b8:	0001f797          	auipc	a5,0x1f
 800022bc:	78078793          	addi	a5,a5,1920 # 80021a38 <uxTasksDeleted>
 800022c0:	0007a783          	lw	a5,0(a5)
@@ -2341,6 +4195,10 @@ Disassembly of section .text:
 800022c8:	0001f797          	auipc	a5,0x1f
 800022cc:	77078793          	addi	a5,a5,1904 # 80021a38 <uxTasksDeleted>
 800022d0:	00e7a023          	sw	a4,0(a5)
+
+			/* Increment the uxTaskNumberVariable also so kernel aware debuggers
+			can detect that the task lists need re-generating. */
+			uxTaskNumber++;
 800022d4:	0001f797          	auipc	a5,0x1f
 800022d8:	79878793          	addi	a5,a5,1944 # 80021a6c <uxTaskNumber>
 800022dc:	0007a783          	lw	a5,0(a5)
@@ -2348,66 +4206,123 @@ Disassembly of section .text:
 800022e4:	0001f797          	auipc	a5,0x1f
 800022e8:	78878793          	addi	a5,a5,1928 # 80021a6c <uxTaskNumber>
 800022ec:	00e7a023          	sw	a4,0(a5)
+
+			traceTASK_DELETE( pxTCB );
+		}
+		taskEXIT_CRITICAL();
 800022f0:	424020ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		/* Force a reschedule if it is the currently running task that has just
+		been deleted. */
+		if( xSchedulerRunning != pdFALSE )
 800022f4:	0001f797          	auipc	a5,0x1f
 800022f8:	76878793          	addi	a5,a5,1896 # 80021a5c <xSchedulerRunning>
 800022fc:	0007a783          	lw	a5,0(a5)
 80002300:	04078263          	beqz	a5,80002344 <vTaskDelete+0x100>
+		{
+			if( pxTCB == pxCurrentTCB )
 80002304:	0001f797          	auipc	a5,0x1f
 80002308:	be078793          	addi	a5,a5,-1056 # 80020ee4 <pxCurrentTCB>
 8000230c:	0007a783          	lw	a5,0(a5)
 80002310:	01c12703          	lw	a4,28(sp)
 80002314:	02f71263          	bne	a4,a5,80002338 <vTaskDelete+0xf4>
+			{
+				configASSERT( uxSchedulerSuspended == 0 );
 80002318:	0001f797          	auipc	a5,0x1f
 8000231c:	75c78793          	addi	a5,a5,1884 # 80021a74 <uxSchedulerSuspended>
 80002320:	0007a783          	lw	a5,0(a5)
 80002324:	00078663          	beqz	a5,80002330 <vTaskDelete+0xec>
-80002328:	30047073          	csrci	mstatus,8
+80002328:	30007073          	csrci	mstatus,0
 8000232c:	0000006f          	j	8000232c <vTaskDelete+0xe8>
+				in which Windows specific clean up operations are performed,
+				after which it is not possible to yield away from this task -
+				hence xYieldPending is used to latch that a context switch is
+				required. */
+				portPRE_TASK_DELETE_HOOK( pxTCB, &xYieldPending );
+				portYIELD_WITHIN_API();
 80002330:	a64fe0ef          	jal	ra,80000594 <vPortYield>
+					prvResetNextTaskUnblockTime();
+				}
+				taskEXIT_CRITICAL();
+			}
+		}
+	}
 80002334:	0100006f          	j	80002344 <vTaskDelete+0x100>
+				taskENTER_CRITICAL();
 80002338:	39c020ef          	jal	ra,800046d4 <vTaskEnterCritical>
+					prvResetNextTaskUnblockTime();
 8000233c:	018020ef          	jal	ra,80004354 <prvResetNextTaskUnblockTime>
+				taskEXIT_CRITICAL();
 80002340:	3d4020ef          	jal	ra,80004714 <vTaskExitCritical>
+	}
 80002344:	00000013          	nop
 80002348:	02c12083          	lw	ra,44(sp)
 8000234c:	03010113          	addi	sp,sp,48
 80002350:	00008067          	ret
 
 80002354 <vTaskDelayUntil>:
+/*-----------------------------------------------------------*/
+
+#if ( INCLUDE_vTaskDelayUntil == 1 )
+
+	void vTaskDelayUntil( TickType_t * const pxPreviousWakeTime, const TickType_t xTimeIncrement )
+	{
 80002354:	fd010113          	addi	sp,sp,-48
 80002358:	02112623          	sw	ra,44(sp)
 8000235c:	00a12623          	sw	a0,12(sp)
 80002360:	00b12423          	sw	a1,8(sp)
+	TickType_t xTimeToWake;
+	BaseType_t xAlreadyYielded, xShouldDelay = pdFALSE;
 80002364:	00012e23          	sw	zero,28(sp)
+
+		configASSERT( pxPreviousWakeTime );
 80002368:	00c12783          	lw	a5,12(sp)
 8000236c:	00079663          	bnez	a5,80002378 <vTaskDelayUntil+0x24>
-80002370:	30047073          	csrci	mstatus,8
+80002370:	30007073          	csrci	mstatus,0
 80002374:	0000006f          	j	80002374 <vTaskDelayUntil+0x20>
+		configASSERT( ( xTimeIncrement > 0U ) );
 80002378:	00812783          	lw	a5,8(sp)
 8000237c:	00079663          	bnez	a5,80002388 <vTaskDelayUntil+0x34>
-80002380:	30047073          	csrci	mstatus,8
+80002380:	30007073          	csrci	mstatus,0
 80002384:	0000006f          	j	80002384 <vTaskDelayUntil+0x30>
+		configASSERT( uxSchedulerSuspended == 0 );
 80002388:	0001f797          	auipc	a5,0x1f
 8000238c:	6ec78793          	addi	a5,a5,1772 # 80021a74 <uxSchedulerSuspended>
 80002390:	0007a783          	lw	a5,0(a5)
 80002394:	00078663          	beqz	a5,800023a0 <vTaskDelayUntil+0x4c>
-80002398:	30047073          	csrci	mstatus,8
+80002398:	30007073          	csrci	mstatus,0
 8000239c:	0000006f          	j	8000239c <vTaskDelayUntil+0x48>
+
+		vTaskSuspendAll();
 800023a0:	1d1000ef          	jal	ra,80002d70 <vTaskSuspendAll>
+		{
+			/* Minor optimisation.  The tick count cannot change in this
+			block. */
+			const TickType_t xConstTickCount = xTickCount;
 800023a4:	0001f797          	auipc	a5,0x1f
 800023a8:	6b078793          	addi	a5,a5,1712 # 80021a54 <xTickCount>
 800023ac:	0007a783          	lw	a5,0(a5)
 800023b0:	00f12c23          	sw	a5,24(sp)
+
+			/* Generate the tick time at which the task wants to wake. */
+			xTimeToWake = *pxPreviousWakeTime + xTimeIncrement;
 800023b4:	00c12783          	lw	a5,12(sp)
 800023b8:	0007a783          	lw	a5,0(a5)
 800023bc:	00812703          	lw	a4,8(sp)
 800023c0:	00f707b3          	add	a5,a4,a5
 800023c4:	00f12a23          	sw	a5,20(sp)
+
+			if( xConstTickCount < *pxPreviousWakeTime )
 800023c8:	00c12783          	lw	a5,12(sp)
 800023cc:	0007a783          	lw	a5,0(a5)
 800023d0:	01812703          	lw	a4,24(sp)
 800023d4:	02f77663          	bleu	a5,a4,80002400 <vTaskDelayUntil+0xac>
+				/* The tick count has overflowed since this function was
+				lasted called.  In this case the only time we should ever
+				actually delay is if the wake time has also	overflowed,
+				and the wake time is greater than the tick time.  When this
+				is the case it is as if neither time had overflowed. */
+				if( ( xTimeToWake < *pxPreviousWakeTime ) && ( xTimeToWake > xConstTickCount ) )
 800023d8:	00c12783          	lw	a5,12(sp)
 800023dc:	0007a783          	lw	a5,0(a5)
 800023e0:	01412703          	lw	a4,20(sp)
@@ -2415,9 +4330,17 @@ Disassembly of section .text:
 800023e8:	01412703          	lw	a4,20(sp)
 800023ec:	01812783          	lw	a5,24(sp)
 800023f0:	02e7fa63          	bleu	a4,a5,80002424 <vTaskDelayUntil+0xd0>
+				{
+					xShouldDelay = pdTRUE;
 800023f4:	00100793          	li	a5,1
 800023f8:	00f12e23          	sw	a5,28(sp)
 800023fc:	0280006f          	j	80002424 <vTaskDelayUntil+0xd0>
+			else
+			{
+				/* The tick time has not overflowed.  In this case we will
+				delay if either the wake time has overflowed, and/or the
+				tick time is less than the wake time. */
+				if( ( xTimeToWake < *pxPreviousWakeTime ) || ( xTimeToWake > xConstTickCount ) )
 80002400:	00c12783          	lw	a5,12(sp)
 80002404:	0007a783          	lw	a5,0(a5)
 80002408:	01412703          	lw	a4,20(sp)
@@ -2425,91 +4348,205 @@ Disassembly of section .text:
 80002410:	01412703          	lw	a4,20(sp)
 80002414:	01812783          	lw	a5,24(sp)
 80002418:	00e7f663          	bleu	a4,a5,80002424 <vTaskDelayUntil+0xd0>
+				{
+					xShouldDelay = pdTRUE;
 8000241c:	00100793          	li	a5,1
 80002420:	00f12e23          	sw	a5,28(sp)
+					mtCOVERAGE_TEST_MARKER();
+				}
+			}
+
+			/* Update the wake time ready for the next call. */
+			*pxPreviousWakeTime = xTimeToWake;
 80002424:	00c12783          	lw	a5,12(sp)
 80002428:	01412703          	lw	a4,20(sp)
 8000242c:	00e7a023          	sw	a4,0(a5)
+
+			if( xShouldDelay != pdFALSE )
 80002430:	01c12783          	lw	a5,28(sp)
 80002434:	02078263          	beqz	a5,80002458 <vTaskDelayUntil+0x104>
+			{
+				traceTASK_DELAY_UNTIL();
+
+				/* Remove the task from the ready list before adding it to the
+				blocked list as the same list item is used for both lists. */
+				if( uxListRemove( &( pxCurrentTCB->xGenericListItem ) ) == ( UBaseType_t ) 0 )
 80002438:	0001f797          	auipc	a5,0x1f
 8000243c:	aac78793          	addi	a5,a5,-1364 # 80020ee4 <pxCurrentTCB>
 80002440:	0007a783          	lw	a5,0(a5)
 80002444:	00478793          	addi	a5,a5,4
 80002448:	00078513          	mv	a0,a5
 8000244c:	de4fe0ef          	jal	ra,80000a30 <uxListRemove>
+				else
+				{
+					mtCOVERAGE_TEST_MARKER();
+				}
+
+				prvAddCurrentTaskToDelayedList( xTimeToWake );
 80002450:	01412503          	lw	a0,20(sp)
 80002454:	2f5010ef          	jal	ra,80003f48 <prvAddCurrentTaskToDelayedList>
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+		xAlreadyYielded = xTaskResumeAll();
 80002458:	13d000ef          	jal	ra,80002d94 <xTaskResumeAll>
 8000245c:	00a12823          	sw	a0,16(sp)
+
+		/* Force a reschedule if xTaskResumeAll has not already done so, we may
+		have put ourselves to sleep. */
+		if( xAlreadyYielded == pdFALSE )
 80002460:	01012783          	lw	a5,16(sp)
 80002464:	00079463          	bnez	a5,8000246c <vTaskDelayUntil+0x118>
+		{
+			portYIELD_WITHIN_API();
 80002468:	92cfe0ef          	jal	ra,80000594 <vPortYield>
+		}
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
 8000246c:	00000013          	nop
 80002470:	02c12083          	lw	ra,44(sp)
 80002474:	03010113          	addi	sp,sp,48
 80002478:	00008067          	ret
 
 8000247c <vTaskDelay>:
+/*-----------------------------------------------------------*/
+
+#if ( INCLUDE_vTaskDelay == 1 )
+
+	void vTaskDelay( const TickType_t xTicksToDelay )
+	{
 8000247c:	fd010113          	addi	sp,sp,-48
 80002480:	02112623          	sw	ra,44(sp)
 80002484:	00a12623          	sw	a0,12(sp)
+	TickType_t xTimeToWake;
+	BaseType_t xAlreadyYielded = pdFALSE;
 80002488:	00012e23          	sw	zero,28(sp)
+
+
+		/* A delay time of zero just forces a reschedule. */
+		if( xTicksToDelay > ( TickType_t ) 0U )
 8000248c:	00c12783          	lw	a5,12(sp)
 80002490:	06078063          	beqz	a5,800024f0 <vTaskDelay+0x74>
+		{
+			configASSERT( uxSchedulerSuspended == 0 );
 80002494:	0001f797          	auipc	a5,0x1f
 80002498:	5e078793          	addi	a5,a5,1504 # 80021a74 <uxSchedulerSuspended>
 8000249c:	0007a783          	lw	a5,0(a5)
 800024a0:	00078663          	beqz	a5,800024ac <vTaskDelay+0x30>
-800024a4:	30047073          	csrci	mstatus,8
+800024a4:	30007073          	csrci	mstatus,0
 800024a8:	0000006f          	j	800024a8 <vTaskDelay+0x2c>
+			vTaskSuspendAll();
 800024ac:	0c5000ef          	jal	ra,80002d70 <vTaskSuspendAll>
+				This task cannot be in an event list as it is the currently
+				executing task. */
+
+				/* Calculate the time to wake - this may overflow but this is
+				not a problem. */
+				xTimeToWake = xTickCount + xTicksToDelay;
 800024b0:	0001f797          	auipc	a5,0x1f
 800024b4:	5a478793          	addi	a5,a5,1444 # 80021a54 <xTickCount>
 800024b8:	0007a783          	lw	a5,0(a5)
 800024bc:	00c12703          	lw	a4,12(sp)
 800024c0:	00f707b3          	add	a5,a4,a5
 800024c4:	00f12c23          	sw	a5,24(sp)
+
+				/* We must remove ourselves from the ready list before adding
+				ourselves to the blocked list as the same list item is used for
+				both lists. */
+				if( uxListRemove( &( pxCurrentTCB->xGenericListItem ) ) == ( UBaseType_t ) 0 )
 800024c8:	0001f797          	auipc	a5,0x1f
 800024cc:	a1c78793          	addi	a5,a5,-1508 # 80020ee4 <pxCurrentTCB>
 800024d0:	0007a783          	lw	a5,0(a5)
 800024d4:	00478793          	addi	a5,a5,4
 800024d8:	00078513          	mv	a0,a5
 800024dc:	d54fe0ef          	jal	ra,80000a30 <uxListRemove>
+				}
+				else
+				{
+					mtCOVERAGE_TEST_MARKER();
+				}
+				prvAddCurrentTaskToDelayedList( xTimeToWake );
 800024e0:	01812503          	lw	a0,24(sp)
 800024e4:	265010ef          	jal	ra,80003f48 <prvAddCurrentTaskToDelayedList>
+			}
+			xAlreadyYielded = xTaskResumeAll();
 800024e8:	0ad000ef          	jal	ra,80002d94 <xTaskResumeAll>
 800024ec:	00a12e23          	sw	a0,28(sp)
+			mtCOVERAGE_TEST_MARKER();
+		}
+
+		/* Force a reschedule if xTaskResumeAll has not already done so, we may
+		have put ourselves to sleep. */
+		if( xAlreadyYielded == pdFALSE )
 800024f0:	01c12783          	lw	a5,28(sp)
 800024f4:	00079463          	bnez	a5,800024fc <vTaskDelay+0x80>
+		{
+			portYIELD_WITHIN_API();
 800024f8:	89cfe0ef          	jal	ra,80000594 <vPortYield>
+		}
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
 800024fc:	00000013          	nop
 80002500:	02c12083          	lw	ra,44(sp)
 80002504:	03010113          	addi	sp,sp,48
 80002508:	00008067          	ret
 
 8000250c <eTaskGetState>:
+/*-----------------------------------------------------------*/
+
+#if ( INCLUDE_eTaskGetState == 1 )
+
+	eTaskState eTaskGetState( TaskHandle_t xTask )
+	{
 8000250c:	fd010113          	addi	sp,sp,-48
 80002510:	02112623          	sw	ra,44(sp)
 80002514:	00a12623          	sw	a0,12(sp)
+	eTaskState eReturn;
+	List_t *pxStateList;
+	const TCB_t * const pxTCB = ( TCB_t * ) xTask;
 80002518:	00c12783          	lw	a5,12(sp)
 8000251c:	00f12c23          	sw	a5,24(sp)
+
+		configASSERT( pxTCB );
 80002520:	01812783          	lw	a5,24(sp)
 80002524:	00079663          	bnez	a5,80002530 <eTaskGetState+0x24>
-80002528:	30047073          	csrci	mstatus,8
+80002528:	30007073          	csrci	mstatus,0
 8000252c:	0000006f          	j	8000252c <eTaskGetState+0x20>
+
+		if( pxTCB == pxCurrentTCB )
 80002530:	0001f797          	auipc	a5,0x1f
 80002534:	9b478793          	addi	a5,a5,-1612 # 80020ee4 <pxCurrentTCB>
 80002538:	0007a783          	lw	a5,0(a5)
 8000253c:	01812703          	lw	a4,24(sp)
 80002540:	00f71663          	bne	a4,a5,8000254c <eTaskGetState+0x40>
+		{
+			/* The task calling this function is querying its own state. */
+			eReturn = eRunning;
 80002544:	00012e23          	sw	zero,28(sp)
 80002548:	0a40006f          	j	800025ec <eTaskGetState+0xe0>
+		}
+		else
+		{
+			taskENTER_CRITICAL();
 8000254c:	188020ef          	jal	ra,800046d4 <vTaskEnterCritical>
+			{
+				pxStateList = ( List_t * ) listLIST_ITEM_CONTAINER( &( pxTCB->xGenericListItem ) );
 80002550:	01812783          	lw	a5,24(sp)
 80002554:	0147a783          	lw	a5,20(a5)
 80002558:	00f12a23          	sw	a5,20(sp)
+			}
+			taskEXIT_CRITICAL();
 8000255c:	1b8020ef          	jal	ra,80004714 <vTaskExitCritical>
+
+			if( ( pxStateList == pxDelayedTaskList ) || ( pxStateList == pxOverflowDelayedTaskList ) )
 80002560:	0001f797          	auipc	a5,0x1f
 80002564:	4a878793          	addi	a5,a5,1192 # 80021a08 <pxDelayedTaskList>
 80002568:	0007a783          	lw	a5,0(a5)
@@ -2520,42 +4557,96 @@ Disassembly of section .text:
 8000257c:	0007a783          	lw	a5,0(a5)
 80002580:	01412703          	lw	a4,20(sp)
 80002584:	00f71863          	bne	a4,a5,80002594 <eTaskGetState+0x88>
+			{
+				/* The task being queried is referenced from one of the Blocked
+				lists. */
+				eReturn = eBlocked;
 80002588:	00200793          	li	a5,2
 8000258c:	00f12e23          	sw	a5,28(sp)
 80002590:	05c0006f          	j	800025ec <eTaskGetState+0xe0>
+			}
+
+			#if ( INCLUDE_vTaskSuspend == 1 )
+				else if( pxStateList == &xSuspendedTaskList )
 80002594:	01412703          	lw	a4,20(sp)
 80002598:	0001f797          	auipc	a5,0x1f
 8000259c:	4a478793          	addi	a5,a5,1188 # 80021a3c <xSuspendedTaskList>
 800025a0:	02f71463          	bne	a4,a5,800025c8 <eTaskGetState+0xbc>
+				{
+					/* The task being queried is referenced from the suspended
+					list.  Is it genuinely suspended or is it block
+					indefinitely? */
+					if( listLIST_ITEM_CONTAINER( &( pxTCB->xEventListItem ) ) == NULL )
 800025a4:	01812783          	lw	a5,24(sp)
 800025a8:	0287a783          	lw	a5,40(a5)
 800025ac:	00079863          	bnez	a5,800025bc <eTaskGetState+0xb0>
+					{
+						eReturn = eSuspended;
 800025b0:	00300793          	li	a5,3
 800025b4:	00f12e23          	sw	a5,28(sp)
 800025b8:	0340006f          	j	800025ec <eTaskGetState+0xe0>
+					}
+					else
+					{
+						eReturn = eBlocked;
 800025bc:	00200793          	li	a5,2
 800025c0:	00f12e23          	sw	a5,28(sp)
 800025c4:	0280006f          	j	800025ec <eTaskGetState+0xe0>
+					}
+				}
+			#endif
+
+			#if ( INCLUDE_vTaskDelete == 1 )
+				else if( pxStateList == &xTasksWaitingTermination )
 800025c8:	01412703          	lw	a4,20(sp)
 800025cc:	0001f797          	auipc	a5,0x1f
 800025d0:	45878793          	addi	a5,a5,1112 # 80021a24 <xTasksWaitingTermination>
 800025d4:	00f71863          	bne	a4,a5,800025e4 <eTaskGetState+0xd8>
+				{
+					/* The task being queried is referenced from the deleted
+					tasks list. */
+					eReturn = eDeleted;
 800025d8:	00400793          	li	a5,4
 800025dc:	00f12e23          	sw	a5,28(sp)
 800025e0:	00c0006f          	j	800025ec <eTaskGetState+0xe0>
+
+			else /*lint !e525 Negative indentation is intended to make use of pre-processor clearer. */
+			{
+				/* If the task is not in any other state, it must be in the
+				Ready (including pending ready) state. */
+				eReturn = eReady;
 800025e4:	00100793          	li	a5,1
 800025e8:	00f12e23          	sw	a5,28(sp)
+			}
+		}
+
+		return eReturn;
 800025ec:	01c12783          	lw	a5,28(sp)
+	} /*lint !e818 xTask cannot be a pointer to const because it is a typedef. */
 800025f0:	00078513          	mv	a0,a5
 800025f4:	02c12083          	lw	ra,44(sp)
 800025f8:	03010113          	addi	sp,sp,48
 800025fc:	00008067          	ret
 
 80002600 <uxTaskPriorityGet>:
+/*-----------------------------------------------------------*/
+
+#if ( INCLUDE_uxTaskPriorityGet == 1 )
+
+	UBaseType_t uxTaskPriorityGet( TaskHandle_t xTask )
+	{
 80002600:	fd010113          	addi	sp,sp,-48
 80002604:	02112623          	sw	ra,44(sp)
 80002608:	00a12623          	sw	a0,12(sp)
+	TCB_t *pxTCB;
+	UBaseType_t uxReturn;
+
+		taskENTER_CRITICAL();
 8000260c:	0c8020ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			/* If null is passed in here then it is the priority of the that
+			called uxTaskPriorityGet() that is being queried. */
+			pxTCB = prvGetTCBFromHandle( xTask );
 80002610:	00c12783          	lw	a5,12(sp)
 80002614:	00079a63          	bnez	a5,80002628 <uxTaskPriorityGet+0x28>
 80002618:	0001f797          	auipc	a5,0x1f
@@ -2564,23 +4655,45 @@ Disassembly of section .text:
 80002624:	0080006f          	j	8000262c <uxTaskPriorityGet+0x2c>
 80002628:	00c12783          	lw	a5,12(sp)
 8000262c:	00f12e23          	sw	a5,28(sp)
+			uxReturn = pxTCB->uxPriority;
 80002630:	01c12783          	lw	a5,28(sp)
 80002634:	02c7a783          	lw	a5,44(a5)
 80002638:	00f12c23          	sw	a5,24(sp)
+		}
+		taskEXIT_CRITICAL();
 8000263c:	0d8020ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		return uxReturn;
 80002640:	01812783          	lw	a5,24(sp)
+	}
 80002644:	00078513          	mv	a0,a5
 80002648:	02c12083          	lw	ra,44(sp)
 8000264c:	03010113          	addi	sp,sp,48
 80002650:	00008067          	ret
 
 80002654 <uxTaskPriorityGetFromISR>:
+/*-----------------------------------------------------------*/
+
+#if ( INCLUDE_uxTaskPriorityGet == 1 )
+
+	UBaseType_t uxTaskPriorityGetFromISR( TaskHandle_t xTask )
+	{
 80002654:	fd010113          	addi	sp,sp,-48
 80002658:	02112623          	sw	ra,44(sp)
 8000265c:	00a12623          	sw	a0,12(sp)
+		simple as possible.  More information (albeit Cortex-M specific) is
+		provided on the following link:
+		http://www.freertos.org/RTOS-Cortex-M3-M4.html */
+		portASSERT_IF_INTERRUPT_PRIORITY_INVALID();
+
+		uxSavedInterruptState = portSET_INTERRUPT_MASK_FROM_ISR();
 80002660:	944fe0ef          	jal	ra,800007a4 <vPortSetInterruptMask>
 80002664:	00050793          	mv	a5,a0
 80002668:	00f12e23          	sw	a5,28(sp)
+		{
+			/* If null is passed in here then it is the priority of the calling
+			task that is being queried. */
+			pxTCB = prvGetTCBFromHandle( xTask );
 8000266c:	00c12783          	lw	a5,12(sp)
 80002670:	00079a63          	bnez	a5,80002684 <uxTaskPriorityGetFromISR+0x30>
 80002674:	0001f797          	auipc	a5,0x1f
@@ -2589,35 +4702,67 @@ Disassembly of section .text:
 80002680:	0080006f          	j	80002688 <uxTaskPriorityGetFromISR+0x34>
 80002684:	00c12783          	lw	a5,12(sp)
 80002688:	00f12c23          	sw	a5,24(sp)
+			uxReturn = pxTCB->uxPriority;
 8000268c:	01812783          	lw	a5,24(sp)
 80002690:	02c7a783          	lw	a5,44(a5)
 80002694:	00f12a23          	sw	a5,20(sp)
+		}
+		portCLEAR_INTERRUPT_MASK_FROM_ISR( uxSavedInterruptState );
 80002698:	01c12783          	lw	a5,28(sp)
 8000269c:	00078513          	mv	a0,a5
 800026a0:	8e8fe0ef          	jal	ra,80000788 <vPortClearInterruptMask>
+
+		return uxReturn;
 800026a4:	01412783          	lw	a5,20(sp)
+	}
 800026a8:	00078513          	mv	a0,a5
 800026ac:	02c12083          	lw	ra,44(sp)
 800026b0:	03010113          	addi	sp,sp,48
 800026b4:	00008067          	ret
 
 800026b8 <vTaskPrioritySet>:
+/*-----------------------------------------------------------*/
+
+#if ( INCLUDE_vTaskPrioritySet == 1 )
+
+	void vTaskPrioritySet( TaskHandle_t xTask, UBaseType_t uxNewPriority )
+	{
 800026b8:	fd010113          	addi	sp,sp,-48
 800026bc:	02112623          	sw	ra,44(sp)
 800026c0:	00a12623          	sw	a0,12(sp)
 800026c4:	00b12423          	sw	a1,8(sp)
+	TCB_t *pxTCB;
+	UBaseType_t uxCurrentBasePriority, uxPriorityUsedOnEntry;
+	BaseType_t xYieldRequired = pdFALSE;
 800026c8:	00012e23          	sw	zero,28(sp)
+
+		configASSERT( ( uxNewPriority < configMAX_PRIORITIES ) );
 800026cc:	00812703          	lw	a4,8(sp)
 800026d0:	00400793          	li	a5,4
 800026d4:	00e7f663          	bleu	a4,a5,800026e0 <vTaskPrioritySet+0x28>
-800026d8:	30047073          	csrci	mstatus,8
+800026d8:	30007073          	csrci	mstatus,0
 800026dc:	0000006f          	j	800026dc <vTaskPrioritySet+0x24>
+
+		/* Ensure the new priority is valid. */
+		if( uxNewPriority >= ( UBaseType_t ) configMAX_PRIORITIES )
 800026e0:	00812703          	lw	a4,8(sp)
 800026e4:	00400793          	li	a5,4
 800026e8:	00e7f663          	bleu	a4,a5,800026f4 <vTaskPrioritySet+0x3c>
+		{
+			uxNewPriority = ( UBaseType_t ) configMAX_PRIORITIES - ( UBaseType_t ) 1U;
 800026ec:	00400793          	li	a5,4
 800026f0:	00f12423          	sw	a5,8(sp)
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+
+		taskENTER_CRITICAL();
 800026f4:	7e1010ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			/* If null is passed in here then it is the priority of the calling
+			task that is being changed. */
+			pxTCB = prvGetTCBFromHandle( xTask );
 800026f8:	00c12783          	lw	a5,12(sp)
 800026fc:	00079a63          	bnez	a5,80002710 <vTaskPrioritySet+0x58>
 80002700:	0001e797          	auipc	a5,0x1e
@@ -2626,58 +4771,128 @@ Disassembly of section .text:
 8000270c:	0080006f          	j	80002714 <vTaskPrioritySet+0x5c>
 80002710:	00c12783          	lw	a5,12(sp)
 80002714:	00f12c23          	sw	a5,24(sp)
+
+			traceTASK_PRIORITY_SET( pxTCB, uxNewPriority );
+
+			#if ( configUSE_MUTEXES == 1 )
+			{
+				uxCurrentBasePriority = pxTCB->uxBasePriority;
 80002718:	01812783          	lw	a5,24(sp)
 8000271c:	0507a783          	lw	a5,80(a5)
 80002720:	00f12a23          	sw	a5,20(sp)
+			{
+				uxCurrentBasePriority = pxTCB->uxPriority;
+			}
+			#endif
+
+			if( uxCurrentBasePriority != uxNewPriority )
 80002724:	01412703          	lw	a4,20(sp)
 80002728:	00812783          	lw	a5,8(sp)
 8000272c:	16f70e63          	beq	a4,a5,800028a8 <vTaskPrioritySet+0x1f0>
+			{
+				/* The priority change may have readied a task of higher
+				priority than the calling task. */
+				if( uxNewPriority > uxCurrentBasePriority )
 80002730:	00812703          	lw	a4,8(sp)
 80002734:	01412783          	lw	a5,20(sp)
 80002738:	02e7fe63          	bleu	a4,a5,80002774 <vTaskPrioritySet+0xbc>
+				{
+					if( pxTCB != pxCurrentTCB )
 8000273c:	0001e797          	auipc	a5,0x1e
 80002740:	7a878793          	addi	a5,a5,1960 # 80020ee4 <pxCurrentTCB>
 80002744:	0007a783          	lw	a5,0(a5)
 80002748:	01812703          	lw	a4,24(sp)
 8000274c:	04f70263          	beq	a4,a5,80002790 <vTaskPrioritySet+0xd8>
+					{
+						/* The priority of a task other than the currently
+						running task is being raised.  Is the priority being
+						raised above that of the running task? */
+						if( uxNewPriority >= pxCurrentTCB->uxPriority )
 80002750:	0001e797          	auipc	a5,0x1e
 80002754:	79478793          	addi	a5,a5,1940 # 80020ee4 <pxCurrentTCB>
 80002758:	0007a783          	lw	a5,0(a5)
 8000275c:	02c7a783          	lw	a5,44(a5)
 80002760:	00812703          	lw	a4,8(sp)
 80002764:	02f76663          	bltu	a4,a5,80002790 <vTaskPrioritySet+0xd8>
+						{
+							xYieldRequired = pdTRUE;
 80002768:	00100793          	li	a5,1
 8000276c:	00f12e23          	sw	a5,28(sp)
 80002770:	0200006f          	j	80002790 <vTaskPrioritySet+0xd8>
+						/* The priority of the running task is being raised,
+						but the running task must already be the highest
+						priority task able to run so no yield is required. */
+					}
+				}
+				else if( pxTCB == pxCurrentTCB )
 80002774:	0001e797          	auipc	a5,0x1e
 80002778:	77078793          	addi	a5,a5,1904 # 80020ee4 <pxCurrentTCB>
 8000277c:	0007a783          	lw	a5,0(a5)
 80002780:	01812703          	lw	a4,24(sp)
 80002784:	00f71663          	bne	a4,a5,80002790 <vTaskPrioritySet+0xd8>
+				{
+					/* Setting the priority of the running task down means
+					there may now be another task of higher priority that
+					is ready to execute. */
+					xYieldRequired = pdTRUE;
 80002788:	00100793          	li	a5,1
 8000278c:	00f12e23          	sw	a5,28(sp)
+				}
+
+				/* Remember the ready list the task might be referenced from
+				before its uxPriority member is changed so the
+				taskRESET_READY_PRIORITY() macro can function correctly. */
+				uxPriorityUsedOnEntry = pxTCB->uxPriority;
 80002790:	01812783          	lw	a5,24(sp)
 80002794:	02c7a783          	lw	a5,44(a5)
 80002798:	00f12823          	sw	a5,16(sp)
+
+				#if ( configUSE_MUTEXES == 1 )
+				{
+					/* Only change the priority being used if the task is not
+					currently using an inherited priority. */
+					if( pxTCB->uxBasePriority == pxTCB->uxPriority )
 8000279c:	01812783          	lw	a5,24(sp)
 800027a0:	0507a703          	lw	a4,80(a5)
 800027a4:	01812783          	lw	a5,24(sp)
 800027a8:	02c7a783          	lw	a5,44(a5)
 800027ac:	00f71863          	bne	a4,a5,800027bc <vTaskPrioritySet+0x104>
+					{
+						pxTCB->uxPriority = uxNewPriority;
 800027b0:	01812783          	lw	a5,24(sp)
 800027b4:	00812703          	lw	a4,8(sp)
 800027b8:	02e7a623          	sw	a4,44(a5)
+					{
+						mtCOVERAGE_TEST_MARKER();
+					}
+
+					/* The base priority gets set whatever. */
+					pxTCB->uxBasePriority = uxNewPriority;
 800027bc:	01812783          	lw	a5,24(sp)
 800027c0:	00812703          	lw	a4,8(sp)
 800027c4:	04e7a823          	sw	a4,80(a5)
+				}
+				#endif
+
+				/* Only reset the event list item value if the value is not
+				being used for anything else. */
+				if( ( listGET_LIST_ITEM_VALUE( &( pxTCB->xEventListItem ) ) & taskEVENT_LIST_ITEM_VALUE_IN_USE ) == 0UL )
 800027c8:	01812783          	lw	a5,24(sp)
 800027cc:	0187a783          	lw	a5,24(a5)
 800027d0:	0007cc63          	bltz	a5,800027e8 <vTaskPrioritySet+0x130>
+				{
+					listSET_LIST_ITEM_VALUE( &( pxTCB->xEventListItem ), ( ( TickType_t ) configMAX_PRIORITIES - ( TickType_t ) uxNewPriority ) ); /*lint !e961 MISRA exception as the casts are only redundant for some ports. */
 800027d4:	00500713          	li	a4,5
 800027d8:	00812783          	lw	a5,8(sp)
 800027dc:	40f70733          	sub	a4,a4,a5
 800027e0:	01812783          	lw	a5,24(sp)
 800027e4:	00e7ac23          	sw	a4,24(a5)
+
+				/* If the task is in the blocked or suspended list we need do
+				nothing more than change it's priority variable. However, if
+				the task is in a ready list it needs to be removed and placed
+				in the list appropriate to its new priority. */
+				if( listIS_CONTAINED_WITHIN( &( pxReadyTasksLists[ uxPriorityUsedOnEntry ] ), &( pxTCB->xGenericListItem ) ) != pdFALSE )
 800027e8:	01812783          	lw	a5,24(sp)
 800027ec:	0147a683          	lw	a3,20(a5)
 800027f0:	01012703          	lw	a4,16(sp)
@@ -2693,10 +4908,21 @@ Disassembly of section .text:
 80002818:	0080006f          	j	80002820 <vTaskPrioritySet+0x168>
 8000281c:	00000793          	li	a5,0
 80002820:	06078c63          	beqz	a5,80002898 <vTaskPrioritySet+0x1e0>
+				{
+					/* The task is currently in its ready list - remove before adding
+					it to it's new ready list.  As we are in a critical section we
+					can do this even if the scheduler is suspended. */
+					if( uxListRemove( &( pxTCB->xGenericListItem ) ) == ( UBaseType_t ) 0 )
 80002824:	01812783          	lw	a5,24(sp)
 80002828:	00478793          	addi	a5,a5,4
 8000282c:	00078513          	mv	a0,a5
 80002830:	a00fe0ef          	jal	ra,80000a30 <uxListRemove>
+					}
+					else
+					{
+						mtCOVERAGE_TEST_MARKER();
+					}
+					prvAddTaskToReadyList( pxTCB );
 80002834:	01812783          	lw	a5,24(sp)
 80002838:	02c7a703          	lw	a4,44(a5)
 8000283c:	0001f797          	auipc	a5,0x1f
@@ -2722,21 +4948,49 @@ Disassembly of section .text:
 8000288c:	00078593          	mv	a1,a5
 80002890:	00070513          	mv	a0,a4
 80002894:	858fe0ef          	jal	ra,800008ec <vListInsertEnd>
+				else
+				{
+					mtCOVERAGE_TEST_MARKER();
+				}
+
+				if( xYieldRequired == pdTRUE )
 80002898:	01c12703          	lw	a4,28(sp)
 8000289c:	00100793          	li	a5,1
 800028a0:	00f71463          	bne	a4,a5,800028a8 <vTaskPrioritySet+0x1f0>
+				{
+					taskYIELD_IF_USING_PREEMPTION();
 800028a4:	cf1fd0ef          	jal	ra,80000594 <vPortYield>
+				/* Remove compiler warning about unused variables when the port
+				optimised task selection is not being used. */
+				( void ) uxPriorityUsedOnEntry;
+			}
+		}
+		taskEXIT_CRITICAL();
 800028a8:	66d010ef          	jal	ra,80004714 <vTaskExitCritical>
+	}
 800028ac:	00000013          	nop
 800028b0:	02c12083          	lw	ra,44(sp)
 800028b4:	03010113          	addi	sp,sp,48
 800028b8:	00008067          	ret
 
 800028bc <vTaskSuspend>:
+/*-----------------------------------------------------------*/
+
+#if ( INCLUDE_vTaskSuspend == 1 )
+
+	void vTaskSuspend( TaskHandle_t xTaskToSuspend )
+	{
 800028bc:	fd010113          	addi	sp,sp,-48
 800028c0:	02112623          	sw	ra,44(sp)
 800028c4:	00a12623          	sw	a0,12(sp)
+	TCB_t *pxTCB;
+
+		taskENTER_CRITICAL();
 800028c8:	60d010ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			/* If null is passed in here then it is the running task that is
+			being suspended. */
+			pxTCB = prvGetTCBFromHandle( xTaskToSuspend );
 800028cc:	00c12783          	lw	a5,12(sp)
 800028d0:	00079a63          	bnez	a5,800028e4 <vTaskSuspend+0x28>
 800028d4:	0001e797          	auipc	a5,0x1e
@@ -2745,41 +4999,78 @@ Disassembly of section .text:
 800028e0:	0080006f          	j	800028e8 <vTaskSuspend+0x2c>
 800028e4:	00c12783          	lw	a5,12(sp)
 800028e8:	00f12e23          	sw	a5,28(sp)
+
+			traceTASK_SUSPEND( pxTCB );
+
+			/* Remove task from the ready/delayed list and place in the
+			suspended list. */
+			if( uxListRemove( &( pxTCB->xGenericListItem ) ) == ( UBaseType_t ) 0 )
 800028ec:	01c12783          	lw	a5,28(sp)
 800028f0:	00478793          	addi	a5,a5,4
 800028f4:	00078513          	mv	a0,a5
 800028f8:	938fe0ef          	jal	ra,80000a30 <uxListRemove>
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+
+			/* Is the task waiting on an event also? */
+			if( listLIST_ITEM_CONTAINER( &( pxTCB->xEventListItem ) ) != NULL )
 800028fc:	01c12783          	lw	a5,28(sp)
 80002900:	0287a783          	lw	a5,40(a5)
 80002904:	00078a63          	beqz	a5,80002918 <vTaskSuspend+0x5c>
+			{
+				( void ) uxListRemove( &( pxTCB->xEventListItem ) );
 80002908:	01c12783          	lw	a5,28(sp)
 8000290c:	01878793          	addi	a5,a5,24
 80002910:	00078513          	mv	a0,a5
 80002914:	91cfe0ef          	jal	ra,80000a30 <uxListRemove>
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+
+			vListInsertEnd( &xSuspendedTaskList, &( pxTCB->xGenericListItem ) );
 80002918:	01c12783          	lw	a5,28(sp)
 8000291c:	00478793          	addi	a5,a5,4
 80002920:	00078593          	mv	a1,a5
 80002924:	0001f517          	auipc	a0,0x1f
 80002928:	11850513          	addi	a0,a0,280 # 80021a3c <xSuspendedTaskList>
 8000292c:	fc1fd0ef          	jal	ra,800008ec <vListInsertEnd>
+		}
+		taskEXIT_CRITICAL();
 80002930:	5e5010ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		if( pxTCB == pxCurrentTCB )
 80002934:	0001e797          	auipc	a5,0x1e
 80002938:	5b078793          	addi	a5,a5,1456 # 80020ee4 <pxCurrentTCB>
 8000293c:	0007a783          	lw	a5,0(a5)
 80002940:	01c12703          	lw	a4,28(sp)
 80002944:	06f71463          	bne	a4,a5,800029ac <vTaskSuspend+0xf0>
+		{
+			if( xSchedulerRunning != pdFALSE )
 80002948:	0001f797          	auipc	a5,0x1f
 8000294c:	11478793          	addi	a5,a5,276 # 80021a5c <xSchedulerRunning>
 80002950:	0007a783          	lw	a5,0(a5)
 80002954:	02078263          	beqz	a5,80002978 <vTaskSuspend+0xbc>
+			{
+				/* The current task has just been suspended. */
+				configASSERT( uxSchedulerSuspended == 0 );
 80002958:	0001f797          	auipc	a5,0x1f
 8000295c:	11c78793          	addi	a5,a5,284 # 80021a74 <uxSchedulerSuspended>
 80002960:	0007a783          	lw	a5,0(a5)
 80002964:	00078663          	beqz	a5,80002970 <vTaskSuspend+0xb4>
-80002968:	30047073          	csrci	mstatus,8
+80002968:	30007073          	csrci	mstatus,0
 8000296c:	0000006f          	j	8000296c <vTaskSuspend+0xb0>
+				portYIELD_WITHIN_API();
 80002970:	c25fd0ef          	jal	ra,80000594 <vPortYield>
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+	}
 80002974:	0540006f          	j	800029c8 <vTaskSuspend+0x10c>
+				if( listCURRENT_LIST_LENGTH( &xSuspendedTaskList ) == uxCurrentNumberOfTasks )
 80002978:	0001f797          	auipc	a5,0x1f
 8000297c:	0c478793          	addi	a5,a5,196 # 80021a3c <xSuspendedTaskList>
 80002980:	0007a703          	lw	a4,0(a5)
@@ -2787,34 +5078,60 @@ Disassembly of section .text:
 80002988:	0cc78793          	addi	a5,a5,204 # 80021a50 <uxCurrentNumberOfTasks>
 8000298c:	0007a783          	lw	a5,0(a5)
 80002990:	00f71a63          	bne	a4,a5,800029a4 <vTaskSuspend+0xe8>
+					pxCurrentTCB = NULL;
 80002994:	0001e797          	auipc	a5,0x1e
 80002998:	55078793          	addi	a5,a5,1360 # 80020ee4 <pxCurrentTCB>
 8000299c:	0007a023          	sw	zero,0(a5)
+	}
 800029a0:	0280006f          	j	800029c8 <vTaskSuspend+0x10c>
+					vTaskSwitchContext();
 800029a4:	289000ef          	jal	ra,8000342c <vTaskSwitchContext>
+	}
 800029a8:	0200006f          	j	800029c8 <vTaskSuspend+0x10c>
+			if( xSchedulerRunning != pdFALSE )
 800029ac:	0001f797          	auipc	a5,0x1f
 800029b0:	0b078793          	addi	a5,a5,176 # 80021a5c <xSchedulerRunning>
 800029b4:	0007a783          	lw	a5,0(a5)
 800029b8:	00078863          	beqz	a5,800029c8 <vTaskSuspend+0x10c>
+				taskENTER_CRITICAL();
 800029bc:	519010ef          	jal	ra,800046d4 <vTaskEnterCritical>
+					prvResetNextTaskUnblockTime();
 800029c0:	195010ef          	jal	ra,80004354 <prvResetNextTaskUnblockTime>
+				taskEXIT_CRITICAL();
 800029c4:	551010ef          	jal	ra,80004714 <vTaskExitCritical>
+	}
 800029c8:	00000013          	nop
 800029cc:	02c12083          	lw	ra,44(sp)
 800029d0:	03010113          	addi	sp,sp,48
 800029d4:	00008067          	ret
 
 800029d8 <prvTaskIsTaskSuspended>:
+/*-----------------------------------------------------------*/
+
+#if ( INCLUDE_vTaskSuspend == 1 )
+
+	static BaseType_t prvTaskIsTaskSuspended( const TaskHandle_t xTask )
+	{
 800029d8:	fe010113          	addi	sp,sp,-32
 800029dc:	00a12623          	sw	a0,12(sp)
+	BaseType_t xReturn = pdFALSE;
 800029e0:	00012e23          	sw	zero,28(sp)
+	const TCB_t * const pxTCB = ( TCB_t * ) xTask;
 800029e4:	00c12783          	lw	a5,12(sp)
 800029e8:	00f12c23          	sw	a5,24(sp)
+
+		/* Accesses xPendingReadyList so must be called from a critical
+		section. */
+
+		/* It does not make sense to check if the calling task is suspended. */
+		configASSERT( xTask );
 800029ec:	00c12783          	lw	a5,12(sp)
 800029f0:	00079663          	bnez	a5,800029fc <prvTaskIsTaskSuspended+0x24>
-800029f4:	30047073          	csrci	mstatus,8
+800029f4:	30007073          	csrci	mstatus,0
 800029f8:	0000006f          	j	800029f8 <prvTaskIsTaskSuspended+0x20>
+
+		/* Is the task being resumed actually in the suspended list? */
+		if( listIS_CONTAINED_WITHIN( &xSuspendedTaskList, &( pxTCB->xGenericListItem ) ) != pdFALSE )
 800029fc:	01812783          	lw	a5,24(sp)
 80002a00:	0147a703          	lw	a4,20(a5)
 80002a04:	0001f797          	auipc	a5,0x1f
@@ -2824,11 +5141,18 @@ Disassembly of section .text:
 80002a14:	0080006f          	j	80002a1c <prvTaskIsTaskSuspended+0x44>
 80002a18:	00000793          	li	a5,0
 80002a1c:	02078e63          	beqz	a5,80002a58 <prvTaskIsTaskSuspended+0x80>
+		{
+			/* Has the task already been resumed from within an ISR? */
+			if( listIS_CONTAINED_WITHIN( &xPendingReadyList, &( pxTCB->xEventListItem ) ) == pdFALSE )
 80002a20:	01812783          	lw	a5,24(sp)
 80002a24:	0287a703          	lw	a4,40(a5)
 80002a28:	0001f797          	auipc	a5,0x1f
 80002a2c:	fe878793          	addi	a5,a5,-24 # 80021a10 <xPendingReadyList>
 80002a30:	02f70463          	beq	a4,a5,80002a58 <prvTaskIsTaskSuspended+0x80>
+			{
+				/* Is it in the suspended list because it is in the	Suspended
+				state, or because is is blocked with no timeout? */
+				if( listIS_CONTAINED_WITHIN( NULL, &( pxTCB->xEventListItem ) ) != pdFALSE )
 80002a34:	01812783          	lw	a5,24(sp)
 80002a38:	0287a783          	lw	a5,40(a5)
 80002a3c:	00079663          	bnez	a5,80002a48 <prvTaskIsTaskSuspended+0x70>
@@ -2836,23 +5160,46 @@ Disassembly of section .text:
 80002a44:	0080006f          	j	80002a4c <prvTaskIsTaskSuspended+0x74>
 80002a48:	00000793          	li	a5,0
 80002a4c:	00078663          	beqz	a5,80002a58 <prvTaskIsTaskSuspended+0x80>
+				{
+					xReturn = pdTRUE;
 80002a50:	00100793          	li	a5,1
 80002a54:	00f12e23          	sw	a5,28(sp)
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+
+		return xReturn;
 80002a58:	01c12783          	lw	a5,28(sp)
+	} /*lint !e818 xTask cannot be a pointer to const because it is a typedef. */
 80002a5c:	00078513          	mv	a0,a5
 80002a60:	02010113          	addi	sp,sp,32
 80002a64:	00008067          	ret
 
 80002a68 <vTaskResume>:
+/*-----------------------------------------------------------*/
+
+#if ( INCLUDE_vTaskSuspend == 1 )
+
+	void vTaskResume( TaskHandle_t xTaskToResume )
+	{
 80002a68:	fd010113          	addi	sp,sp,-48
 80002a6c:	02112623          	sw	ra,44(sp)
 80002a70:	00a12623          	sw	a0,12(sp)
+	TCB_t * const pxTCB = ( TCB_t * ) xTaskToResume;
 80002a74:	00c12783          	lw	a5,12(sp)
 80002a78:	00f12e23          	sw	a5,28(sp)
+
+		/* It does not make sense to resume the calling task. */
+		configASSERT( xTaskToResume );
 80002a7c:	00c12783          	lw	a5,12(sp)
 80002a80:	00079663          	bnez	a5,80002a8c <vTaskResume+0x24>
-80002a84:	30047073          	csrci	mstatus,8
+80002a84:	30007073          	csrci	mstatus,0
 80002a88:	0000006f          	j	80002a88 <vTaskResume+0x20>
+
+		/* The parameter cannot be NULL as it is impossible to resume the
+		currently executing task. */
+		if( ( pxTCB != NULL ) && ( pxTCB != pxCurrentTCB ) )
 80002a8c:	01c12783          	lw	a5,28(sp)
 80002a90:	0c078463          	beqz	a5,80002b58 <vTaskResume+0xf0>
 80002a94:	0001e797          	auipc	a5,0x1e
@@ -2860,16 +5207,27 @@ Disassembly of section .text:
 80002a9c:	0007a783          	lw	a5,0(a5)
 80002aa0:	01c12703          	lw	a4,28(sp)
 80002aa4:	0af70a63          	beq	a4,a5,80002b58 <vTaskResume+0xf0>
+		{
+			taskENTER_CRITICAL();
 80002aa8:	42d010ef          	jal	ra,800046d4 <vTaskEnterCritical>
+			{
+				if( prvTaskIsTaskSuspended( pxTCB ) == pdTRUE )
 80002aac:	01c12503          	lw	a0,28(sp)
 80002ab0:	f29ff0ef          	jal	ra,800029d8 <prvTaskIsTaskSuspended>
 80002ab4:	00050713          	mv	a4,a0
 80002ab8:	00100793          	li	a5,1
 80002abc:	08f71c63          	bne	a4,a5,80002b54 <vTaskResume+0xec>
+				{
+					traceTASK_RESUME( pxTCB );
+
+					/* As we are in a critical section we can access the ready
+					lists even if the scheduler is suspended. */
+					( void ) uxListRemove(  &( pxTCB->xGenericListItem ) );
 80002ac0:	01c12783          	lw	a5,28(sp)
 80002ac4:	00478793          	addi	a5,a5,4
 80002ac8:	00078513          	mv	a0,a5
 80002acc:	f65fd0ef          	jal	ra,80000a30 <uxListRemove>
+					prvAddTaskToReadyList( pxTCB );
 80002ad0:	01c12783          	lw	a5,28(sp)
 80002ad4:	02c7a703          	lw	a4,44(a5)
 80002ad8:	0001f797          	auipc	a5,0x1f
@@ -2895,6 +5253,9 @@ Disassembly of section .text:
 80002b28:	00078593          	mv	a1,a5
 80002b2c:	00070513          	mv	a0,a4
 80002b30:	dbdfd0ef          	jal	ra,800008ec <vListInsertEnd>
+
+					/* We may have just resumed a higher priority task. */
+					if( pxTCB->uxPriority >= pxCurrentTCB->uxPriority )
 80002b34:	01c12783          	lw	a5,28(sp)
 80002b38:	02c7a703          	lw	a4,44(a5)
 80002b3c:	0001e797          	auipc	a5,0x1e
@@ -2902,36 +5263,81 @@ Disassembly of section .text:
 80002b44:	0007a783          	lw	a5,0(a5)
 80002b48:	02c7a783          	lw	a5,44(a5)
 80002b4c:	00f76463          	bltu	a4,a5,80002b54 <vTaskResume+0xec>
+					{
+						/* This yield may not cause the task just resumed to run,
+						but will leave the lists in the correct state for the
+						next yield. */
+						taskYIELD_IF_USING_PREEMPTION();
 80002b50:	a45fd0ef          	jal	ra,80000594 <vPortYield>
+				else
+				{
+					mtCOVERAGE_TEST_MARKER();
+				}
+			}
+			taskEXIT_CRITICAL();
 80002b54:	3c1010ef          	jal	ra,80004714 <vTaskExitCritical>
+		}
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
 80002b58:	00000013          	nop
 80002b5c:	02c12083          	lw	ra,44(sp)
 80002b60:	03010113          	addi	sp,sp,48
 80002b64:	00008067          	ret
 
 80002b68 <xTaskResumeFromISR>:
+/*-----------------------------------------------------------*/
+
+#if ( ( INCLUDE_xTaskResumeFromISR == 1 ) && ( INCLUDE_vTaskSuspend == 1 ) )
+
+	BaseType_t xTaskResumeFromISR( TaskHandle_t xTaskToResume )
+	{
 80002b68:	fd010113          	addi	sp,sp,-48
 80002b6c:	02112623          	sw	ra,44(sp)
 80002b70:	00a12623          	sw	a0,12(sp)
+	BaseType_t xYieldRequired = pdFALSE;
 80002b74:	00012e23          	sw	zero,28(sp)
+	TCB_t * const pxTCB = ( TCB_t * ) xTaskToResume;
 80002b78:	00c12783          	lw	a5,12(sp)
 80002b7c:	00f12c23          	sw	a5,24(sp)
+	UBaseType_t uxSavedInterruptStatus;
+
+		configASSERT( xTaskToResume );
 80002b80:	00c12783          	lw	a5,12(sp)
 80002b84:	00079663          	bnez	a5,80002b90 <xTaskResumeFromISR+0x28>
-80002b88:	30047073          	csrci	mstatus,8
+80002b88:	30007073          	csrci	mstatus,0
 80002b8c:	0000006f          	j	80002b8c <xTaskResumeFromISR+0x24>
+		simple as possible.  More information (albeit Cortex-M specific) is
+		provided on the following link:
+		http://www.freertos.org/RTOS-Cortex-M3-M4.html */
+		portASSERT_IF_INTERRUPT_PRIORITY_INVALID();
+
+		uxSavedInterruptStatus = portSET_INTERRUPT_MASK_FROM_ISR();
 80002b90:	c15fd0ef          	jal	ra,800007a4 <vPortSetInterruptMask>
 80002b94:	00050793          	mv	a5,a0
 80002b98:	00f12a23          	sw	a5,20(sp)
+		{
+			if( prvTaskIsTaskSuspended( pxTCB ) == pdTRUE )
 80002b9c:	01812503          	lw	a0,24(sp)
 80002ba0:	e39ff0ef          	jal	ra,800029d8 <prvTaskIsTaskSuspended>
 80002ba4:	00050713          	mv	a4,a0
 80002ba8:	00100793          	li	a5,1
 80002bac:	0cf71463          	bne	a4,a5,80002c74 <xTaskResumeFromISR+0x10c>
+			{
+				traceTASK_RESUME_FROM_ISR( pxTCB );
+
+				/* Check the ready lists can be accessed. */
+				if( uxSchedulerSuspended == ( UBaseType_t ) pdFALSE )
 80002bb0:	0001f797          	auipc	a5,0x1f
 80002bb4:	ec478793          	addi	a5,a5,-316 # 80021a74 <uxSchedulerSuspended>
 80002bb8:	0007a783          	lw	a5,0(a5)
 80002bbc:	0a079063          	bnez	a5,80002c5c <xTaskResumeFromISR+0xf4>
+				{
+					/* Ready lists can be accessed so move the task from the
+					suspended list to the ready list directly. */
+					if( pxTCB->uxPriority >= pxCurrentTCB->uxPriority )
 80002bc0:	01812783          	lw	a5,24(sp)
 80002bc4:	02c7a703          	lw	a4,44(a5)
 80002bc8:	0001e797          	auipc	a5,0x1e
@@ -2939,12 +5345,21 @@ Disassembly of section .text:
 80002bd0:	0007a783          	lw	a5,0(a5)
 80002bd4:	02c7a783          	lw	a5,44(a5)
 80002bd8:	00f76663          	bltu	a4,a5,80002be4 <xTaskResumeFromISR+0x7c>
+					{
+						xYieldRequired = pdTRUE;
 80002bdc:	00100793          	li	a5,1
 80002be0:	00f12e23          	sw	a5,28(sp)
+					else
+					{
+						mtCOVERAGE_TEST_MARKER();
+					}
+
+					( void ) uxListRemove(  &( pxTCB->xGenericListItem ) );
 80002be4:	01812783          	lw	a5,24(sp)
 80002be8:	00478793          	addi	a5,a5,4
 80002bec:	00078513          	mv	a0,a5
 80002bf0:	e41fd0ef          	jal	ra,80000a30 <uxListRemove>
+					prvAddTaskToReadyList( pxTCB );
 80002bf4:	01812783          	lw	a5,24(sp)
 80002bf8:	02c7a703          	lw	a4,44(a5)
 80002bfc:	0001f797          	auipc	a5,0x1f
@@ -2971,24 +5386,51 @@ Disassembly of section .text:
 80002c50:	00070513          	mv	a0,a4
 80002c54:	c99fd0ef          	jal	ra,800008ec <vListInsertEnd>
 80002c58:	01c0006f          	j	80002c74 <xTaskResumeFromISR+0x10c>
+				else
+				{
+					/* The delayed or ready lists cannot be accessed so the task
+					is held in the pending ready list until the scheduler is
+					unsuspended. */
+					vListInsertEnd( &( xPendingReadyList ), &( pxTCB->xEventListItem ) );
 80002c5c:	01812783          	lw	a5,24(sp)
 80002c60:	01878793          	addi	a5,a5,24
 80002c64:	00078593          	mv	a1,a5
 80002c68:	0001f517          	auipc	a0,0x1f
 80002c6c:	da850513          	addi	a0,a0,-600 # 80021a10 <xPendingReadyList>
 80002c70:	c7dfd0ef          	jal	ra,800008ec <vListInsertEnd>
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+		portCLEAR_INTERRUPT_MASK_FROM_ISR( uxSavedInterruptStatus );
 80002c74:	01412783          	lw	a5,20(sp)
 80002c78:	00078513          	mv	a0,a5
 80002c7c:	b0dfd0ef          	jal	ra,80000788 <vPortClearInterruptMask>
+
+		return xYieldRequired;
 80002c80:	01c12783          	lw	a5,28(sp)
+	}
 80002c84:	00078513          	mv	a0,a5
 80002c88:	02c12083          	lw	ra,44(sp)
 80002c8c:	03010113          	addi	sp,sp,48
 80002c90:	00008067          	ret
 
 80002c94 <vTaskStartScheduler>:
+
+#endif /* ( ( INCLUDE_xTaskResumeFromISR == 1 ) && ( INCLUDE_vTaskSuspend == 1 ) ) */
+/*-----------------------------------------------------------*/
+
+void vTaskStartScheduler( void )
+{
 80002c94:	fe010113          	addi	sp,sp,-32
 80002c98:	00112e23          	sw	ra,28(sp)
+		xReturn = xTaskCreate( prvIdleTask, "IDLE", tskIDLE_STACK_SIZE, ( void * ) NULL, ( tskIDLE_PRIORITY | portPRIVILEGE_BIT ), &xIdleTaskHandle ); /*lint !e961 MISRA exception, justified as it is not a redundant explicit cast to all supported compilers. */
+	}
+	#else
+	{
+		/* Create the idle task without storing its handle. */
+		xReturn = xTaskCreate( prvIdleTask, "IDLE", tskIDLE_STACK_SIZE, ( void * ) NULL, ( tskIDLE_PRIORITY | portPRIVILEGE_BIT ), NULL );  /*lint !e961 MISRA exception, justified as it is not a redundant explicit cast to all supported compilers. */
 80002c9c:	00000893          	li	a7,0
 80002ca0:	00000813          	li	a6,0
 80002ca4:	00000793          	li	a5,0
@@ -3001,51 +5443,110 @@ Disassembly of section .text:
 80002cc0:	fb050513          	addi	a0,a0,-80 # 80003c6c <prvIdleTask>
 80002cc4:	af8ff0ef          	jal	ra,80001fbc <xTaskGenericCreate>
 80002cc8:	00a12623          	sw	a0,12(sp)
+	}
+	#endif /* INCLUDE_xTaskGetIdleTaskHandle */
+
+	#if ( configUSE_TIMERS == 1 )
+	{
+		if( xReturn == pdPASS )
 80002ccc:	00c12703          	lw	a4,12(sp)
 80002cd0:	00100793          	li	a5,1
 80002cd4:	00f71663          	bne	a4,a5,80002ce0 <vTaskStartScheduler+0x4c>
+		{
+			xReturn = xTimerCreateTimerTask();
 80002cd8:	3ac020ef          	jal	ra,80005084 <xTimerCreateTimerTask>
 80002cdc:	00a12623          	sw	a0,12(sp)
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
+	#endif /* configUSE_TIMERS */
+
+	if( xReturn == pdPASS )
 80002ce0:	00c12703          	lw	a4,12(sp)
 80002ce4:	00100793          	li	a5,1
 80002ce8:	02f71e63          	bne	a4,a5,80002d24 <vTaskStartScheduler+0x90>
-80002cec:	30047073          	csrci	mstatus,8
+		/* Interrupts are turned off here, to ensure a tick does not occur
+		before or during the call to xPortStartScheduler().  The stacks of
+		the created tasks contain a status word with interrupts switched on
+		so interrupts will automatically get re-enabled when the first task
+		starts to run. */
+		portDISABLE_INTERRUPTS();
+80002cec:	30007073          	csrci	mstatus,0
+			structure specific to the task that will run first. */
+			_impure_ptr = &( pxCurrentTCB->xNewLib_reent );
+		}
+		#endif /* configUSE_NEWLIB_REENTRANT */
+
+		xNextTaskUnblockTime = portMAX_DELAY;
 80002cf0:	0001f797          	auipc	a5,0x1f
 80002cf4:	d8078793          	addi	a5,a5,-640 # 80021a70 <xNextTaskUnblockTime>
 80002cf8:	fff00713          	li	a4,-1
 80002cfc:	00e7a023          	sw	a4,0(a5)
+		xSchedulerRunning = pdTRUE;
 80002d00:	0001f797          	auipc	a5,0x1f
 80002d04:	d5c78793          	addi	a5,a5,-676 # 80021a5c <xSchedulerRunning>
 80002d08:	00100713          	li	a4,1
 80002d0c:	00e7a023          	sw	a4,0(a5)
+		xTickCount = ( TickType_t ) 0U;
 80002d10:	0001f797          	auipc	a5,0x1f
 80002d14:	d4478793          	addi	a5,a5,-700 # 80021a54 <xTickCount>
 80002d18:	0007a023          	sw	zero,0(a5)
+		the run time counter time base. */
+		portCONFIGURE_TIMER_FOR_RUN_TIME_STATS();
+
+		/* Setting up the timer tick is hardware specific and thus in the
+		portable interface. */
+		if( xPortStartScheduler() != pdFALSE )
 80002d1c:	eccfd0ef          	jal	ra,800003e8 <xPortStartScheduler>
+		/* This line will only be reached if the kernel could not be started,
+		because there was not enough FreeRTOS heap to create the idle task
+		or the timer task. */
+		configASSERT( xReturn );
+	}
+}
 80002d20:	0140006f          	j	80002d34 <vTaskStartScheduler+0xa0>
+		configASSERT( xReturn );
 80002d24:	00c12783          	lw	a5,12(sp)
 80002d28:	00079663          	bnez	a5,80002d34 <vTaskStartScheduler+0xa0>
-80002d2c:	30047073          	csrci	mstatus,8
+80002d2c:	30007073          	csrci	mstatus,0
 80002d30:	0000006f          	j	80002d30 <vTaskStartScheduler+0x9c>
+}
 80002d34:	00000013          	nop
 80002d38:	01c12083          	lw	ra,28(sp)
 80002d3c:	02010113          	addi	sp,sp,32
 80002d40:	00008067          	ret
 
 80002d44 <vTaskEndScheduler>:
+/*-----------------------------------------------------------*/
+
+void vTaskEndScheduler( void )
+{
 80002d44:	ff010113          	addi	sp,sp,-16
 80002d48:	00112623          	sw	ra,12(sp)
-80002d4c:	30047073          	csrci	mstatus,8
+	/* Stop the scheduler interrupts and call the portable scheduler end
+	routine so the original ISRs can be restored if necessary.  The port
+	layer must ensure interrupts enable	bit is left in the correct state. */
+	portDISABLE_INTERRUPTS();
+80002d4c:	30007073          	csrci	mstatus,0
+	xSchedulerRunning = pdFALSE;
 80002d50:	0001f797          	auipc	a5,0x1f
 80002d54:	d0c78793          	addi	a5,a5,-756 # 80021a5c <xSchedulerRunning>
 80002d58:	0007a023          	sw	zero,0(a5)
+	vPortEndScheduler();
 80002d5c:	fb0fd0ef          	jal	ra,8000050c <vPortEndScheduler>
+}
 80002d60:	00000013          	nop
 80002d64:	00c12083          	lw	ra,12(sp)
 80002d68:	01010113          	addi	sp,sp,16
 80002d6c:	00008067          	ret
 
 80002d70 <vTaskSuspendAll>:
+{
+	/* A critical section is not required as the variable is of type
+	BaseType_t.  Please read Richard Barry's reply in the following link to a
+	post in the FreeRTOS support forum before reporting this as a bug! -
+	http://goo.gl/wu4acr */
+	++uxSchedulerSuspended;
 80002d70:	0001f797          	auipc	a5,0x1f
 80002d74:	d0478793          	addi	a5,a5,-764 # 80021a74 <uxSchedulerSuspended>
 80002d78:	0007a783          	lw	a5,0(a5)
@@ -3053,20 +5554,41 @@ Disassembly of section .text:
 80002d80:	0001f797          	auipc	a5,0x1f
 80002d84:	cf478793          	addi	a5,a5,-780 # 80021a74 <uxSchedulerSuspended>
 80002d88:	00e7a023          	sw	a4,0(a5)
+}
 80002d8c:	00000013          	nop
 80002d90:	00008067          	ret
 
 80002d94 <xTaskResumeAll>:
+
+#endif /* configUSE_TICKLESS_IDLE */
+/*----------------------------------------------------------*/
+
+BaseType_t xTaskResumeAll( void )
+{
 80002d94:	fe010113          	addi	sp,sp,-32
 80002d98:	00112e23          	sw	ra,28(sp)
+TCB_t *pxTCB;
+BaseType_t xAlreadyYielded = pdFALSE;
 80002d9c:	00012623          	sw	zero,12(sp)
+
+	/* If uxSchedulerSuspended is zero then this function does not match a
+	previous call to vTaskSuspendAll(). */
+	configASSERT( uxSchedulerSuspended );
 80002da0:	0001f797          	auipc	a5,0x1f
 80002da4:	cd478793          	addi	a5,a5,-812 # 80021a74 <uxSchedulerSuspended>
 80002da8:	0007a783          	lw	a5,0(a5)
 80002dac:	00079663          	bnez	a5,80002db8 <xTaskResumeAll+0x24>
-80002db0:	30047073          	csrci	mstatus,8
+80002db0:	30007073          	csrci	mstatus,0
 80002db4:	0000006f          	j	80002db4 <xTaskResumeAll+0x20>
+	/* It is possible that an ISR caused a task to be removed from an event
+	list while the scheduler was suspended.  If this was the case then the
+	removed task will have been added to the xPendingReadyList.  Once the
+	scheduler has been resumed it is safe to move all the pending ready
+	tasks from this list into their appropriate ready list. */
+	taskENTER_CRITICAL();
 80002db8:	11d010ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		--uxSchedulerSuspended;
 80002dbc:	0001f797          	auipc	a5,0x1f
 80002dc0:	cb878793          	addi	a5,a5,-840 # 80021a74 <uxSchedulerSuspended>
 80002dc4:	0007a783          	lw	a5,0(a5)
@@ -3074,28 +5596,41 @@ Disassembly of section .text:
 80002dcc:	0001f797          	auipc	a5,0x1f
 80002dd0:	ca878793          	addi	a5,a5,-856 # 80021a74 <uxSchedulerSuspended>
 80002dd4:	00e7a023          	sw	a4,0(a5)
+
+		if( uxSchedulerSuspended == ( UBaseType_t ) pdFALSE )
 80002dd8:	0001f797          	auipc	a5,0x1f
 80002ddc:	c9c78793          	addi	a5,a5,-868 # 80021a74 <uxSchedulerSuspended>
 80002de0:	0007a783          	lw	a5,0(a5)
 80002de4:	16079463          	bnez	a5,80002f4c <xTaskResumeAll+0x1b8>
+		{
+			if( uxCurrentNumberOfTasks > ( UBaseType_t ) 0U )
 80002de8:	0001f797          	auipc	a5,0x1f
 80002dec:	c6878793          	addi	a5,a5,-920 # 80021a50 <uxCurrentNumberOfTasks>
 80002df0:	0007a783          	lw	a5,0(a5)
 80002df4:	14078c63          	beqz	a5,80002f4c <xTaskResumeAll+0x1b8>
+			{
+				/* Move any readied tasks from the pending list into the
+				appropriate ready list. */
+				while( listLIST_IS_EMPTY( &xPendingReadyList ) == pdFALSE )
 80002df8:	0c80006f          	j	80002ec0 <xTaskResumeAll+0x12c>
+				{
+					pxTCB = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( ( &xPendingReadyList ) );
 80002dfc:	0001f797          	auipc	a5,0x1f
 80002e00:	c1478793          	addi	a5,a5,-1004 # 80021a10 <xPendingReadyList>
 80002e04:	00c7a783          	lw	a5,12(a5)
 80002e08:	00c7a783          	lw	a5,12(a5)
 80002e0c:	00f12423          	sw	a5,8(sp)
+					( void ) uxListRemove( &( pxTCB->xEventListItem ) );
 80002e10:	00812783          	lw	a5,8(sp)
 80002e14:	01878793          	addi	a5,a5,24
 80002e18:	00078513          	mv	a0,a5
 80002e1c:	c15fd0ef          	jal	ra,80000a30 <uxListRemove>
+					( void ) uxListRemove( &( pxTCB->xGenericListItem ) );
 80002e20:	00812783          	lw	a5,8(sp)
 80002e24:	00478793          	addi	a5,a5,4
 80002e28:	00078513          	mv	a0,a5
 80002e2c:	c05fd0ef          	jal	ra,80000a30 <uxListRemove>
+					prvAddTaskToReadyList( pxTCB );
 80002e30:	00812783          	lw	a5,8(sp)
 80002e34:	02c7a703          	lw	a4,44(a5)
 80002e38:	0001f797          	auipc	a5,0x1f
@@ -3121,6 +5656,10 @@ Disassembly of section .text:
 80002e88:	00078593          	mv	a1,a5
 80002e8c:	00070513          	mv	a0,a4
 80002e90:	a5dfd0ef          	jal	ra,800008ec <vListInsertEnd>
+
+					/* If the moved task has a priority higher than the current
+					task then a yield must be performed. */
+					if( pxTCB->uxPriority >= pxCurrentTCB->uxPriority )
 80002e94:	00812783          	lw	a5,8(sp)
 80002e98:	02c7a703          	lw	a4,44(a5)
 80002e9c:	0001e797          	auipc	a5,0x1e
@@ -3128,26 +5667,47 @@ Disassembly of section .text:
 80002ea4:	0007a783          	lw	a5,0(a5)
 80002ea8:	02c7a783          	lw	a5,44(a5)
 80002eac:	00f76a63          	bltu	a4,a5,80002ec0 <xTaskResumeAll+0x12c>
+					{
+						xYieldPending = pdTRUE;
 80002eb0:	0001f797          	auipc	a5,0x1f
 80002eb4:	bb478793          	addi	a5,a5,-1100 # 80021a64 <xYieldPending>
 80002eb8:	00100713          	li	a4,1
 80002ebc:	00e7a023          	sw	a4,0(a5)
+				while( listLIST_IS_EMPTY( &xPendingReadyList ) == pdFALSE )
 80002ec0:	0001f797          	auipc	a5,0x1f
 80002ec4:	b5078793          	addi	a5,a5,-1200 # 80021a10 <xPendingReadyList>
 80002ec8:	0007a783          	lw	a5,0(a5)
 80002ecc:	f20798e3          	bnez	a5,80002dfc <xTaskResumeAll+0x68>
+
+				/* If any ticks occurred while the scheduler was suspended then
+				they should be processed now.  This ensures the tick count does
+				not	slip, and that any delayed tasks are resumed at the correct
+				time. */
+				if( uxPendedTicks > ( UBaseType_t ) 0U )
 80002ed0:	0001f797          	auipc	a5,0x1f
 80002ed4:	b9078793          	addi	a5,a5,-1136 # 80021a60 <uxPendedTicks>
 80002ed8:	0007a783          	lw	a5,0(a5)
 80002edc:	04078863          	beqz	a5,80002f2c <xTaskResumeAll+0x198>
+				{
+					while( uxPendedTicks > ( UBaseType_t ) 0U )
 80002ee0:	03c0006f          	j	80002f1c <xTaskResumeAll+0x188>
+					{
+						if( xTaskIncrementTick() != pdFALSE )
 80002ee4:	2b0000ef          	jal	ra,80003194 <xTaskIncrementTick>
 80002ee8:	00050793          	mv	a5,a0
 80002eec:	00078a63          	beqz	a5,80002f00 <xTaskResumeAll+0x16c>
+						{
+							xYieldPending = pdTRUE;
 80002ef0:	0001f797          	auipc	a5,0x1f
 80002ef4:	b7478793          	addi	a5,a5,-1164 # 80021a64 <xYieldPending>
 80002ef8:	00100713          	li	a4,1
 80002efc:	00e7a023          	sw	a4,0(a5)
+						}
+						else
+						{
+							mtCOVERAGE_TEST_MARKER();
+						}
+						--uxPendedTicks;
 80002f00:	0001f797          	auipc	a5,0x1f
 80002f04:	b6078793          	addi	a5,a5,-1184 # 80021a60 <uxPendedTicks>
 80002f08:	0007a783          	lw	a5,0(a5)
@@ -3155,84 +5715,165 @@ Disassembly of section .text:
 80002f10:	0001f797          	auipc	a5,0x1f
 80002f14:	b5078793          	addi	a5,a5,-1200 # 80021a60 <uxPendedTicks>
 80002f18:	00e7a023          	sw	a4,0(a5)
+					while( uxPendedTicks > ( UBaseType_t ) 0U )
 80002f1c:	0001f797          	auipc	a5,0x1f
 80002f20:	b4478793          	addi	a5,a5,-1212 # 80021a60 <uxPendedTicks>
 80002f24:	0007a783          	lw	a5,0(a5)
 80002f28:	fa079ee3          	bnez	a5,80002ee4 <xTaskResumeAll+0x150>
+				else
+				{
+					mtCOVERAGE_TEST_MARKER();
+				}
+
+				if( xYieldPending == pdTRUE )
 80002f2c:	0001f797          	auipc	a5,0x1f
 80002f30:	b3878793          	addi	a5,a5,-1224 # 80021a64 <xYieldPending>
 80002f34:	0007a703          	lw	a4,0(a5)
 80002f38:	00100793          	li	a5,1
 80002f3c:	00f71863          	bne	a4,a5,80002f4c <xTaskResumeAll+0x1b8>
+				{
+					#if( configUSE_PREEMPTION != 0 )
+					{
+						xAlreadyYielded = pdTRUE;
 80002f40:	00100793          	li	a5,1
 80002f44:	00f12623          	sw	a5,12(sp)
+					}
+					#endif
+					taskYIELD_IF_USING_PREEMPTION();
 80002f48:	e4cfd0ef          	jal	ra,80000594 <vPortYield>
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
+	taskEXIT_CRITICAL();
 80002f4c:	7c8010ef          	jal	ra,80004714 <vTaskExitCritical>
+
+	return xAlreadyYielded;
 80002f50:	00c12783          	lw	a5,12(sp)
+}
 80002f54:	00078513          	mv	a0,a5
 80002f58:	01c12083          	lw	ra,28(sp)
 80002f5c:	02010113          	addi	sp,sp,32
 80002f60:	00008067          	ret
 
 80002f64 <xTaskGetTickCount>:
+/*-----------------------------------------------------------*/
+
+TickType_t xTaskGetTickCount( void )
+{
 80002f64:	fe010113          	addi	sp,sp,-32
 80002f68:	00112e23          	sw	ra,28(sp)
+TickType_t xTicks;
+
+	/* Critical section required if running on a 16 bit processor. */
+	portTICK_TYPE_ENTER_CRITICAL();
 80002f6c:	768010ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		xTicks = xTickCount;
 80002f70:	0001f797          	auipc	a5,0x1f
 80002f74:	ae478793          	addi	a5,a5,-1308 # 80021a54 <xTickCount>
 80002f78:	0007a783          	lw	a5,0(a5)
 80002f7c:	00f12623          	sw	a5,12(sp)
+	}
+	portTICK_TYPE_EXIT_CRITICAL();
 80002f80:	794010ef          	jal	ra,80004714 <vTaskExitCritical>
+
+	return xTicks;
 80002f84:	00c12783          	lw	a5,12(sp)
+}
 80002f88:	00078513          	mv	a0,a5
 80002f8c:	01c12083          	lw	ra,28(sp)
 80002f90:	02010113          	addi	sp,sp,32
 80002f94:	00008067          	ret
 
 80002f98 <xTaskGetTickCountFromISR>:
+/*-----------------------------------------------------------*/
+
+TickType_t xTaskGetTickCountFromISR( void )
+{
 80002f98:	fe010113          	addi	sp,sp,-32
 80002f9c:	00112e23          	sw	ra,28(sp)
+	safe API to ensure interrupt entry is as fast and as simple as possible.
+	More information (albeit Cortex-M specific) is provided on the following
+	link: http://www.freertos.org/RTOS-Cortex-M3-M4.html */
+	portASSERT_IF_INTERRUPT_PRIORITY_INVALID();
+
+	uxSavedInterruptStatus = portTICK_TYPE_SET_INTERRUPT_MASK_FROM_ISR();
 80002fa0:	805fd0ef          	jal	ra,800007a4 <vPortSetInterruptMask>
 80002fa4:	00050793          	mv	a5,a0
 80002fa8:	00f12623          	sw	a5,12(sp)
+	{
+		xReturn = xTickCount;
 80002fac:	0001f797          	auipc	a5,0x1f
 80002fb0:	aa878793          	addi	a5,a5,-1368 # 80021a54 <xTickCount>
 80002fb4:	0007a783          	lw	a5,0(a5)
 80002fb8:	00f12423          	sw	a5,8(sp)
+	}
+	portTICK_TYPE_CLEAR_INTERRUPT_MASK_FROM_ISR( uxSavedInterruptStatus );
 80002fbc:	00c12783          	lw	a5,12(sp)
 80002fc0:	00078513          	mv	a0,a5
 80002fc4:	fc4fd0ef          	jal	ra,80000788 <vPortClearInterruptMask>
+
+	return xReturn;
 80002fc8:	00812783          	lw	a5,8(sp)
+}
 80002fcc:	00078513          	mv	a0,a5
 80002fd0:	01c12083          	lw	ra,28(sp)
 80002fd4:	02010113          	addi	sp,sp,32
 80002fd8:	00008067          	ret
 
 80002fdc <uxTaskGetNumberOfTasks>:
+
+UBaseType_t uxTaskGetNumberOfTasks( void )
+{
+	/* A critical section is not required because the variables are of type
+	BaseType_t. */
+	return uxCurrentNumberOfTasks;
 80002fdc:	0001f797          	auipc	a5,0x1f
 80002fe0:	a7478793          	addi	a5,a5,-1420 # 80021a50 <uxCurrentNumberOfTasks>
 80002fe4:	0007a783          	lw	a5,0(a5)
+}
 80002fe8:	00078513          	mv	a0,a5
 80002fec:	00008067          	ret
 
 80002ff0 <uxTaskGetSystemState>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_TRACE_FACILITY == 1 )
+
+	UBaseType_t uxTaskGetSystemState( TaskStatus_t * const pxTaskStatusArray, const UBaseType_t uxArraySize, uint32_t * const pulTotalRunTime )
+	{
 80002ff0:	fd010113          	addi	sp,sp,-48
 80002ff4:	02112623          	sw	ra,44(sp)
 80002ff8:	00a12623          	sw	a0,12(sp)
 80002ffc:	00b12423          	sw	a1,8(sp)
 80003000:	00c12223          	sw	a2,4(sp)
+	UBaseType_t uxTask = 0, uxQueue = configMAX_PRIORITIES;
 80003004:	00012e23          	sw	zero,28(sp)
 80003008:	00500793          	li	a5,5
 8000300c:	00f12c23          	sw	a5,24(sp)
+
+		vTaskSuspendAll();
 80003010:	d61ff0ef          	jal	ra,80002d70 <vTaskSuspendAll>
+		{
+			/* Is there a space in the array for each task in the system? */
+			if( uxArraySize >= uxCurrentNumberOfTasks )
 80003014:	0001f797          	auipc	a5,0x1f
 80003018:	a3c78793          	addi	a5,a5,-1476 # 80021a50 <uxCurrentNumberOfTasks>
 8000301c:	0007a783          	lw	a5,0(a5)
 80003020:	00812703          	lw	a4,8(sp)
 80003024:	14f76c63          	bltu	a4,a5,8000317c <uxTaskGetSystemState+0x18c>
+			{
+				/* Fill in an TaskStatus_t structure with information on each
+				task in the Ready state. */
+				do
+				{
+					uxQueue--;
 80003028:	01812783          	lw	a5,24(sp)
 8000302c:	fff78793          	addi	a5,a5,-1
 80003030:	00f12c23          	sw	a5,24(sp)
+					uxTask += prvListTaskWithinSingleList( &( pxTaskStatusArray[ uxTask ] ), &( pxReadyTasksLists[ uxQueue ] ), eReady );
 80003034:	01c12783          	lw	a5,28(sp)
 80003038:	00579793          	slli	a5,a5,0x5
 8000303c:	00c12703          	lw	a4,12(sp)
@@ -3253,8 +5894,14 @@ Disassembly of section .text:
 80003078:	01c12783          	lw	a5,28(sp)
 8000307c:	00e787b3          	add	a5,a5,a4
 80003080:	00f12e23          	sw	a5,28(sp)
+
+				} while( uxQueue > ( UBaseType_t ) tskIDLE_PRIORITY ); /*lint !e961 MISRA exception as the casts are only redundant for some ports. */
 80003084:	01812783          	lw	a5,24(sp)
 80003088:	fa0790e3          	bnez	a5,80003028 <uxTaskGetSystemState+0x38>
+
+				/* Fill in an TaskStatus_t structure with information on each
+				task in the Blocked state. */
+				uxTask += prvListTaskWithinSingleList( &( pxTaskStatusArray[ uxTask ] ), ( List_t * ) pxDelayedTaskList, eBlocked );
 8000308c:	01c12783          	lw	a5,28(sp)
 80003090:	00579793          	slli	a5,a5,0x5
 80003094:	00c12703          	lw	a4,12(sp)
@@ -3270,6 +5917,7 @@ Disassembly of section .text:
 800030bc:	01c12783          	lw	a5,28(sp)
 800030c0:	00e787b3          	add	a5,a5,a4
 800030c4:	00f12e23          	sw	a5,28(sp)
+				uxTask += prvListTaskWithinSingleList( &( pxTaskStatusArray[ uxTask ] ), ( List_t * ) pxOverflowDelayedTaskList, eBlocked );
 800030c8:	01c12783          	lw	a5,28(sp)
 800030cc:	00579793          	slli	a5,a5,0x5
 800030d0:	00c12703          	lw	a4,12(sp)
@@ -3285,6 +5933,12 @@ Disassembly of section .text:
 800030f8:	01c12783          	lw	a5,28(sp)
 800030fc:	00e787b3          	add	a5,a5,a4
 80003100:	00f12e23          	sw	a5,28(sp)
+
+				#if( INCLUDE_vTaskDelete == 1 )
+				{
+					/* Fill in an TaskStatus_t structure with information on
+					each task that has been deleted but not yet cleaned up. */
+					uxTask += prvListTaskWithinSingleList( &( pxTaskStatusArray[ uxTask ] ), &xTasksWaitingTermination, eDeleted );
 80003104:	01c12783          	lw	a5,28(sp)
 80003108:	00579793          	slli	a5,a5,0x5
 8000310c:	00c12703          	lw	a4,12(sp)
@@ -3298,6 +5952,12 @@ Disassembly of section .text:
 8000312c:	01c12783          	lw	a5,28(sp)
 80003130:	00e787b3          	add	a5,a5,a4
 80003134:	00f12e23          	sw	a5,28(sp)
+
+				#if ( INCLUDE_vTaskSuspend == 1 )
+				{
+					/* Fill in an TaskStatus_t structure with information on
+					each task in the Suspended state. */
+					uxTask += prvListTaskWithinSingleList( &( pxTaskStatusArray[ uxTask ] ), &xSuspendedTaskList, eSuspended );
 80003138:	01c12783          	lw	a5,28(sp)
 8000313c:	00579793          	slli	a5,a5,0x5
 80003140:	00c12703          	lw	a4,12(sp)
@@ -3311,25 +5971,61 @@ Disassembly of section .text:
 80003160:	01c12783          	lw	a5,28(sp)
 80003164:	00e787b3          	add	a5,a5,a4
 80003168:	00f12e23          	sw	a5,28(sp)
+						#endif
+					}
+				}
+				#else
+				{
+					if( pulTotalRunTime != NULL )
 8000316c:	00412783          	lw	a5,4(sp)
 80003170:	00078663          	beqz	a5,8000317c <uxTaskGetSystemState+0x18c>
+					{
+						*pulTotalRunTime = 0;
 80003174:	00412783          	lw	a5,4(sp)
 80003178:	0007a023          	sw	zero,0(a5)
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+		( void ) xTaskResumeAll();
 8000317c:	c19ff0ef          	jal	ra,80002d94 <xTaskResumeAll>
+
+		return uxTask;
 80003180:	01c12783          	lw	a5,28(sp)
+	}
 80003184:	00078513          	mv	a0,a5
 80003188:	02c12083          	lw	ra,44(sp)
 8000318c:	03010113          	addi	sp,sp,48
 80003190:	00008067          	ret
 
 80003194 <xTaskIncrementTick>:
+
+#endif /* configUSE_TICKLESS_IDLE */
+/*----------------------------------------------------------*/
+
+BaseType_t xTaskIncrementTick( void )
+{
 80003194:	fd010113          	addi	sp,sp,-48
 80003198:	02112623          	sw	ra,44(sp)
+TCB_t * pxTCB;
+TickType_t xItemValue;
+BaseType_t xSwitchRequired = pdFALSE;
 8000319c:	00012e23          	sw	zero,28(sp)
+
+	/* Called by the portable layer each time a tick interrupt occurs.
+	Increments the tick then checks to see if the new tick value will cause any
+	tasks to be unblocked. */
+	traceTASK_INCREMENT_TICK( xTickCount );
+	if( uxSchedulerSuspended == ( UBaseType_t ) pdFALSE )
 800031a0:	0001f797          	auipc	a5,0x1f
 800031a4:	8d478793          	addi	a5,a5,-1836 # 80021a74 <uxSchedulerSuspended>
 800031a8:	0007a783          	lw	a5,0(a5)
 800031ac:	22079c63          	bnez	a5,800033e4 <xTaskIncrementTick+0x250>
+	{
+		/* Increment the RTOS tick, switching the delayed and overflowed
+		delayed lists if it wraps to 0. */
+		++xTickCount;
 800031b0:	0001f797          	auipc	a5,0x1f
 800031b4:	8a478793          	addi	a5,a5,-1884 # 80021a54 <xTickCount>
 800031b8:	0007a783          	lw	a5,0(a5)
@@ -3337,18 +6033,27 @@ Disassembly of section .text:
 800031c0:	0001f797          	auipc	a5,0x1f
 800031c4:	89478793          	addi	a5,a5,-1900 # 80021a54 <xTickCount>
 800031c8:	00e7a023          	sw	a4,0(a5)
+
+		{
+			/* Minor optimisation.  The tick count cannot change in this
+			block. */
+			const TickType_t xConstTickCount = xTickCount;
 800031cc:	0001f797          	auipc	a5,0x1f
 800031d0:	88878793          	addi	a5,a5,-1912 # 80021a54 <xTickCount>
 800031d4:	0007a783          	lw	a5,0(a5)
 800031d8:	00f12c23          	sw	a5,24(sp)
+
+			if( xConstTickCount == ( TickType_t ) 0U )
 800031dc:	01812783          	lw	a5,24(sp)
 800031e0:	06079c63          	bnez	a5,80003258 <xTaskIncrementTick+0xc4>
+			{
+				taskSWITCH_DELAYED_LISTS();
 800031e4:	0001f797          	auipc	a5,0x1f
 800031e8:	82478793          	addi	a5,a5,-2012 # 80021a08 <pxDelayedTaskList>
 800031ec:	0007a783          	lw	a5,0(a5)
 800031f0:	0007a783          	lw	a5,0(a5)
 800031f4:	00078663          	beqz	a5,80003200 <xTaskIncrementTick+0x6c>
-800031f8:	30047073          	csrci	mstatus,8
+800031f8:	30007073          	csrci	mstatus,0
 800031fc:	0000006f          	j	800031fc <xTaskIncrementTick+0x68>
 80003200:	0001f797          	auipc	a5,0x1f
 80003204:	80878793          	addi	a5,a5,-2040 # 80021a08 <pxDelayedTaskList>
@@ -3372,11 +6077,21 @@ Disassembly of section .text:
 8000324c:	82078793          	addi	a5,a5,-2016 # 80021a68 <xNumOfOverflows>
 80003250:	00e7a023          	sw	a4,0(a5)
 80003254:	100010ef          	jal	ra,80004354 <prvResetNextTaskUnblockTime>
+
+			/* See if this tick has made a timeout expire.  Tasks are stored in
+			the	queue in the order of their wake time - meaning once one task
+			has been found whose block time has not expired there is no need to
+			look any further down the list. */
+			if( xConstTickCount >= xNextTaskUnblockTime )
 80003258:	0001f797          	auipc	a5,0x1f
 8000325c:	81878793          	addi	a5,a5,-2024 # 80021a70 <xNextTaskUnblockTime>
 80003260:	0007a783          	lw	a5,0(a5)
 80003264:	01812703          	lw	a4,24(sp)
 80003268:	12f76c63          	bltu	a4,a5,800033a0 <xTaskIncrementTick+0x20c>
+			{
+				for( ;; )
+				{
+					if( listLIST_IS_EMPTY( pxDelayedTaskList ) != pdFALSE )
 8000326c:	0001e797          	auipc	a5,0x1e
 80003270:	79c78793          	addi	a5,a5,1948 # 80021a08 <pxDelayedTaskList>
 80003274:	0007a783          	lw	a5,0(a5)
@@ -3386,39 +6101,80 @@ Disassembly of section .text:
 80003284:	0080006f          	j	8000328c <xTaskIncrementTick+0xf8>
 80003288:	00000793          	li	a5,0
 8000328c:	00078c63          	beqz	a5,800032a4 <xTaskIncrementTick+0x110>
+						/* The delayed list is empty.  Set xNextTaskUnblockTime
+						to the maximum possible value so it is extremely
+						unlikely that the
+						if( xTickCount >= xNextTaskUnblockTime ) test will pass
+						next time through. */
+						xNextTaskUnblockTime = portMAX_DELAY;
 80003290:	0001e797          	auipc	a5,0x1e
 80003294:	7e078793          	addi	a5,a5,2016 # 80021a70 <xNextTaskUnblockTime>
 80003298:	fff00713          	li	a4,-1
 8000329c:	00e7a023          	sw	a4,0(a5)
+						break;
 800032a0:	1000006f          	j	800033a0 <xTaskIncrementTick+0x20c>
+					{
+						/* The delayed list is not empty, get the value of the
+						item at the head of the delayed list.  This is the time
+						at which the task at the head of the delayed list must
+						be removed from the Blocked state. */
+						pxTCB = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxDelayedTaskList );
 800032a4:	0001e797          	auipc	a5,0x1e
 800032a8:	76478793          	addi	a5,a5,1892 # 80021a08 <pxDelayedTaskList>
 800032ac:	0007a783          	lw	a5,0(a5)
 800032b0:	00c7a783          	lw	a5,12(a5)
 800032b4:	00c7a783          	lw	a5,12(a5)
 800032b8:	00f12823          	sw	a5,16(sp)
+						xItemValue = listGET_LIST_ITEM_VALUE( &( pxTCB->xGenericListItem ) );
 800032bc:	01012783          	lw	a5,16(sp)
 800032c0:	0047a783          	lw	a5,4(a5)
 800032c4:	00f12623          	sw	a5,12(sp)
+
+						if( xConstTickCount < xItemValue )
 800032c8:	01812703          	lw	a4,24(sp)
 800032cc:	00c12783          	lw	a5,12(sp)
 800032d0:	00f77c63          	bleu	a5,a4,800032e8 <xTaskIncrementTick+0x154>
+							/* It is not time to unblock this item yet, but the
+							item value is the time at which the task at the head
+							of the blocked list must be removed from the Blocked
+							state -	so record the item value in
+							xNextTaskUnblockTime. */
+							xNextTaskUnblockTime = xItemValue;
 800032d4:	0001e797          	auipc	a5,0x1e
 800032d8:	79c78793          	addi	a5,a5,1948 # 80021a70 <xNextTaskUnblockTime>
 800032dc:	00c12703          	lw	a4,12(sp)
 800032e0:	00e7a023          	sw	a4,0(a5)
+							break;
 800032e4:	0bc0006f          	j	800033a0 <xTaskIncrementTick+0x20c>
+						{
+							mtCOVERAGE_TEST_MARKER();
+						}
+
+						/* It is time to remove the item from the Blocked state. */
+						( void ) uxListRemove( &( pxTCB->xGenericListItem ) );
 800032e8:	01012783          	lw	a5,16(sp)
 800032ec:	00478793          	addi	a5,a5,4
 800032f0:	00078513          	mv	a0,a5
 800032f4:	f3cfd0ef          	jal	ra,80000a30 <uxListRemove>
+
+						/* Is the task waiting on an event also?  If so remove
+						it from the event list. */
+						if( listLIST_ITEM_CONTAINER( &( pxTCB->xEventListItem ) ) != NULL )
 800032f8:	01012783          	lw	a5,16(sp)
 800032fc:	0287a783          	lw	a5,40(a5)
 80003300:	00078a63          	beqz	a5,80003314 <xTaskIncrementTick+0x180>
+						{
+							( void ) uxListRemove( &( pxTCB->xEventListItem ) );
 80003304:	01012783          	lw	a5,16(sp)
 80003308:	01878793          	addi	a5,a5,24
 8000330c:	00078513          	mv	a0,a5
 80003310:	f20fd0ef          	jal	ra,80000a30 <uxListRemove>
+							mtCOVERAGE_TEST_MARKER();
+						}
+
+						/* Place the unblocked task into the appropriate ready
+						list. */
+						prvAddTaskToReadyList( pxTCB );
 80003314:	01012783          	lw	a5,16(sp)
 80003318:	02c7a703          	lw	a4,44(a5)
 8000331c:	0001e797          	auipc	a5,0x1e
@@ -3444,6 +6200,12 @@ Disassembly of section .text:
 8000336c:	00078593          	mv	a1,a5
 80003370:	00070513          	mv	a0,a4
 80003374:	d78fd0ef          	jal	ra,800008ec <vListInsertEnd>
+						{
+							/* Preemption is on, but a context switch should
+							only be performed if the unblocked task has a
+							priority that is equal to or higher than the
+							currently executing task. */
+							if( pxTCB->uxPriority >= pxCurrentTCB->uxPriority )
 80003378:	01012783          	lw	a5,16(sp)
 8000337c:	02c7a703          	lw	a4,44(a5)
 80003380:	0001e797          	auipc	a5,0x1e
@@ -3451,9 +6213,18 @@ Disassembly of section .text:
 80003388:	0007a783          	lw	a5,0(a5)
 8000338c:	02c7a783          	lw	a5,44(a5)
 80003390:	ecf76ee3          	bltu	a4,a5,8000326c <xTaskIncrementTick+0xd8>
+							{
+								xSwitchRequired = pdTRUE;
 80003394:	00100793          	li	a5,1
 80003398:	00f12e23          	sw	a5,28(sp)
+					if( listLIST_IS_EMPTY( pxDelayedTaskList ) != pdFALSE )
 8000339c:	ed1ff06f          	j	8000326c <xTaskIncrementTick+0xd8>
+		/* Tasks of equal priority to the currently running task will share
+		processing time (time slice) if preemption is on, and the application
+		writer has not explicitly turned time slicing off. */
+		#if ( ( configUSE_PREEMPTION == 1 ) && ( configUSE_TIME_SLICING == 1 ) )
+		{
+			if( listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ pxCurrentTCB->uxPriority ] ) ) > ( UBaseType_t ) 1 )
 800033a0:	0001e797          	auipc	a5,0x1e
 800033a4:	b4478793          	addi	a5,a5,-1212 # 80020ee4 <pxCurrentTCB>
 800033a8:	0007a783          	lw	a5,0(a5)
@@ -3468,9 +6239,17 @@ Disassembly of section .text:
 800033cc:	0007a703          	lw	a4,0(a5)
 800033d0:	00100793          	li	a5,1
 800033d4:	02e7f663          	bleu	a4,a5,80003400 <xTaskIncrementTick+0x26c>
+			{
+				xSwitchRequired = pdTRUE;
 800033d8:	00100793          	li	a5,1
 800033dc:	00f12e23          	sw	a5,28(sp)
 800033e0:	0200006f          	j	80003400 <xTaskIncrementTick+0x26c>
+		}
+		#endif /* configUSE_TICK_HOOK */
+	}
+	else
+	{
+		++uxPendedTicks;
 800033e4:	0001e797          	auipc	a5,0x1e
 800033e8:	67c78793          	addi	a5,a5,1660 # 80021a60 <uxPendedTicks>
 800033ec:	0007a783          	lw	a5,0(a5)
@@ -3478,33 +6257,67 @@ Disassembly of section .text:
 800033f4:	0001e797          	auipc	a5,0x1e
 800033f8:	66c78793          	addi	a5,a5,1644 # 80021a60 <uxPendedTicks>
 800033fc:	00e7a023          	sw	a4,0(a5)
+		#endif
+	}
+
+	#if ( configUSE_PREEMPTION == 1 )
+	{
+		if( xYieldPending != pdFALSE )
 80003400:	0001e797          	auipc	a5,0x1e
 80003404:	66478793          	addi	a5,a5,1636 # 80021a64 <xYieldPending>
 80003408:	0007a783          	lw	a5,0(a5)
 8000340c:	00078663          	beqz	a5,80003418 <xTaskIncrementTick+0x284>
+		{
+			xSwitchRequired = pdTRUE;
 80003410:	00100793          	li	a5,1
 80003414:	00f12e23          	sw	a5,28(sp)
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
+	#endif /* configUSE_PREEMPTION */
+
+	return xSwitchRequired;
 80003418:	01c12783          	lw	a5,28(sp)
+}
 8000341c:	00078513          	mv	a0,a5
 80003420:	02c12083          	lw	ra,44(sp)
 80003424:	03010113          	addi	sp,sp,48
 80003428:	00008067          	ret
 
 8000342c <vTaskSwitchContext>:
+
+#endif /* configUSE_APPLICATION_TASK_TAG */
+/*-----------------------------------------------------------*/
+
+void vTaskSwitchContext( void )
+{
 8000342c:	fe010113          	addi	sp,sp,-32
 80003430:	00112e23          	sw	ra,28(sp)
+	if( uxSchedulerSuspended != ( UBaseType_t ) pdFALSE )
 80003434:	0001e797          	auipc	a5,0x1e
 80003438:	64078793          	addi	a5,a5,1600 # 80021a74 <uxSchedulerSuspended>
 8000343c:	0007a783          	lw	a5,0(a5)
 80003440:	00078c63          	beqz	a5,80003458 <vTaskSwitchContext+0x2c>
+	{
+		/* The scheduler is currently suspended - do not allow a context
+		switch. */
+		xYieldPending = pdTRUE;
 80003444:	0001e797          	auipc	a5,0x1e
 80003448:	62078793          	addi	a5,a5,1568 # 80021a64 <xYieldPending>
 8000344c:	00100713          	li	a4,1
 80003450:	00e7a023          	sw	a4,0(a5)
+			structure specific to this task. */
+			_impure_ptr = &( pxCurrentTCB->xNewLib_reent );
+		}
+		#endif /* configUSE_NEWLIB_REENTRANT */
+	}
+}
 80003454:	18c0006f          	j	800035e0 <vTaskSwitchContext+0x1b4>
+		xYieldPending = pdFALSE;
 80003458:	0001e797          	auipc	a5,0x1e
 8000345c:	60c78793          	addi	a5,a5,1548 # 80021a64 <xYieldPending>
 80003460:	0007a023          	sw	zero,0(a5)
+		taskCHECK_FOR_STACK_OVERFLOW();
 80003464:	0001e797          	auipc	a5,0x1e
 80003468:	a8078793          	addi	a5,a5,-1408 # 80020ee4 <pxCurrentTCB>
 8000346c:	0007a783          	lw	a5,0(a5)
@@ -3542,12 +6355,13 @@ Disassembly of section .text:
 800034ec:	00078593          	mv	a1,a5
 800034f0:	00070513          	mv	a0,a4
 800034f4:	645030ef          	jal	ra,80007338 <vApplicationStackOverflowHook>
+		taskSELECT_HIGHEST_PRIORITY_TASK();
 800034f8:	0380006f          	j	80003530 <vTaskSwitchContext+0x104>
 800034fc:	0001e797          	auipc	a5,0x1e
 80003500:	55c78793          	addi	a5,a5,1372 # 80021a58 <uxTopReadyPriority>
 80003504:	0007a783          	lw	a5,0(a5)
 80003508:	00079663          	bnez	a5,80003514 <vTaskSwitchContext+0xe8>
-8000350c:	30047073          	csrci	mstatus,8
+8000350c:	30007073          	csrci	mstatus,0
 80003510:	0000006f          	j	80003510 <vTaskSwitchContext+0xe4>
 80003514:	0001e797          	auipc	a5,0x1e
 80003518:	54478793          	addi	a5,a5,1348 # 80021a58 <uxTopReadyPriority>
@@ -3600,20 +6414,34 @@ Disassembly of section .text:
 800035d4:	0001e797          	auipc	a5,0x1e
 800035d8:	91078793          	addi	a5,a5,-1776 # 80020ee4 <pxCurrentTCB>
 800035dc:	00e7a023          	sw	a4,0(a5)
+}
 800035e0:	00000013          	nop
 800035e4:	01c12083          	lw	ra,28(sp)
 800035e8:	02010113          	addi	sp,sp,32
 800035ec:	00008067          	ret
 
 800035f0 <vTaskPlaceOnEventList>:
+/*-----------------------------------------------------------*/
+
+void vTaskPlaceOnEventList( List_t * const pxEventList, const TickType_t xTicksToWait )
+{
 800035f0:	fd010113          	addi	sp,sp,-48
 800035f4:	02112623          	sw	ra,44(sp)
 800035f8:	00a12623          	sw	a0,12(sp)
 800035fc:	00b12423          	sw	a1,8(sp)
+TickType_t xTimeToWake;
+
+	configASSERT( pxEventList );
 80003600:	00c12783          	lw	a5,12(sp)
 80003604:	00079663          	bnez	a5,80003610 <vTaskPlaceOnEventList+0x20>
-80003608:	30047073          	csrci	mstatus,8
+80003608:	30007073          	csrci	mstatus,0
 8000360c:	0000006f          	j	8000360c <vTaskPlaceOnEventList+0x1c>
+
+	/* Place the event list item of the TCB in the appropriate event list.
+	This is placed in the list in priority order so the highest priority task
+	is the first to be woken by the event.  The queue that contains the event
+	list is locked, preventing simultaneous access from interrupts. */
+	vListInsert( pxEventList, &( pxCurrentTCB->xEventListItem ) );
 80003610:	0001e797          	auipc	a5,0x1e
 80003614:	8d478793          	addi	a5,a5,-1836 # 80020ee4 <pxCurrentTCB>
 80003618:	0007a783          	lw	a5,0(a5)
@@ -3621,15 +6449,31 @@ Disassembly of section .text:
 80003620:	00078593          	mv	a1,a5
 80003624:	00c12503          	lw	a0,12(sp)
 80003628:	b40fd0ef          	jal	ra,80000968 <vListInsert>
+
+	/* The task must be removed from from the ready list before it is added to
+	the blocked list as the same list item is used for both lists.  Exclusive
+	access to the ready lists guaranteed because the scheduler is locked. */
+	if( uxListRemove( &( pxCurrentTCB->xGenericListItem ) ) == ( UBaseType_t ) 0 )
 8000362c:	0001e797          	auipc	a5,0x1e
 80003630:	8b878793          	addi	a5,a5,-1864 # 80020ee4 <pxCurrentTCB>
 80003634:	0007a783          	lw	a5,0(a5)
 80003638:	00478793          	addi	a5,a5,4
 8000363c:	00078513          	mv	a0,a5
 80003640:	bf0fd0ef          	jal	ra,80000a30 <uxListRemove>
+		mtCOVERAGE_TEST_MARKER();
+	}
+
+	#if ( INCLUDE_vTaskSuspend == 1 )
+	{
+		if( xTicksToWait == portMAX_DELAY )
 80003644:	00812703          	lw	a4,8(sp)
 80003648:	fff00793          	li	a5,-1
 8000364c:	02f71463          	bne	a4,a5,80003674 <vTaskPlaceOnEventList+0x84>
+		{
+			/* Add the task to the suspended task list instead of a delayed task
+			list to ensure the task is not woken by a timing event.  It will
+			block indefinitely. */
+			vListInsertEnd( &xSuspendedTaskList, &( pxCurrentTCB->xGenericListItem ) );
 80003650:	0001e797          	auipc	a5,0x1e
 80003654:	89478793          	addi	a5,a5,-1900 # 80020ee4 <pxCurrentTCB>
 80003658:	0007a783          	lw	a5,0(a5)
@@ -3638,36 +6482,61 @@ Disassembly of section .text:
 80003664:	0001e517          	auipc	a0,0x1e
 80003668:	3d850513          	addi	a0,a0,984 # 80021a3c <xSuspendedTaskList>
 8000366c:	a80fd0ef          	jal	ra,800008ec <vListInsertEnd>
+			will handle it. */
+			xTimeToWake = xTickCount + xTicksToWait;
+			prvAddCurrentTaskToDelayedList( xTimeToWake );
+	}
+	#endif /* INCLUDE_vTaskSuspend */
+}
 80003670:	0240006f          	j	80003694 <vTaskPlaceOnEventList+0xa4>
+			xTimeToWake = xTickCount + xTicksToWait;
 80003674:	0001e797          	auipc	a5,0x1e
 80003678:	3e078793          	addi	a5,a5,992 # 80021a54 <xTickCount>
 8000367c:	0007a783          	lw	a5,0(a5)
 80003680:	00812703          	lw	a4,8(sp)
 80003684:	00f707b3          	add	a5,a4,a5
 80003688:	00f12e23          	sw	a5,28(sp)
+			prvAddCurrentTaskToDelayedList( xTimeToWake );
 8000368c:	01c12503          	lw	a0,28(sp)
 80003690:	0b9000ef          	jal	ra,80003f48 <prvAddCurrentTaskToDelayedList>
+}
 80003694:	00000013          	nop
 80003698:	02c12083          	lw	ra,44(sp)
 8000369c:	03010113          	addi	sp,sp,48
 800036a0:	00008067          	ret
 
 800036a4 <vTaskPlaceOnUnorderedEventList>:
+/*-----------------------------------------------------------*/
+
+void vTaskPlaceOnUnorderedEventList( List_t * pxEventList, const TickType_t xItemValue, const TickType_t xTicksToWait )
+{
 800036a4:	fd010113          	addi	sp,sp,-48
 800036a8:	02112623          	sw	ra,44(sp)
 800036ac:	00a12623          	sw	a0,12(sp)
 800036b0:	00b12423          	sw	a1,8(sp)
 800036b4:	00c12223          	sw	a2,4(sp)
+TickType_t xTimeToWake;
+
+	configASSERT( pxEventList );
 800036b8:	00c12783          	lw	a5,12(sp)
 800036bc:	00079663          	bnez	a5,800036c8 <vTaskPlaceOnUnorderedEventList+0x24>
-800036c0:	30047073          	csrci	mstatus,8
+800036c0:	30007073          	csrci	mstatus,0
 800036c4:	0000006f          	j	800036c4 <vTaskPlaceOnUnorderedEventList+0x20>
+
+	/* THIS FUNCTION MUST BE CALLED WITH THE SCHEDULER SUSPENDED.  It is used by
+	the event groups implementation. */
+	configASSERT( uxSchedulerSuspended != 0 );
 800036c8:	0001e797          	auipc	a5,0x1e
 800036cc:	3ac78793          	addi	a5,a5,940 # 80021a74 <uxSchedulerSuspended>
 800036d0:	0007a783          	lw	a5,0(a5)
 800036d4:	00079663          	bnez	a5,800036e0 <vTaskPlaceOnUnorderedEventList+0x3c>
-800036d8:	30047073          	csrci	mstatus,8
+800036d8:	30007073          	csrci	mstatus,0
 800036dc:	0000006f          	j	800036dc <vTaskPlaceOnUnorderedEventList+0x38>
+
+	/* Store the item value in the event list item.  It is safe to access the
+	event list item here as interrupts won't access the event list item of a
+	task that is not in the Blocked state. */
+	listSET_LIST_ITEM_VALUE( &( pxCurrentTCB->xEventListItem ), xItemValue | taskEVENT_LIST_ITEM_VALUE_IN_USE );
 800036e0:	0001e797          	auipc	a5,0x1e
 800036e4:	80478793          	addi	a5,a5,-2044 # 80020ee4 <pxCurrentTCB>
 800036e8:	0007a783          	lw	a5,0(a5)
@@ -3675,6 +6544,12 @@ Disassembly of section .text:
 800036f0:	80000737          	lui	a4,0x80000
 800036f4:	00e6e733          	or	a4,a3,a4
 800036f8:	00e7ac23          	sw	a4,24(a5)
+	/* Place the event list item of the TCB at the end of the appropriate event
+	list.  It is safe to access the event list here because it is part of an
+	event group implementation - and interrupts don't access event groups
+	directly (instead they access them indirectly by pending function calls to
+	the task level). */
+	vListInsertEnd( pxEventList, &( pxCurrentTCB->xEventListItem ) );
 800036fc:	0001d797          	auipc	a5,0x1d
 80003700:	7e878793          	addi	a5,a5,2024 # 80020ee4 <pxCurrentTCB>
 80003704:	0007a783          	lw	a5,0(a5)
@@ -3682,15 +6557,31 @@ Disassembly of section .text:
 8000370c:	00078593          	mv	a1,a5
 80003710:	00c12503          	lw	a0,12(sp)
 80003714:	9d8fd0ef          	jal	ra,800008ec <vListInsertEnd>
+
+	/* The task must be removed from the ready list before it is added to the
+	blocked list.  Exclusive access can be assured to the ready list as the
+	scheduler is locked. */
+	if( uxListRemove( &( pxCurrentTCB->xGenericListItem ) ) == ( UBaseType_t ) 0 )
 80003718:	0001d797          	auipc	a5,0x1d
 8000371c:	7cc78793          	addi	a5,a5,1996 # 80020ee4 <pxCurrentTCB>
 80003720:	0007a783          	lw	a5,0(a5)
 80003724:	00478793          	addi	a5,a5,4
 80003728:	00078513          	mv	a0,a5
 8000372c:	b04fd0ef          	jal	ra,80000a30 <uxListRemove>
+		mtCOVERAGE_TEST_MARKER();
+	}
+
+	#if ( INCLUDE_vTaskSuspend == 1 )
+	{
+		if( xTicksToWait == portMAX_DELAY )
 80003730:	00412703          	lw	a4,4(sp)
 80003734:	fff00793          	li	a5,-1
 80003738:	02f71463          	bne	a4,a5,80003760 <vTaskPlaceOnUnorderedEventList+0xbc>
+		{
+			/* Add the task to the suspended task list instead of a delayed task
+			list to ensure it is not woken by a timing event.  It will block
+			indefinitely. */
+			vListInsertEnd( &xSuspendedTaskList, &( pxCurrentTCB->xGenericListItem ) );
 8000373c:	0001d797          	auipc	a5,0x1d
 80003740:	7a878793          	addi	a5,a5,1960 # 80020ee4 <pxCurrentTCB>
 80003744:	0007a783          	lw	a5,0(a5)
@@ -3699,30 +6590,54 @@ Disassembly of section .text:
 80003750:	0001e517          	auipc	a0,0x1e
 80003754:	2ec50513          	addi	a0,a0,748 # 80021a3c <xSuspendedTaskList>
 80003758:	994fd0ef          	jal	ra,800008ec <vListInsertEnd>
+			will manage it correctly. */
+			xTimeToWake = xTickCount + xTicksToWait;
+			prvAddCurrentTaskToDelayedList( xTimeToWake );
+	}
+	#endif /* INCLUDE_vTaskSuspend */
+}
 8000375c:	0240006f          	j	80003780 <vTaskPlaceOnUnorderedEventList+0xdc>
+			xTimeToWake = xTickCount + xTicksToWait;
 80003760:	0001e797          	auipc	a5,0x1e
 80003764:	2f478793          	addi	a5,a5,756 # 80021a54 <xTickCount>
 80003768:	0007a783          	lw	a5,0(a5)
 8000376c:	00412703          	lw	a4,4(sp)
 80003770:	00f707b3          	add	a5,a4,a5
 80003774:	00f12e23          	sw	a5,28(sp)
+			prvAddCurrentTaskToDelayedList( xTimeToWake );
 80003778:	01c12503          	lw	a0,28(sp)
 8000377c:	7cc000ef          	jal	ra,80003f48 <prvAddCurrentTaskToDelayedList>
+}
 80003780:	00000013          	nop
 80003784:	02c12083          	lw	ra,44(sp)
 80003788:	03010113          	addi	sp,sp,48
 8000378c:	00008067          	ret
 
 80003790 <vTaskPlaceOnEventListRestricted>:
+/*-----------------------------------------------------------*/
+
+#if configUSE_TIMERS == 1
+
+	void vTaskPlaceOnEventListRestricted( List_t * const pxEventList, const TickType_t xTicksToWait, const BaseType_t xWaitIndefinitely )
+	{
 80003790:	fd010113          	addi	sp,sp,-48
 80003794:	02112623          	sw	ra,44(sp)
 80003798:	00a12623          	sw	a0,12(sp)
 8000379c:	00b12423          	sw	a1,8(sp)
 800037a0:	00c12223          	sw	a2,4(sp)
+	TickType_t xTimeToWake;
+
+		configASSERT( pxEventList );
 800037a4:	00c12783          	lw	a5,12(sp)
 800037a8:	00079663          	bnez	a5,800037b4 <vTaskPlaceOnEventListRestricted+0x24>
-800037ac:	30047073          	csrci	mstatus,8
+800037ac:	30007073          	csrci	mstatus,0
 800037b0:	0000006f          	j	800037b0 <vTaskPlaceOnEventListRestricted+0x20>
+
+		/* Place the event list item of the TCB in the appropriate event list.
+		In this case it is assume that this is the only task that is going to
+		be waiting on this event list, so the faster vListInsertEnd() function
+		can be used in place of vListInsert. */
+		vListInsertEnd( pxEventList, &( pxCurrentTCB->xEventListItem ) );
 800037b4:	0001d797          	auipc	a5,0x1d
 800037b8:	73078793          	addi	a5,a5,1840 # 80020ee4 <pxCurrentTCB>
 800037bc:	0007a783          	lw	a5,0(a5)
@@ -3730,15 +6645,32 @@ Disassembly of section .text:
 800037c4:	00078593          	mv	a1,a5
 800037c8:	00c12503          	lw	a0,12(sp)
 800037cc:	920fd0ef          	jal	ra,800008ec <vListInsertEnd>
+
+		/* We must remove this task from the ready list before adding it to the
+		blocked list as the same list item is used for both lists.  This
+		function is called with the scheduler locked so interrupts will not
+		access the lists at the same time. */
+		if( uxListRemove( &( pxCurrentTCB->xGenericListItem ) ) == ( UBaseType_t ) 0 )
 800037d0:	0001d797          	auipc	a5,0x1d
 800037d4:	71478793          	addi	a5,a5,1812 # 80020ee4 <pxCurrentTCB>
 800037d8:	0007a783          	lw	a5,0(a5)
 800037dc:	00478793          	addi	a5,a5,4
 800037e0:	00078513          	mv	a0,a5
 800037e4:	a4cfd0ef          	jal	ra,80000a30 <uxListRemove>
+		Ready state when the event it is waiting indefinitely for occurs).
+		Blocking indefinitely is useful when using tickless idle mode as when
+		all tasks are blocked indefinitely all timers can be turned off. */
+		#if( INCLUDE_vTaskSuspend == 1 )
+		{
+			if( xWaitIndefinitely == pdTRUE )
 800037e8:	00412703          	lw	a4,4(sp)
 800037ec:	00100793          	li	a5,1
 800037f0:	02f71463          	bne	a4,a5,80003818 <vTaskPlaceOnEventListRestricted+0x88>
+			{
+				/* Add the task to the suspended task list instead of a delayed
+				task list to ensure the task is not woken by a timing event.  It
+				will block indefinitely. */
+				vListInsertEnd( &xSuspendedTaskList, &( pxCurrentTCB->xGenericListItem ) );
 800037f4:	0001d797          	auipc	a5,0x1d
 800037f8:	6f078793          	addi	a5,a5,1776 # 80020ee4 <pxCurrentTCB>
 800037fc:	0007a783          	lw	a5,0(a5)
@@ -3747,44 +6679,72 @@ Disassembly of section .text:
 80003808:	0001e517          	auipc	a0,0x1e
 8000380c:	23450513          	addi	a0,a0,564 # 80021a3c <xSuspendedTaskList>
 80003810:	8dcfd0ef          	jal	ra,800008ec <vListInsertEnd>
+			/* Remove compiler warnings when INCLUDE_vTaskSuspend() is not
+			defined. */
+			( void ) xWaitIndefinitely;
+		}
+		#endif
+	}
 80003814:	0240006f          	j	80003838 <vTaskPlaceOnEventListRestricted+0xa8>
+				xTimeToWake = xTickCount + xTicksToWait;
 80003818:	0001e797          	auipc	a5,0x1e
 8000381c:	23c78793          	addi	a5,a5,572 # 80021a54 <xTickCount>
 80003820:	0007a783          	lw	a5,0(a5)
 80003824:	00812703          	lw	a4,8(sp)
 80003828:	00f707b3          	add	a5,a4,a5
 8000382c:	00f12e23          	sw	a5,28(sp)
+				prvAddCurrentTaskToDelayedList( xTimeToWake );
 80003830:	01c12503          	lw	a0,28(sp)
 80003834:	714000ef          	jal	ra,80003f48 <prvAddCurrentTaskToDelayedList>
+	}
 80003838:	00000013          	nop
 8000383c:	02c12083          	lw	ra,44(sp)
 80003840:	03010113          	addi	sp,sp,48
 80003844:	00008067          	ret
 
 80003848 <xTaskRemoveFromEventList>:
+
+#endif /* configUSE_TIMERS */
+/*-----------------------------------------------------------*/
+
+BaseType_t xTaskRemoveFromEventList( const List_t * const pxEventList )
+{
 80003848:	fd010113          	addi	sp,sp,-48
 8000384c:	02112623          	sw	ra,44(sp)
 80003850:	00a12623          	sw	a0,12(sp)
+	get called - the lock count on the queue will get modified instead.  This
+	means exclusive access to the event list is guaranteed here.
+
+	This function assumes that a check has already been made to ensure that
+	pxEventList is not empty. */
+	pxUnblockedTCB = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxEventList );
 80003854:	00c12783          	lw	a5,12(sp)
 80003858:	00c7a783          	lw	a5,12(a5)
 8000385c:	00c7a783          	lw	a5,12(a5)
 80003860:	00f12c23          	sw	a5,24(sp)
+	configASSERT( pxUnblockedTCB );
 80003864:	01812783          	lw	a5,24(sp)
 80003868:	00079663          	bnez	a5,80003874 <xTaskRemoveFromEventList+0x2c>
-8000386c:	30047073          	csrci	mstatus,8
+8000386c:	30007073          	csrci	mstatus,0
 80003870:	0000006f          	j	80003870 <xTaskRemoveFromEventList+0x28>
+	( void ) uxListRemove( &( pxUnblockedTCB->xEventListItem ) );
 80003874:	01812783          	lw	a5,24(sp)
 80003878:	01878793          	addi	a5,a5,24
 8000387c:	00078513          	mv	a0,a5
 80003880:	9b0fd0ef          	jal	ra,80000a30 <uxListRemove>
+
+	if( uxSchedulerSuspended == ( UBaseType_t ) pdFALSE )
 80003884:	0001e797          	auipc	a5,0x1e
 80003888:	1f078793          	addi	a5,a5,496 # 80021a74 <uxSchedulerSuspended>
 8000388c:	0007a783          	lw	a5,0(a5)
 80003890:	06079e63          	bnez	a5,8000390c <xTaskRemoveFromEventList+0xc4>
+	{
+		( void ) uxListRemove( &( pxUnblockedTCB->xGenericListItem ) );
 80003894:	01812783          	lw	a5,24(sp)
 80003898:	00478793          	addi	a5,a5,4
 8000389c:	00078513          	mv	a0,a5
 800038a0:	990fd0ef          	jal	ra,80000a30 <uxListRemove>
+		prvAddTaskToReadyList( pxUnblockedTCB );
 800038a4:	01812783          	lw	a5,24(sp)
 800038a8:	02c7a703          	lw	a4,44(a5)
 800038ac:	0001e797          	auipc	a5,0x1e
@@ -3811,12 +6771,21 @@ Disassembly of section .text:
 80003900:	00070513          	mv	a0,a4
 80003904:	fe9fc0ef          	jal	ra,800008ec <vListInsertEnd>
 80003908:	01c0006f          	j	80003924 <xTaskRemoveFromEventList+0xdc>
+	}
+	else
+	{
+		/* The delayed and ready lists cannot be accessed, so hold this task
+		pending until the scheduler is resumed. */
+		vListInsertEnd( &( xPendingReadyList ), &( pxUnblockedTCB->xEventListItem ) );
 8000390c:	01812783          	lw	a5,24(sp)
 80003910:	01878793          	addi	a5,a5,24
 80003914:	00078593          	mv	a1,a5
 80003918:	0001e517          	auipc	a0,0x1e
 8000391c:	0f850513          	addi	a0,a0,248 # 80021a10 <xPendingReadyList>
 80003920:	fcdfc0ef          	jal	ra,800008ec <vListInsertEnd>
+	}
+
+	if( pxUnblockedTCB->uxPriority > pxCurrentTCB->uxPriority )
 80003924:	01812783          	lw	a5,24(sp)
 80003928:	02c7a703          	lw	a4,44(a5)
 8000392c:	0001d797          	auipc	a5,0x1d
@@ -3824,49 +6793,94 @@ Disassembly of section .text:
 80003934:	0007a783          	lw	a5,0(a5)
 80003938:	02c7a783          	lw	a5,44(a5)
 8000393c:	02e7f063          	bleu	a4,a5,8000395c <xTaskRemoveFromEventList+0x114>
+	{
+		/* Return true if the task removed from the event list has a higher
+		priority than the calling task.  This allows the calling task to know if
+		it should force a context switch now. */
+		xReturn = pdTRUE;
 80003940:	00100793          	li	a5,1
 80003944:	00f12e23          	sw	a5,28(sp)
+
+		/* Mark that a yield is pending in case the user is not using the
+		"xHigherPriorityTaskWoken" parameter to an ISR safe FreeRTOS function. */
+		xYieldPending = pdTRUE;
 80003948:	0001e797          	auipc	a5,0x1e
 8000394c:	11c78793          	addi	a5,a5,284 # 80021a64 <xYieldPending>
 80003950:	00100713          	li	a4,1
 80003954:	00e7a023          	sw	a4,0(a5)
 80003958:	0080006f          	j	80003960 <xTaskRemoveFromEventList+0x118>
+	}
+	else
+	{
+		xReturn = pdFALSE;
 8000395c:	00012e23          	sw	zero,28(sp)
+		ensure it is updated at the earliest possible time. */
+		prvResetNextTaskUnblockTime();
+	}
+	#endif
+
+	return xReturn;
 80003960:	01c12783          	lw	a5,28(sp)
+}
 80003964:	00078513          	mv	a0,a5
 80003968:	02c12083          	lw	ra,44(sp)
 8000396c:	03010113          	addi	sp,sp,48
 80003970:	00008067          	ret
 
 80003974 <xTaskRemoveFromUnorderedEventList>:
+/*-----------------------------------------------------------*/
+
+BaseType_t xTaskRemoveFromUnorderedEventList( ListItem_t * pxEventListItem, const TickType_t xItemValue )
+{
 80003974:	fd010113          	addi	sp,sp,-48
 80003978:	02112623          	sw	ra,44(sp)
 8000397c:	00a12623          	sw	a0,12(sp)
 80003980:	00b12423          	sw	a1,8(sp)
+TCB_t *pxUnblockedTCB;
+BaseType_t xReturn;
+
+	/* THIS FUNCTION MUST BE CALLED WITH THE SCHEDULER SUSPENDED.  It is used by
+	the event flags implementation. */
+	configASSERT( uxSchedulerSuspended != pdFALSE );
 80003984:	0001e797          	auipc	a5,0x1e
 80003988:	0f078793          	addi	a5,a5,240 # 80021a74 <uxSchedulerSuspended>
 8000398c:	0007a783          	lw	a5,0(a5)
 80003990:	00079663          	bnez	a5,8000399c <xTaskRemoveFromUnorderedEventList+0x28>
-80003994:	30047073          	csrci	mstatus,8
+80003994:	30007073          	csrci	mstatus,0
 80003998:	0000006f          	j	80003998 <xTaskRemoveFromUnorderedEventList+0x24>
+
+	/* Store the new item value in the event list. */
+	listSET_LIST_ITEM_VALUE( pxEventListItem, xItemValue | taskEVENT_LIST_ITEM_VALUE_IN_USE );
 8000399c:	00812703          	lw	a4,8(sp)
 800039a0:	800007b7          	lui	a5,0x80000
 800039a4:	00f76733          	or	a4,a4,a5
 800039a8:	00c12783          	lw	a5,12(sp)
 800039ac:	00e7a023          	sw	a4,0(a5) # 80000000 <__stack+0xfffc33f4>
+
+	/* Remove the event list form the event flag.  Interrupts do not access
+	event flags. */
+	pxUnblockedTCB = ( TCB_t * ) listGET_LIST_ITEM_OWNER( pxEventListItem );
 800039b0:	00c12783          	lw	a5,12(sp)
 800039b4:	00c7a783          	lw	a5,12(a5)
 800039b8:	00f12c23          	sw	a5,24(sp)
+	configASSERT( pxUnblockedTCB );
 800039bc:	01812783          	lw	a5,24(sp)
 800039c0:	00079663          	bnez	a5,800039cc <xTaskRemoveFromUnorderedEventList+0x58>
-800039c4:	30047073          	csrci	mstatus,8
+800039c4:	30007073          	csrci	mstatus,0
 800039c8:	0000006f          	j	800039c8 <xTaskRemoveFromUnorderedEventList+0x54>
+	( void ) uxListRemove( pxEventListItem );
 800039cc:	00c12503          	lw	a0,12(sp)
 800039d0:	860fd0ef          	jal	ra,80000a30 <uxListRemove>
+
+	/* Remove the task from the delayed list and add it to the ready list.  The
+	scheduler is suspended so interrupts will not be accessing the ready
+	lists. */
+	( void ) uxListRemove( &( pxUnblockedTCB->xGenericListItem ) );
 800039d4:	01812783          	lw	a5,24(sp)
 800039d8:	00478793          	addi	a5,a5,4
 800039dc:	00078513          	mv	a0,a5
 800039e0:	850fd0ef          	jal	ra,80000a30 <uxListRemove>
+	prvAddTaskToReadyList( pxUnblockedTCB );
 800039e4:	01812783          	lw	a5,24(sp)
 800039e8:	02c7a703          	lw	a4,44(a5)
 800039ec:	0001e797          	auipc	a5,0x1e
@@ -3892,6 +6906,8 @@ Disassembly of section .text:
 80003a3c:	00078593          	mv	a1,a5
 80003a40:	00070513          	mv	a0,a4
 80003a44:	ea9fc0ef          	jal	ra,800008ec <vListInsertEnd>
+
+	if( pxUnblockedTCB->uxPriority > pxCurrentTCB->uxPriority )
 80003a48:	01812783          	lw	a5,24(sp)
 80003a4c:	02c7a703          	lw	a4,44(a5)
 80003a50:	0001d797          	auipc	a5,0x1d
@@ -3899,65 +6915,117 @@ Disassembly of section .text:
 80003a58:	0007a783          	lw	a5,0(a5)
 80003a5c:	02c7a783          	lw	a5,44(a5)
 80003a60:	02e7f063          	bleu	a4,a5,80003a80 <xTaskRemoveFromUnorderedEventList+0x10c>
+	{
+		/* Return true if the task removed from the event list has
+		a higher priority than the calling task.  This allows
+		the calling task to know if it should force a context
+		switch now. */
+		xReturn = pdTRUE;
 80003a64:	00100793          	li	a5,1
 80003a68:	00f12e23          	sw	a5,28(sp)
+
+		/* Mark that a yield is pending in case the user is not using the
+		"xHigherPriorityTaskWoken" parameter to an ISR safe FreeRTOS function. */
+		xYieldPending = pdTRUE;
 80003a6c:	0001e797          	auipc	a5,0x1e
 80003a70:	ff878793          	addi	a5,a5,-8 # 80021a64 <xYieldPending>
 80003a74:	00100713          	li	a4,1
 80003a78:	00e7a023          	sw	a4,0(a5)
 80003a7c:	0080006f          	j	80003a84 <xTaskRemoveFromUnorderedEventList+0x110>
+	}
+	else
+	{
+		xReturn = pdFALSE;
 80003a80:	00012e23          	sw	zero,28(sp)
+	}
+
+	return xReturn;
 80003a84:	01c12783          	lw	a5,28(sp)
+}
 80003a88:	00078513          	mv	a0,a5
 80003a8c:	02c12083          	lw	ra,44(sp)
 80003a90:	03010113          	addi	sp,sp,48
 80003a94:	00008067          	ret
 
 80003a98 <vTaskSetTimeOutState>:
+/*-----------------------------------------------------------*/
+
+void vTaskSetTimeOutState( TimeOut_t * const pxTimeOut )
+{
 80003a98:	ff010113          	addi	sp,sp,-16
 80003a9c:	00a12623          	sw	a0,12(sp)
+	configASSERT( pxTimeOut );
 80003aa0:	00c12783          	lw	a5,12(sp)
 80003aa4:	00079663          	bnez	a5,80003ab0 <vTaskSetTimeOutState+0x18>
-80003aa8:	30047073          	csrci	mstatus,8
+80003aa8:	30007073          	csrci	mstatus,0
 80003aac:	0000006f          	j	80003aac <vTaskSetTimeOutState+0x14>
+	pxTimeOut->xOverflowCount = xNumOfOverflows;
 80003ab0:	0001e797          	auipc	a5,0x1e
 80003ab4:	fb878793          	addi	a5,a5,-72 # 80021a68 <xNumOfOverflows>
 80003ab8:	0007a703          	lw	a4,0(a5)
 80003abc:	00c12783          	lw	a5,12(sp)
 80003ac0:	00e7a023          	sw	a4,0(a5)
+	pxTimeOut->xTimeOnEntering = xTickCount;
 80003ac4:	0001e797          	auipc	a5,0x1e
 80003ac8:	f9078793          	addi	a5,a5,-112 # 80021a54 <xTickCount>
 80003acc:	0007a703          	lw	a4,0(a5)
 80003ad0:	00c12783          	lw	a5,12(sp)
 80003ad4:	00e7a223          	sw	a4,4(a5)
+}
 80003ad8:	00000013          	nop
 80003adc:	01010113          	addi	sp,sp,16
 80003ae0:	00008067          	ret
 
 80003ae4 <xTaskCheckForTimeOut>:
+/*-----------------------------------------------------------*/
+
+BaseType_t xTaskCheckForTimeOut( TimeOut_t * const pxTimeOut, TickType_t * const pxTicksToWait )
+{
 80003ae4:	fd010113          	addi	sp,sp,-48
 80003ae8:	02112623          	sw	ra,44(sp)
 80003aec:	00a12623          	sw	a0,12(sp)
 80003af0:	00b12423          	sw	a1,8(sp)
+BaseType_t xReturn;
+
+	configASSERT( pxTimeOut );
 80003af4:	00c12783          	lw	a5,12(sp)
 80003af8:	00079663          	bnez	a5,80003b04 <xTaskCheckForTimeOut+0x20>
-80003afc:	30047073          	csrci	mstatus,8
+80003afc:	30007073          	csrci	mstatus,0
 80003b00:	0000006f          	j	80003b00 <xTaskCheckForTimeOut+0x1c>
+	configASSERT( pxTicksToWait );
 80003b04:	00812783          	lw	a5,8(sp)
 80003b08:	00079663          	bnez	a5,80003b14 <xTaskCheckForTimeOut+0x30>
-80003b0c:	30047073          	csrci	mstatus,8
+80003b0c:	30007073          	csrci	mstatus,0
 80003b10:	0000006f          	j	80003b10 <xTaskCheckForTimeOut+0x2c>
+
+	taskENTER_CRITICAL();
 80003b14:	3c1000ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		/* Minor optimisation.  The tick count cannot change in this block. */
+		const TickType_t xConstTickCount = xTickCount;
 80003b18:	0001e797          	auipc	a5,0x1e
 80003b1c:	f3c78793          	addi	a5,a5,-196 # 80021a54 <xTickCount>
 80003b20:	0007a783          	lw	a5,0(a5)
 80003b24:	00f12c23          	sw	a5,24(sp)
+
+		#if ( INCLUDE_vTaskSuspend == 1 )
+			/* If INCLUDE_vTaskSuspend is set to 1 and the block time specified is
+			the maximum block time then the task should block indefinitely, and
+			therefore never time out. */
+			if( *pxTicksToWait == portMAX_DELAY )
 80003b28:	00812783          	lw	a5,8(sp)
 80003b2c:	0007a703          	lw	a4,0(a5)
 80003b30:	fff00793          	li	a5,-1
 80003b34:	00f71663          	bne	a4,a5,80003b40 <xTaskCheckForTimeOut+0x5c>
+			{
+				xReturn = pdFALSE;
 80003b38:	00012e23          	sw	zero,28(sp)
 80003b3c:	0900006f          	j	80003bcc <xTaskCheckForTimeOut+0xe8>
+			}
+			else /* We are not blocking indefinitely, perform the checks below. */
+		#endif
+
+		if( ( xNumOfOverflows != pxTimeOut->xOverflowCount ) && ( xConstTickCount >= pxTimeOut->xTimeOnEntering ) ) /*lint !e525 Indentation preferred as is to make code within pre-processor directives clearer. */
 80003b40:	00c12783          	lw	a5,12(sp)
 80003b44:	0007a703          	lw	a4,0(a5)
 80003b48:	0001e797          	auipc	a5,0x1e
@@ -3968,9 +7036,17 @@ Disassembly of section .text:
 80003b5c:	0047a783          	lw	a5,4(a5)
 80003b60:	01812703          	lw	a4,24(sp)
 80003b64:	00f76863          	bltu	a4,a5,80003b74 <xTaskCheckForTimeOut+0x90>
+		{
+			/* The tick count is greater than the time at which vTaskSetTimeout()
+			was called, but has also overflowed since vTaskSetTimeOut() was called.
+			It must have wrapped all the way around and gone past us again. This
+			passed since vTaskSetTimeout() was called. */
+			xReturn = pdTRUE;
 80003b68:	00100793          	li	a5,1
 80003b6c:	00f12e23          	sw	a5,28(sp)
 80003b70:	05c0006f          	j	80003bcc <xTaskCheckForTimeOut+0xe8>
+		}
+		else if( ( xConstTickCount - pxTimeOut->xTimeOnEntering ) < *pxTicksToWait )
 80003b74:	00c12783          	lw	a5,12(sp)
 80003b78:	0047a783          	lw	a5,4(a5)
 80003b7c:	01812703          	lw	a4,24(sp)
@@ -3978,6 +7054,9 @@ Disassembly of section .text:
 80003b84:	00812783          	lw	a5,8(sp)
 80003b88:	0007a783          	lw	a5,0(a5)
 80003b8c:	02f77c63          	bleu	a5,a4,80003bc4 <xTaskCheckForTimeOut+0xe0>
+		{
+			/* Not a genuine timeout. Adjust parameters for time remaining. */
+			*pxTicksToWait -= ( xConstTickCount -  pxTimeOut->xTimeOnEntering );
 80003b90:	00812783          	lw	a5,8(sp)
 80003b94:	0007a703          	lw	a4,0(a5)
 80003b98:	00c12783          	lw	a5,12(sp)
@@ -3987,73 +7066,153 @@ Disassembly of section .text:
 80003ba8:	00f70733          	add	a4,a4,a5
 80003bac:	00812783          	lw	a5,8(sp)
 80003bb0:	00e7a023          	sw	a4,0(a5)
+			vTaskSetTimeOutState( pxTimeOut );
 80003bb4:	00c12503          	lw	a0,12(sp)
 80003bb8:	ee1ff0ef          	jal	ra,80003a98 <vTaskSetTimeOutState>
+			xReturn = pdFALSE;
 80003bbc:	00012e23          	sw	zero,28(sp)
 80003bc0:	00c0006f          	j	80003bcc <xTaskCheckForTimeOut+0xe8>
+		}
+		else
+		{
+			xReturn = pdTRUE;
 80003bc4:	00100793          	li	a5,1
 80003bc8:	00f12e23          	sw	a5,28(sp)
+		}
+	}
+	taskEXIT_CRITICAL();
 80003bcc:	349000ef          	jal	ra,80004714 <vTaskExitCritical>
+
+	return xReturn;
 80003bd0:	01c12783          	lw	a5,28(sp)
+}
 80003bd4:	00078513          	mv	a0,a5
 80003bd8:	02c12083          	lw	ra,44(sp)
 80003bdc:	03010113          	addi	sp,sp,48
 80003be0:	00008067          	ret
 
 80003be4 <vTaskMissedYield>:
+/*-----------------------------------------------------------*/
+
+void vTaskMissedYield( void )
+{
+	xYieldPending = pdTRUE;
 80003be4:	0001e797          	auipc	a5,0x1e
 80003be8:	e8078793          	addi	a5,a5,-384 # 80021a64 <xYieldPending>
 80003bec:	00100713          	li	a4,1
 80003bf0:	00e7a023          	sw	a4,0(a5)
+}
 80003bf4:	00000013          	nop
 80003bf8:	00008067          	ret
 
 80003bfc <uxTaskGetTaskNumber>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_TRACE_FACILITY == 1 )
+
+	UBaseType_t uxTaskGetTaskNumber( TaskHandle_t xTask )
+	{
 80003bfc:	fe010113          	addi	sp,sp,-32
 80003c00:	00a12623          	sw	a0,12(sp)
+	UBaseType_t uxReturn;
+	TCB_t *pxTCB;
+
+		if( xTask != NULL )
 80003c04:	00c12783          	lw	a5,12(sp)
 80003c08:	00078e63          	beqz	a5,80003c24 <uxTaskGetTaskNumber+0x28>
+		{
+			pxTCB = ( TCB_t * ) xTask;
 80003c0c:	00c12783          	lw	a5,12(sp)
 80003c10:	00f12c23          	sw	a5,24(sp)
+			uxReturn = pxTCB->uxTaskNumber;
 80003c14:	01812783          	lw	a5,24(sp)
 80003c18:	04c7a783          	lw	a5,76(a5)
 80003c1c:	00f12e23          	sw	a5,28(sp)
 80003c20:	0080006f          	j	80003c28 <uxTaskGetTaskNumber+0x2c>
+		}
+		else
+		{
+			uxReturn = 0U;
 80003c24:	00012e23          	sw	zero,28(sp)
+		}
+
+		return uxReturn;
 80003c28:	01c12783          	lw	a5,28(sp)
+	}
 80003c2c:	00078513          	mv	a0,a5
 80003c30:	02010113          	addi	sp,sp,32
 80003c34:	00008067          	ret
 
 80003c38 <vTaskSetTaskNumber>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_TRACE_FACILITY == 1 )
+
+	void vTaskSetTaskNumber( TaskHandle_t xTask, const UBaseType_t uxHandle )
+	{
 80003c38:	fe010113          	addi	sp,sp,-32
 80003c3c:	00a12623          	sw	a0,12(sp)
 80003c40:	00b12423          	sw	a1,8(sp)
+	TCB_t *pxTCB;
+
+		if( xTask != NULL )
 80003c44:	00c12783          	lw	a5,12(sp)
 80003c48:	00078c63          	beqz	a5,80003c60 <vTaskSetTaskNumber+0x28>
+		{
+			pxTCB = ( TCB_t * ) xTask;
 80003c4c:	00c12783          	lw	a5,12(sp)
 80003c50:	00f12e23          	sw	a5,28(sp)
+			pxTCB->uxTaskNumber = uxHandle;
 80003c54:	01c12783          	lw	a5,28(sp)
 80003c58:	00812703          	lw	a4,8(sp)
 80003c5c:	04e7a623          	sw	a4,76(a5)
+		}
+	}
 80003c60:	00000013          	nop
 80003c64:	02010113          	addi	sp,sp,32
 80003c68:	00008067          	ret
 
 80003c6c <prvIdleTask>:
+ *
+ * void prvIdleTask( void *pvParameters );
+ *
+ */
+static portTASK_FUNCTION( prvIdleTask, pvParameters )
+{
 80003c6c:	fe010113          	addi	sp,sp,-32
 80003c70:	00112e23          	sw	ra,28(sp)
 80003c74:	00a12623          	sw	a0,12(sp)
+	( void ) pvParameters;
+
+	for( ;; )
+	{
+		/* See if any tasks have been deleted. */
+		prvCheckTasksWaitingTermination();
 80003c78:	210000ef          	jal	ra,80003e88 <prvCheckTasksWaitingTermination>
+
+			A critical region is not required here as we are just reading from
+			the list, and an occasional incorrect value will not matter.  If
+			the ready list at the idle priority contains more than one task
+			then a task other than the idle task is ready to execute. */
+			if( listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ tskIDLE_PRIORITY ] ) ) > ( UBaseType_t ) 1 )
 80003c7c:	0001e797          	auipc	a5,0x1e
 80003c80:	d0078793          	addi	a5,a5,-768 # 8002197c <pxReadyTasksLists>
 80003c84:	0007a703          	lw	a4,0(a5)
 80003c88:	00100793          	li	a5,1
 80003c8c:	fee7f6e3          	bleu	a4,a5,80003c78 <prvIdleTask+0xc>
+			{
+				taskYIELD();
 80003c90:	905fc0ef          	jal	ra,80000594 <vPortYield>
+		prvCheckTasksWaitingTermination();
 80003c94:	fe5ff06f          	j	80003c78 <prvIdleTask+0xc>
 
 80003c98 <prvInitialiseTCBVariables>:
+
+#endif /* configUSE_TICKLESS_IDLE */
+/*-----------------------------------------------------------*/
+
+static void prvInitialiseTCBVariables( TCB_t * const pxTCB, const char * const pcName, UBaseType_t uxPriority, const MemoryRegion_t * const xRegions, const uint16_t usStackDepth ) /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+{
 80003c98:	fc010113          	addi	sp,sp,-64
 80003c9c:	02112e23          	sw	ra,60(sp)
 80003ca0:	00a12e23          	sw	a0,28(sp)
@@ -4062,8 +7221,14 @@ Disassembly of section .text:
 80003cac:	00d12823          	sw	a3,16(sp)
 80003cb0:	00070793          	mv	a5,a4
 80003cb4:	00f11723          	sh	a5,14(sp)
+UBaseType_t x;
+
+	/* Store the task name in the TCB. */
+	for( x = ( UBaseType_t ) 0; x < ( UBaseType_t ) configMAX_TASK_NAME_LEN; x++ )
 80003cb8:	02012623          	sw	zero,44(sp)
 80003cbc:	0440006f          	j	80003d00 <prvInitialiseTCBVariables+0x68>
+	{
+		pxTCB->pcTaskName[ x ] = pcName[ x ];
 80003cc0:	01812703          	lw	a4,24(sp)
 80003cc4:	02c12783          	lw	a5,44(sp)
 80003cc8:	00f707b3          	add	a5,a4,a5
@@ -4072,11 +7237,17 @@ Disassembly of section .text:
 80003cd4:	02c12783          	lw	a5,44(sp)
 80003cd8:	00f687b3          	add	a5,a3,a5
 80003cdc:	02e78a23          	sb	a4,52(a5)
+
+		/* Don't copy all configMAX_TASK_NAME_LEN if the string is shorter than
+		configMAX_TASK_NAME_LEN characters just in case the memory after the
+		string is not accessible (extremely unlikely). */
+		if( pcName[ x ] == 0x00 )
 80003ce0:	01812703          	lw	a4,24(sp)
 80003ce4:	02c12783          	lw	a5,44(sp)
 80003ce8:	00f707b3          	add	a5,a4,a5
 80003cec:	0007c783          	lbu	a5,0(a5)
 80003cf0:	02078063          	beqz	a5,80003d10 <prvInitialiseTCBVariables+0x78>
+	for( x = ( UBaseType_t ) 0; x < ( UBaseType_t ) configMAX_TASK_NAME_LEN; x++ )
 80003cf4:	02c12783          	lw	a5,44(sp)
 80003cf8:	00178793          	addi	a5,a5,1
 80003cfc:	02f12623          	sw	a5,44(sp)
@@ -4084,57 +7255,122 @@ Disassembly of section .text:
 80003d04:	00f00793          	li	a5,15
 80003d08:	fae7fce3          	bleu	a4,a5,80003cc0 <prvInitialiseTCBVariables+0x28>
 80003d0c:	0080006f          	j	80003d14 <prvInitialiseTCBVariables+0x7c>
+		{
+			break;
 80003d10:	00000013          	nop
+		}
+	}
+
+	/* Ensure the name string is terminated in the case that the string length
+	was greater or equal to configMAX_TASK_NAME_LEN. */
+	pxTCB->pcTaskName[ configMAX_TASK_NAME_LEN - 1 ] = '\0';
 80003d14:	01c12783          	lw	a5,28(sp)
 80003d18:	040781a3          	sb	zero,67(a5)
+
+	/* This is used as an array index so must ensure it's not too large.  First
+	remove the privilege bit if one is present. */
+	if( uxPriority >= ( UBaseType_t ) configMAX_PRIORITIES )
 80003d1c:	01412703          	lw	a4,20(sp)
 80003d20:	00400793          	li	a5,4
 80003d24:	00e7f663          	bleu	a4,a5,80003d30 <prvInitialiseTCBVariables+0x98>
+	{
+		uxPriority = ( UBaseType_t ) configMAX_PRIORITIES - ( UBaseType_t ) 1U;
 80003d28:	00400793          	li	a5,4
 80003d2c:	00f12a23          	sw	a5,20(sp)
+	else
+	{
+		mtCOVERAGE_TEST_MARKER();
+	}
+
+	pxTCB->uxPriority = uxPriority;
 80003d30:	01c12783          	lw	a5,28(sp)
 80003d34:	01412703          	lw	a4,20(sp)
 80003d38:	02e7a623          	sw	a4,44(a5)
+	#if ( configUSE_MUTEXES == 1 )
+	{
+		pxTCB->uxBasePriority = uxPriority;
 80003d3c:	01c12783          	lw	a5,28(sp)
 80003d40:	01412703          	lw	a4,20(sp)
 80003d44:	04e7a823          	sw	a4,80(a5)
+		pxTCB->uxMutexesHeld = 0;
 80003d48:	01c12783          	lw	a5,28(sp)
 80003d4c:	0407aa23          	sw	zero,84(a5)
+	}
+	#endif /* configUSE_MUTEXES */
+
+	vListInitialiseItem( &( pxTCB->xGenericListItem ) );
 80003d50:	01c12783          	lw	a5,28(sp)
 80003d54:	00478793          	addi	a5,a5,4
 80003d58:	00078513          	mv	a0,a5
 80003d5c:	b75fc0ef          	jal	ra,800008d0 <vListInitialiseItem>
+	vListInitialiseItem( &( pxTCB->xEventListItem ) );
 80003d60:	01c12783          	lw	a5,28(sp)
 80003d64:	01878793          	addi	a5,a5,24
 80003d68:	00078513          	mv	a0,a5
 80003d6c:	b65fc0ef          	jal	ra,800008d0 <vListInitialiseItem>
+
+	/* Set the pxTCB as a link back from the ListItem_t.  This is so we can get
+	back to	the containing TCB from a generic item in a list. */
+	listSET_LIST_ITEM_OWNER( &( pxTCB->xGenericListItem ), pxTCB );
 80003d70:	01c12783          	lw	a5,28(sp)
 80003d74:	01c12703          	lw	a4,28(sp)
 80003d78:	00e7a823          	sw	a4,16(a5)
+
+	/* Event lists are always in priority order. */
+	listSET_LIST_ITEM_VALUE( &( pxTCB->xEventListItem ), ( TickType_t ) configMAX_PRIORITIES - ( TickType_t ) uxPriority ); /*lint !e961 MISRA exception as the casts are only redundant for some ports. */
 80003d7c:	00500713          	li	a4,5
 80003d80:	01412783          	lw	a5,20(sp)
 80003d84:	40f70733          	sub	a4,a4,a5
 80003d88:	01c12783          	lw	a5,28(sp)
 80003d8c:	00e7ac23          	sw	a4,24(a5)
+	listSET_LIST_ITEM_OWNER( &( pxTCB->xEventListItem ), pxTCB );
 80003d90:	01c12783          	lw	a5,28(sp)
 80003d94:	01c12703          	lw	a4,28(sp)
 80003d98:	02e7a223          	sw	a4,36(a5)
+
+	#if ( portCRITICAL_NESTING_IN_TCB == 1 )
+	{
+		pxTCB->uxCriticalNesting = ( UBaseType_t ) 0U;
 80003d9c:	01c12783          	lw	a5,28(sp)
 80003da0:	0407a223          	sw	zero,68(a5)
+	}
+	#endif
+
+	#if ( configUSE_TASK_NOTIFICATIONS == 1 )
+	{
+		pxTCB->ulNotifiedValue = 0;
 80003da4:	01c12783          	lw	a5,28(sp)
 80003da8:	0407ac23          	sw	zero,88(a5)
+		pxTCB->eNotifyState = eNotWaitingNotification;
 80003dac:	01c12783          	lw	a5,28(sp)
 80003db0:	0407ae23          	sw	zero,92(a5)
+	{
+		/* Initialise this task's Newlib reent structure. */
+		_REENT_INIT_PTR( ( &( pxTCB->xNewLib_reent ) ) );
+	}
+	#endif /* configUSE_NEWLIB_REENTRANT */
+}
 80003db4:	00000013          	nop
 80003db8:	03c12083          	lw	ra,60(sp)
 80003dbc:	04010113          	addi	sp,sp,64
 80003dc0:	00008067          	ret
 
 80003dc4 <prvInitialiseTaskLists>:
+
+#endif /* portUSING_MPU_WRAPPERS */
+/*-----------------------------------------------------------*/
+
+static void prvInitialiseTaskLists( void )
+{
 80003dc4:	fe010113          	addi	sp,sp,-32
 80003dc8:	00112e23          	sw	ra,28(sp)
+UBaseType_t uxPriority;
+
+	for( uxPriority = ( UBaseType_t ) 0U; uxPriority < ( UBaseType_t ) configMAX_PRIORITIES; uxPriority++ )
 80003dcc:	00012623          	sw	zero,12(sp)
 80003dd0:	0380006f          	j	80003e08 <prvInitialiseTaskLists+0x44>
+	{
+		vListInitialise( &( pxReadyTasksLists[ uxPriority ] ) );
 80003dd4:	00c12703          	lw	a4,12(sp)
 80003dd8:	00070793          	mv	a5,a4
 80003ddc:	00279793          	slli	a5,a5,0x2
@@ -4145,66 +7381,116 @@ Disassembly of section .text:
 80003df0:	00e787b3          	add	a5,a5,a4
 80003df4:	00078513          	mv	a0,a5
 80003df8:	a81fc0ef          	jal	ra,80000878 <vListInitialise>
+	for( uxPriority = ( UBaseType_t ) 0U; uxPriority < ( UBaseType_t ) configMAX_PRIORITIES; uxPriority++ )
 80003dfc:	00c12783          	lw	a5,12(sp)
 80003e00:	00178793          	addi	a5,a5,1
 80003e04:	00f12623          	sw	a5,12(sp)
 80003e08:	00c12703          	lw	a4,12(sp)
 80003e0c:	00400793          	li	a5,4
 80003e10:	fce7f2e3          	bleu	a4,a5,80003dd4 <prvInitialiseTaskLists+0x10>
+	}
+
+	vListInitialise( &xDelayedTaskList1 );
 80003e14:	0001e517          	auipc	a0,0x1e
 80003e18:	bcc50513          	addi	a0,a0,-1076 # 800219e0 <xDelayedTaskList1>
 80003e1c:	a5dfc0ef          	jal	ra,80000878 <vListInitialise>
+	vListInitialise( &xDelayedTaskList2 );
 80003e20:	0001e517          	auipc	a0,0x1e
 80003e24:	bd450513          	addi	a0,a0,-1068 # 800219f4 <xDelayedTaskList2>
 80003e28:	a51fc0ef          	jal	ra,80000878 <vListInitialise>
+	vListInitialise( &xPendingReadyList );
 80003e2c:	0001e517          	auipc	a0,0x1e
 80003e30:	be450513          	addi	a0,a0,-1052 # 80021a10 <xPendingReadyList>
 80003e34:	a45fc0ef          	jal	ra,80000878 <vListInitialise>
+
+	#if ( INCLUDE_vTaskDelete == 1 )
+	{
+		vListInitialise( &xTasksWaitingTermination );
 80003e38:	0001e517          	auipc	a0,0x1e
 80003e3c:	bec50513          	addi	a0,a0,-1044 # 80021a24 <xTasksWaitingTermination>
 80003e40:	a39fc0ef          	jal	ra,80000878 <vListInitialise>
+	}
+	#endif /* INCLUDE_vTaskDelete */
+
+	#if ( INCLUDE_vTaskSuspend == 1 )
+	{
+		vListInitialise( &xSuspendedTaskList );
 80003e44:	0001e517          	auipc	a0,0x1e
 80003e48:	bf850513          	addi	a0,a0,-1032 # 80021a3c <xSuspendedTaskList>
 80003e4c:	a2dfc0ef          	jal	ra,80000878 <vListInitialise>
+	}
+	#endif /* INCLUDE_vTaskSuspend */
+
+	/* Start with pxDelayedTaskList using list1 and the pxOverflowDelayedTaskList
+	using list2. */
+	pxDelayedTaskList = &xDelayedTaskList1;
 80003e50:	0001e797          	auipc	a5,0x1e
 80003e54:	bb878793          	addi	a5,a5,-1096 # 80021a08 <pxDelayedTaskList>
 80003e58:	0001e717          	auipc	a4,0x1e
 80003e5c:	b8870713          	addi	a4,a4,-1144 # 800219e0 <xDelayedTaskList1>
 80003e60:	00e7a023          	sw	a4,0(a5)
+	pxOverflowDelayedTaskList = &xDelayedTaskList2;
 80003e64:	0001e797          	auipc	a5,0x1e
 80003e68:	ba878793          	addi	a5,a5,-1112 # 80021a0c <pxOverflowDelayedTaskList>
 80003e6c:	0001e717          	auipc	a4,0x1e
 80003e70:	b8870713          	addi	a4,a4,-1144 # 800219f4 <xDelayedTaskList2>
 80003e74:	00e7a023          	sw	a4,0(a5)
+}
 80003e78:	00000013          	nop
 80003e7c:	01c12083          	lw	ra,28(sp)
 80003e80:	02010113          	addi	sp,sp,32
 80003e84:	00008067          	ret
 
 80003e88 <prvCheckTasksWaitingTermination>:
+/*-----------------------------------------------------------*/
+
+static void prvCheckTasksWaitingTermination( void )
+{
 80003e88:	fe010113          	addi	sp,sp,-32
 80003e8c:	00112e23          	sw	ra,28(sp)
+	{
+		BaseType_t xListIsEmpty;
+
+		/* ucTasksDeleted is used to prevent vTaskSuspendAll() being called
+		too often in the idle task. */
+		while( uxTasksDeleted > ( UBaseType_t ) 0U )
 80003e90:	0980006f          	j	80003f28 <prvCheckTasksWaitingTermination+0xa0>
+		{
+			vTaskSuspendAll();
 80003e94:	eddfe0ef          	jal	ra,80002d70 <vTaskSuspendAll>
+			{
+				xListIsEmpty = listLIST_IS_EMPTY( &xTasksWaitingTermination );
 80003e98:	0001e797          	auipc	a5,0x1e
 80003e9c:	b8c78793          	addi	a5,a5,-1140 # 80021a24 <xTasksWaitingTermination>
 80003ea0:	0007a783          	lw	a5,0(a5)
 80003ea4:	0017b793          	seqz	a5,a5
 80003ea8:	0ff7f793          	andi	a5,a5,255
 80003eac:	00f12623          	sw	a5,12(sp)
+			}
+			( void ) xTaskResumeAll();
 80003eb0:	ee5fe0ef          	jal	ra,80002d94 <xTaskResumeAll>
+
+			if( xListIsEmpty == pdFALSE )
 80003eb4:	00c12783          	lw	a5,12(sp)
 80003eb8:	06079863          	bnez	a5,80003f28 <prvCheckTasksWaitingTermination+0xa0>
+			{
+				TCB_t *pxTCB;
+
+				taskENTER_CRITICAL();
 80003ebc:	019000ef          	jal	ra,800046d4 <vTaskEnterCritical>
+				{
+					pxTCB = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( ( &xTasksWaitingTermination ) );
 80003ec0:	0001e797          	auipc	a5,0x1e
 80003ec4:	b6478793          	addi	a5,a5,-1180 # 80021a24 <xTasksWaitingTermination>
 80003ec8:	00c7a783          	lw	a5,12(a5)
 80003ecc:	00c7a783          	lw	a5,12(a5)
 80003ed0:	00f12423          	sw	a5,8(sp)
+					( void ) uxListRemove( &( pxTCB->xGenericListItem ) );
 80003ed4:	00812783          	lw	a5,8(sp)
 80003ed8:	00478793          	addi	a5,a5,4
 80003edc:	00078513          	mv	a0,a5
 80003ee0:	b51fc0ef          	jal	ra,80000a30 <uxListRemove>
+					--uxCurrentNumberOfTasks;
 80003ee4:	0001e797          	auipc	a5,0x1e
 80003ee8:	b6c78793          	addi	a5,a5,-1172 # 80021a50 <uxCurrentNumberOfTasks>
 80003eec:	0007a783          	lw	a5,0(a5)
@@ -4212,6 +7498,7 @@ Disassembly of section .text:
 80003ef4:	0001e797          	auipc	a5,0x1e
 80003ef8:	b5c78793          	addi	a5,a5,-1188 # 80021a50 <uxCurrentNumberOfTasks>
 80003efc:	00e7a023          	sw	a4,0(a5)
+					--uxTasksDeleted;
 80003f00:	0001e797          	auipc	a5,0x1e
 80003f04:	b3878793          	addi	a5,a5,-1224 # 80021a38 <uxTasksDeleted>
 80003f08:	0007a783          	lw	a5,0(a5)
@@ -4219,32 +7506,54 @@ Disassembly of section .text:
 80003f10:	0001e797          	auipc	a5,0x1e
 80003f14:	b2878793          	addi	a5,a5,-1240 # 80021a38 <uxTasksDeleted>
 80003f18:	00e7a023          	sw	a4,0(a5)
+				}
+				taskEXIT_CRITICAL();
 80003f1c:	7f8000ef          	jal	ra,80004714 <vTaskExitCritical>
+
+				prvDeleteTCB( pxTCB );
 80003f20:	00812503          	lw	a0,8(sp)
 80003f24:	3fc000ef          	jal	ra,80004320 <prvDeleteTCB>
+		while( uxTasksDeleted > ( UBaseType_t ) 0U )
 80003f28:	0001e797          	auipc	a5,0x1e
 80003f2c:	b1078793          	addi	a5,a5,-1264 # 80021a38 <uxTasksDeleted>
 80003f30:	0007a783          	lw	a5,0(a5)
 80003f34:	f60790e3          	bnez	a5,80003e94 <prvCheckTasksWaitingTermination+0xc>
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+	}
+	#endif /* vTaskDelete */
+}
 80003f38:	00000013          	nop
 80003f3c:	01c12083          	lw	ra,28(sp)
 80003f40:	02010113          	addi	sp,sp,32
 80003f44:	00008067          	ret
 
 80003f48 <prvAddCurrentTaskToDelayedList>:
+/*-----------------------------------------------------------*/
+
+static void prvAddCurrentTaskToDelayedList( const TickType_t xTimeToWake )
+{
 80003f48:	fe010113          	addi	sp,sp,-32
 80003f4c:	00112e23          	sw	ra,28(sp)
 80003f50:	00a12623          	sw	a0,12(sp)
+	/* The list item will be inserted in wake time order. */
+	listSET_LIST_ITEM_VALUE( &( pxCurrentTCB->xGenericListItem ), xTimeToWake );
 80003f54:	0001d797          	auipc	a5,0x1d
 80003f58:	f9078793          	addi	a5,a5,-112 # 80020ee4 <pxCurrentTCB>
 80003f5c:	0007a783          	lw	a5,0(a5)
 80003f60:	00c12703          	lw	a4,12(sp)
 80003f64:	00e7a223          	sw	a4,4(a5)
+
+	if( xTimeToWake < xTickCount )
 80003f68:	0001e797          	auipc	a5,0x1e
 80003f6c:	aec78793          	addi	a5,a5,-1300 # 80021a54 <xTickCount>
 80003f70:	0007a783          	lw	a5,0(a5)
 80003f74:	00c12703          	lw	a4,12(sp)
 80003f78:	02f77863          	bleu	a5,a4,80003fa8 <prvAddCurrentTaskToDelayedList+0x60>
+	{
+		/* Wake time has overflowed.  Place this item in the overflow list. */
+		vListInsert( pxOverflowDelayedTaskList, &( pxCurrentTCB->xGenericListItem ) );
 80003f7c:	0001e797          	auipc	a5,0x1e
 80003f80:	a9078793          	addi	a5,a5,-1392 # 80021a0c <pxOverflowDelayedTaskList>
 80003f84:	0007a703          	lw	a4,0(a5)
@@ -4255,7 +7564,14 @@ Disassembly of section .text:
 80003f98:	00078593          	mv	a1,a5
 80003f9c:	00070513          	mv	a0,a4
 80003fa0:	9c9fc0ef          	jal	ra,80000968 <vListInsert>
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
+}
 80003fa4:	0500006f          	j	80003ff4 <prvAddCurrentTaskToDelayedList+0xac>
+		vListInsert( pxDelayedTaskList, &( pxCurrentTCB->xGenericListItem ) );
 80003fa8:	0001e797          	auipc	a5,0x1e
 80003fac:	a6078793          	addi	a5,a5,-1440 # 80021a08 <pxDelayedTaskList>
 80003fb0:	0007a703          	lw	a4,0(a5)
@@ -4266,26 +7582,39 @@ Disassembly of section .text:
 80003fc4:	00078593          	mv	a1,a5
 80003fc8:	00070513          	mv	a0,a4
 80003fcc:	99dfc0ef          	jal	ra,80000968 <vListInsert>
+		if( xTimeToWake < xNextTaskUnblockTime )
 80003fd0:	0001e797          	auipc	a5,0x1e
 80003fd4:	aa078793          	addi	a5,a5,-1376 # 80021a70 <xNextTaskUnblockTime>
 80003fd8:	0007a783          	lw	a5,0(a5)
 80003fdc:	00c12703          	lw	a4,12(sp)
 80003fe0:	00f77a63          	bleu	a5,a4,80003ff4 <prvAddCurrentTaskToDelayedList+0xac>
+			xNextTaskUnblockTime = xTimeToWake;
 80003fe4:	0001e797          	auipc	a5,0x1e
 80003fe8:	a8c78793          	addi	a5,a5,-1396 # 80021a70 <xNextTaskUnblockTime>
 80003fec:	00c12703          	lw	a4,12(sp)
 80003ff0:	00e7a023          	sw	a4,0(a5)
+}
 80003ff4:	00000013          	nop
 80003ff8:	01c12083          	lw	ra,28(sp)
 80003ffc:	02010113          	addi	sp,sp,32
 80004000:	00008067          	ret
 
 80004004 <prvAllocateTCBAndStack>:
+/*-----------------------------------------------------------*/
+
+static TCB_t *prvAllocateTCBAndStack( const uint16_t usStackDepth, StackType_t * const puxStackBuffer )
+{
 80004004:	fd010113          	addi	sp,sp,-48
 80004008:	02112623          	sw	ra,44(sp)
 8000400c:	00050793          	mv	a5,a0
 80004010:	00b12423          	sw	a1,8(sp)
 80004014:	00f11723          	sh	a5,14(sp)
+	#else /* portSTACK_GROWTH */
+	{
+	StackType_t *pxStack;
+
+		/* Allocate space for the stack used by the task being created. */
+		pxStack = ( StackType_t * ) pvPortMallocAligned( ( ( ( size_t ) usStackDepth ) * sizeof( StackType_t ) ), puxStackBuffer ); /*lint !e961 MISRA exception as the casts are only redundant for some ports. */
 80004018:	00812783          	lw	a5,8(sp)
 8000401c:	00079e63          	bnez	a5,80004038 <prvAllocateTCBAndStack+0x34>
 80004020:	00e15783          	lhu	a5,14(sp)
@@ -4296,23 +7625,56 @@ Disassembly of section .text:
 80004034:	0080006f          	j	8000403c <prvAllocateTCBAndStack+0x38>
 80004038:	00812783          	lw	a5,8(sp)
 8000403c:	00f12c23          	sw	a5,24(sp)
+
+		if( pxStack != NULL )
 80004040:	01812783          	lw	a5,24(sp)
 80004044:	02078a63          	beqz	a5,80004078 <prvAllocateTCBAndStack+0x74>
+		{
+			/* Allocate space for the TCB.  Where the memory comes from depends
+			on the implementation of the port malloc function. */
+			pxNewTCB = ( TCB_t * ) pvPortMalloc( sizeof( TCB_t ) );
 80004048:	06000513          	li	a0,96
 8000404c:	2cc020ef          	jal	ra,80006318 <pvPortMalloc>
 80004050:	00a12e23          	sw	a0,28(sp)
+
+			if( pxNewTCB != NULL )
 80004054:	01c12783          	lw	a5,28(sp)
 80004058:	00078a63          	beqz	a5,8000406c <prvAllocateTCBAndStack+0x68>
+			{
+				/* Store the stack location in the TCB. */
+				pxNewTCB->pxStack = pxStack;
 8000405c:	01c12783          	lw	a5,28(sp)
 80004060:	01812703          	lw	a4,24(sp)
 80004064:	02e7a823          	sw	a4,48(a5)
 80004068:	0140006f          	j	8000407c <prvAllocateTCBAndStack+0x78>
+			}
+			else
+			{
+				/* The stack cannot be used as the TCB was not created.  Free it
+				again. */
+				vPortFree( pxStack );
 8000406c:	01812503          	lw	a0,24(sp)
 80004070:	4a4020ef          	jal	ra,80006514 <vPortFree>
 80004074:	0080006f          	j	8000407c <prvAllocateTCBAndStack+0x78>
+			}
+		}
+		else
+		{
+			pxNewTCB = NULL;
 80004078:	00012e23          	sw	zero,28(sp)
+		}
+	}
+	#endif /* portSTACK_GROWTH */
+
+	if( pxNewTCB != NULL )
 8000407c:	01c12783          	lw	a5,28(sp)
 80004080:	02078263          	beqz	a5,800040a4 <prvAllocateTCBAndStack+0xa0>
+	{
+		/* Avoid dependency on memset() if it is not required. */
+		#if( ( configCHECK_FOR_STACK_OVERFLOW > 1 ) || ( configUSE_TRACE_FACILITY == 1 ) || ( INCLUDE_uxTaskGetStackHighWaterMark == 1 ) )
+		{
+			/* Just to help debugging. */
+			( void ) memset( pxNewTCB->pxStack, ( int ) tskSTACK_FILL_BYTE, ( size_t ) usStackDepth * sizeof( StackType_t ) );
 80004084:	01c12783          	lw	a5,28(sp)
 80004088:	0307a703          	lw	a4,48(a5)
 8000408c:	00e15783          	lhu	a5,14(sp)
@@ -4321,23 +7683,41 @@ Disassembly of section .text:
 80004098:	0a500593          	li	a1,165
 8000409c:	00070513          	mv	a0,a4
 800040a0:	6a0020ef          	jal	ra,80006740 <memset>
+		}
+		#endif /* ( ( configCHECK_FOR_STACK_OVERFLOW > 1 ) || ( ( configUSE_TRACE_FACILITY == 1 ) || ( INCLUDE_uxTaskGetStackHighWaterMark == 1 ) ) ) */
+	}
+
+	return pxNewTCB;
 800040a4:	01c12783          	lw	a5,28(sp)
+}
 800040a8:	00078513          	mv	a0,a5
 800040ac:	02c12083          	lw	ra,44(sp)
 800040b0:	03010113          	addi	sp,sp,48
 800040b4:	00008067          	ret
 
 800040b8 <prvListTaskWithinSingleList>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_TRACE_FACILITY == 1 )
+
+	static UBaseType_t prvListTaskWithinSingleList( TaskStatus_t *pxTaskStatusArray, List_t *pxList, eTaskState eState )
+	{
 800040b8:	fc010113          	addi	sp,sp,-64
 800040bc:	02112e23          	sw	ra,60(sp)
 800040c0:	02812c23          	sw	s0,56(sp)
 800040c4:	00a12623          	sw	a0,12(sp)
 800040c8:	00b12423          	sw	a1,8(sp)
 800040cc:	00c12223          	sw	a2,4(sp)
+	volatile TCB_t *pxNextTCB, *pxFirstTCB;
+	UBaseType_t uxTask = 0;
 800040d0:	02012623          	sw	zero,44(sp)
+
+		if( listCURRENT_LIST_LENGTH( pxList ) > ( UBaseType_t ) 0 )
 800040d4:	00812783          	lw	a5,8(sp)
 800040d8:	0007a783          	lw	a5,0(a5)
 800040dc:	1c078863          	beqz	a5,800042ac <prvListTaskWithinSingleList+0x1f4>
+		{
+			listGET_OWNER_OF_NEXT_ENTRY( pxFirstTCB, pxList );
 800040e0:	00812783          	lw	a5,8(sp)
 800040e4:	02f12423          	sw	a5,40(sp)
 800040e8:	02812783          	lw	a5,40(sp)
@@ -4359,6 +7739,12 @@ Disassembly of section .text:
 80004128:	0047a783          	lw	a5,4(a5)
 8000412c:	00c7a783          	lw	a5,12(a5)
 80004130:	02f12223          	sw	a5,36(sp)
+			pxTaskStatusArray array for each task that is referenced from
+			pxList.  See the definition of TaskStatus_t in task.h for the
+			meaning of each TaskStatus_t structure member. */
+			do
+			{
+				listGET_OWNER_OF_NEXT_ENTRY( pxNextTCB, pxList );
 80004134:	00812783          	lw	a5,8(sp)
 80004138:	02f12023          	sw	a5,32(sp)
 8000413c:	02012783          	lw	a5,32(sp)
@@ -4380,12 +7766,15 @@ Disassembly of section .text:
 8000417c:	0047a783          	lw	a5,4(a5)
 80004180:	00c7a783          	lw	a5,12(a5)
 80004184:	00f12e23          	sw	a5,28(sp)
+
+				pxTaskStatusArray[ uxTask ].xHandle = ( TaskHandle_t ) pxNextTCB;
 80004188:	02c12783          	lw	a5,44(sp)
 8000418c:	00579793          	slli	a5,a5,0x5
 80004190:	00c12703          	lw	a4,12(sp)
 80004194:	00f707b3          	add	a5,a4,a5
 80004198:	01c12703          	lw	a4,28(sp)
 8000419c:	00e7a023          	sw	a4,0(a5)
+				pxTaskStatusArray[ uxTask ].pcTaskName = ( const char * ) &( pxNextTCB->pcTaskName [ 0 ] );
 800041a0:	02c12783          	lw	a5,44(sp)
 800041a4:	00579793          	slli	a5,a5,0x5
 800041a8:	00c12703          	lw	a4,12(sp)
@@ -4393,6 +7782,7 @@ Disassembly of section .text:
 800041b0:	01c12703          	lw	a4,28(sp)
 800041b4:	03470713          	addi	a4,a4,52
 800041b8:	00e7a223          	sw	a4,4(a5)
+				pxTaskStatusArray[ uxTask ].xTaskNumber = pxNextTCB->uxTCBNumber;
 800041bc:	02c12783          	lw	a5,44(sp)
 800041c0:	00579793          	slli	a5,a5,0x5
 800041c4:	00c12703          	lw	a4,12(sp)
@@ -4400,12 +7790,14 @@ Disassembly of section .text:
 800041cc:	01c12703          	lw	a4,28(sp)
 800041d0:	04872703          	lw	a4,72(a4)
 800041d4:	00e7a423          	sw	a4,8(a5)
+				pxTaskStatusArray[ uxTask ].eCurrentState = eState;
 800041d8:	02c12783          	lw	a5,44(sp)
 800041dc:	00579793          	slli	a5,a5,0x5
 800041e0:	00c12703          	lw	a4,12(sp)
 800041e4:	00f707b3          	add	a5,a4,a5
 800041e8:	00412703          	lw	a4,4(sp)
 800041ec:	00e7a623          	sw	a4,12(a5)
+				pxTaskStatusArray[ uxTask ].uxCurrentPriority = pxNextTCB->uxPriority;
 800041f0:	02c12783          	lw	a5,44(sp)
 800041f4:	00579793          	slli	a5,a5,0x5
 800041f8:	00c12703          	lw	a4,12(sp)
@@ -4413,18 +7805,34 @@ Disassembly of section .text:
 80004200:	01c12703          	lw	a4,28(sp)
 80004204:	02c72703          	lw	a4,44(a4)
 80004208:	00e7a823          	sw	a4,16(a5)
+				#if ( INCLUDE_vTaskSuspend == 1 )
+				{
+					/* If the task is in the suspended list then there is a chance
+					it is actually just blocked indefinitely - so really it should
+					be reported as being in the Blocked state. */
+					if( eState == eSuspended )
 8000420c:	00412703          	lw	a4,4(sp)
 80004210:	00300793          	li	a5,3
 80004214:	02f71463          	bne	a4,a5,8000423c <prvListTaskWithinSingleList+0x184>
+					{
+						if( listLIST_ITEM_CONTAINER( &( pxNextTCB->xEventListItem ) ) != NULL )
 80004218:	01c12783          	lw	a5,28(sp)
 8000421c:	0287a783          	lw	a5,40(a5)
 80004220:	00078e63          	beqz	a5,8000423c <prvListTaskWithinSingleList+0x184>
+						{
+							pxTaskStatusArray[ uxTask ].eCurrentState = eBlocked;
 80004224:	02c12783          	lw	a5,44(sp)
 80004228:	00579793          	slli	a5,a5,0x5
 8000422c:	00c12703          	lw	a4,12(sp)
 80004230:	00f707b3          	add	a5,a4,a5
 80004234:	00200713          	li	a4,2
 80004238:	00e7a623          	sw	a4,12(a5)
+				}
+				#endif /* INCLUDE_vTaskSuspend */
+
+				#if ( configUSE_MUTEXES == 1 )
+				{
+					pxTaskStatusArray[ uxTask ].uxBasePriority = pxNextTCB->uxBasePriority;
 8000423c:	02c12783          	lw	a5,44(sp)
 80004240:	00579793          	slli	a5,a5,0x5
 80004244:	00c12703          	lw	a4,12(sp)
@@ -4432,11 +7840,23 @@ Disassembly of section .text:
 8000424c:	01c12703          	lw	a4,28(sp)
 80004250:	05072703          	lw	a4,80(a4)
 80004254:	00e7aa23          	sw	a4,20(a5)
+				{
+					pxTaskStatusArray[ uxTask ].ulRunTimeCounter = pxNextTCB->ulRunTimeCounter;
+				}
+				#else
+				{
+					pxTaskStatusArray[ uxTask ].ulRunTimeCounter = 0;
 80004258:	02c12783          	lw	a5,44(sp)
 8000425c:	00579793          	slli	a5,a5,0x5
 80004260:	00c12703          	lw	a4,12(sp)
 80004264:	00f707b3          	add	a5,a4,a5
 80004268:	0007ac23          	sw	zero,24(a5)
+				{
+					pxTaskStatusArray[ uxTask ].usStackHighWaterMark = prvTaskCheckFreeStackSpace( ( uint8_t * ) pxNextTCB->pxEndOfStack );
+				}
+				#else
+				{
+					pxTaskStatusArray[ uxTask ].usStackHighWaterMark = prvTaskCheckFreeStackSpace( ( uint8_t * ) pxNextTCB->pxStack );
 8000426c:	01c12783          	lw	a5,28(sp)
 80004270:	0307a683          	lw	a3,48(a5)
 80004274:	02c12783          	lw	a5,44(sp)
@@ -4447,13 +7867,26 @@ Disassembly of section .text:
 80004288:	03c000ef          	jal	ra,800042c4 <prvTaskCheckFreeStackSpace>
 8000428c:	00050793          	mv	a5,a0
 80004290:	00f41e23          	sh	a5,28(s0)
+				}
+				#endif
+
+				uxTask++;
 80004294:	02c12783          	lw	a5,44(sp)
 80004298:	00178793          	addi	a5,a5,1
 8000429c:	02f12623          	sw	a5,44(sp)
+
+			} while( pxNextTCB != pxFirstTCB );
 800042a0:	01c12703          	lw	a4,28(sp)
 800042a4:	02412783          	lw	a5,36(sp)
 800042a8:	e8f716e3          	bne	a4,a5,80004134 <prvListTaskWithinSingleList+0x7c>
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+
+		return uxTask;
 800042ac:	02c12783          	lw	a5,44(sp)
+	}
 800042b0:	00078513          	mv	a0,a5
 800042b4:	03c12083          	lw	ra,60(sp)
 800042b8:	03812403          	lw	s0,56(sp)
@@ -4461,47 +7894,92 @@ Disassembly of section .text:
 800042c0:	00008067          	ret
 
 800042c4 <prvTaskCheckFreeStackSpace>:
+/*-----------------------------------------------------------*/
+
+#if ( ( configUSE_TRACE_FACILITY == 1 ) || ( INCLUDE_uxTaskGetStackHighWaterMark == 1 ) )
+
+	static uint16_t prvTaskCheckFreeStackSpace( const uint8_t * pucStackByte )
+	{
 800042c4:	fe010113          	addi	sp,sp,-32
 800042c8:	00a12623          	sw	a0,12(sp)
+	uint32_t ulCount = 0U;
 800042cc:	00012e23          	sw	zero,28(sp)
+
+		while( *pucStackByte == ( uint8_t ) tskSTACK_FILL_BYTE )
 800042d0:	01c0006f          	j	800042ec <prvTaskCheckFreeStackSpace+0x28>
+		{
+			pucStackByte -= portSTACK_GROWTH;
 800042d4:	00c12783          	lw	a5,12(sp)
 800042d8:	00178793          	addi	a5,a5,1
 800042dc:	00f12623          	sw	a5,12(sp)
+			ulCount++;
 800042e0:	01c12783          	lw	a5,28(sp)
 800042e4:	00178793          	addi	a5,a5,1
 800042e8:	00f12e23          	sw	a5,28(sp)
+		while( *pucStackByte == ( uint8_t ) tskSTACK_FILL_BYTE )
 800042ec:	00c12783          	lw	a5,12(sp)
 800042f0:	0007c703          	lbu	a4,0(a5)
 800042f4:	0a500793          	li	a5,165
 800042f8:	fcf70ee3          	beq	a4,a5,800042d4 <prvTaskCheckFreeStackSpace+0x10>
+		}
+
+		ulCount /= ( uint32_t ) sizeof( StackType_t ); /*lint !e961 Casting is not redundant on smaller architectures. */
 800042fc:	01c12783          	lw	a5,28(sp)
 80004300:	0027d793          	srli	a5,a5,0x2
 80004304:	00f12e23          	sw	a5,28(sp)
+
+		return ( uint16_t ) ulCount;
 80004308:	01c12783          	lw	a5,28(sp)
 8000430c:	01079793          	slli	a5,a5,0x10
 80004310:	0107d793          	srli	a5,a5,0x10
+	}
 80004314:	00078513          	mv	a0,a5
 80004318:	02010113          	addi	sp,sp,32
 8000431c:	00008067          	ret
 
 80004320 <prvDeleteTCB>:
+/*-----------------------------------------------------------*/
+
+#if ( INCLUDE_vTaskDelete == 1 )
+
+	static void prvDeleteTCB( TCB_t *pxTCB )
+	{
 80004320:	fe010113          	addi	sp,sp,-32
 80004324:	00112e23          	sw	ra,28(sp)
 80004328:	00a12623          	sw	a0,12(sp)
+				vPortFreeAligned( pxTCB->pxStack );
+			}
+		}
+		#else
+		{
+			vPortFreeAligned( pxTCB->pxStack );
 8000432c:	00c12783          	lw	a5,12(sp)
 80004330:	0307a783          	lw	a5,48(a5)
 80004334:	00078513          	mv	a0,a5
 80004338:	1dc020ef          	jal	ra,80006514 <vPortFree>
+		}
+		#endif
+
+		vPortFree( pxTCB );
 8000433c:	00c12503          	lw	a0,12(sp)
 80004340:	1d4020ef          	jal	ra,80006514 <vPortFree>
+	}
 80004344:	00000013          	nop
 80004348:	01c12083          	lw	ra,28(sp)
 8000434c:	02010113          	addi	sp,sp,32
 80004350:	00008067          	ret
 
 80004354 <prvResetNextTaskUnblockTime>:
+
+#endif /* INCLUDE_vTaskDelete */
+/*-----------------------------------------------------------*/
+
+static void prvResetNextTaskUnblockTime( void )
+{
 80004354:	ff010113          	addi	sp,sp,-16
+TCB_t *pxTCB;
+
+	if( listLIST_IS_EMPTY( pxDelayedTaskList ) != pdFALSE )
 80004358:	0001d797          	auipc	a5,0x1d
 8000435c:	6b078793          	addi	a5,a5,1712 # 80021a08 <pxDelayedTaskList>
 80004360:	0007a783          	lw	a5,0(a5)
@@ -4511,67 +7989,139 @@ Disassembly of section .text:
 80004370:	0080006f          	j	80004378 <prvResetNextTaskUnblockTime+0x24>
 80004374:	00000793          	li	a5,0
 80004378:	00078c63          	beqz	a5,80004390 <prvResetNextTaskUnblockTime+0x3c>
+	{
+		/* The new current delayed list is empty.  Set xNextTaskUnblockTime to
+		the maximum possible value so it is	extremely unlikely that the
+		if( xTickCount >= xNextTaskUnblockTime ) test will pass until
+		there is an item in the delayed list. */
+		xNextTaskUnblockTime = portMAX_DELAY;
 8000437c:	0001d797          	auipc	a5,0x1d
 80004380:	6f478793          	addi	a5,a5,1780 # 80021a70 <xNextTaskUnblockTime>
 80004384:	fff00713          	li	a4,-1
 80004388:	00e7a023          	sw	a4,0(a5)
+		which the task at the head of the delayed list should be removed
+		from the Blocked state. */
+		( pxTCB ) = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxDelayedTaskList );
+		xNextTaskUnblockTime = listGET_LIST_ITEM_VALUE( &( ( pxTCB )->xGenericListItem ) );
+	}
+}
 8000438c:	0300006f          	j	800043bc <prvResetNextTaskUnblockTime+0x68>
+		( pxTCB ) = ( TCB_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxDelayedTaskList );
 80004390:	0001d797          	auipc	a5,0x1d
 80004394:	67878793          	addi	a5,a5,1656 # 80021a08 <pxDelayedTaskList>
 80004398:	0007a783          	lw	a5,0(a5)
 8000439c:	00c7a783          	lw	a5,12(a5)
 800043a0:	00c7a783          	lw	a5,12(a5)
 800043a4:	00f12623          	sw	a5,12(sp)
+		xNextTaskUnblockTime = listGET_LIST_ITEM_VALUE( &( ( pxTCB )->xGenericListItem ) );
 800043a8:	00c12783          	lw	a5,12(sp)
 800043ac:	0047a703          	lw	a4,4(a5)
 800043b0:	0001d797          	auipc	a5,0x1d
 800043b4:	6c078793          	addi	a5,a5,1728 # 80021a70 <xNextTaskUnblockTime>
 800043b8:	00e7a023          	sw	a4,0(a5)
+}
 800043bc:	00000013          	nop
 800043c0:	01010113          	addi	sp,sp,16
 800043c4:	00008067          	ret
 
 800043c8 <xTaskGetCurrentTaskHandle>:
+/*-----------------------------------------------------------*/
+
+#if ( ( INCLUDE_xTaskGetCurrentTaskHandle == 1 ) || ( configUSE_MUTEXES == 1 ) )
+
+	TaskHandle_t xTaskGetCurrentTaskHandle( void )
+	{
 800043c8:	ff010113          	addi	sp,sp,-16
+	TaskHandle_t xReturn;
+
+		/* A critical section is not required as this is not called from
+		an interrupt and the current TCB will always be the same for any
+		individual execution thread. */
+		xReturn = pxCurrentTCB;
 800043cc:	0001d797          	auipc	a5,0x1d
 800043d0:	b1878793          	addi	a5,a5,-1256 # 80020ee4 <pxCurrentTCB>
 800043d4:	0007a783          	lw	a5,0(a5)
 800043d8:	00f12623          	sw	a5,12(sp)
+
+		return xReturn;
 800043dc:	00c12783          	lw	a5,12(sp)
+	}
 800043e0:	00078513          	mv	a0,a5
 800043e4:	01010113          	addi	sp,sp,16
 800043e8:	00008067          	ret
 
 800043ec <xTaskGetSchedulerState>:
+/*-----------------------------------------------------------*/
+
+#if ( ( INCLUDE_xTaskGetSchedulerState == 1 ) || ( configUSE_TIMERS == 1 ) )
+
+	BaseType_t xTaskGetSchedulerState( void )
+	{
 800043ec:	ff010113          	addi	sp,sp,-16
+	BaseType_t xReturn;
+
+		if( xSchedulerRunning == pdFALSE )
 800043f0:	0001d797          	auipc	a5,0x1d
 800043f4:	66c78793          	addi	a5,a5,1644 # 80021a5c <xSchedulerRunning>
 800043f8:	0007a783          	lw	a5,0(a5)
 800043fc:	00079863          	bnez	a5,8000440c <xTaskGetSchedulerState+0x20>
+		{
+			xReturn = taskSCHEDULER_NOT_STARTED;
 80004400:	00100793          	li	a5,1
 80004404:	00f12623          	sw	a5,12(sp)
 80004408:	0240006f          	j	8000442c <xTaskGetSchedulerState+0x40>
+		}
+		else
+		{
+			if( uxSchedulerSuspended == ( UBaseType_t ) pdFALSE )
 8000440c:	0001d797          	auipc	a5,0x1d
 80004410:	66878793          	addi	a5,a5,1640 # 80021a74 <uxSchedulerSuspended>
 80004414:	0007a783          	lw	a5,0(a5)
 80004418:	00079863          	bnez	a5,80004428 <xTaskGetSchedulerState+0x3c>
+			{
+				xReturn = taskSCHEDULER_RUNNING;
 8000441c:	00200793          	li	a5,2
 80004420:	00f12623          	sw	a5,12(sp)
 80004424:	0080006f          	j	8000442c <xTaskGetSchedulerState+0x40>
+			}
+			else
+			{
+				xReturn = taskSCHEDULER_SUSPENDED;
 80004428:	00012623          	sw	zero,12(sp)
+			}
+		}
+
+		return xReturn;
 8000442c:	00c12783          	lw	a5,12(sp)
+	}
 80004430:	00078513          	mv	a0,a5
 80004434:	01010113          	addi	sp,sp,16
 80004438:	00008067          	ret
 
 8000443c <vTaskPriorityInherit>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_MUTEXES == 1 )
+
+	void vTaskPriorityInherit( TaskHandle_t const pxMutexHolder )
+	{
 8000443c:	fd010113          	addi	sp,sp,-48
 80004440:	02112623          	sw	ra,44(sp)
 80004444:	00a12623          	sw	a0,12(sp)
+	TCB_t * const pxTCB = ( TCB_t * ) pxMutexHolder;
 80004448:	00c12783          	lw	a5,12(sp)
 8000444c:	00f12e23          	sw	a5,28(sp)
+
+		/* If the mutex was given back by an interrupt while the queue was
+		locked then the mutex holder might now be NULL. */
+		if( pxMutexHolder != NULL )
 80004450:	00c12783          	lw	a5,12(sp)
 80004454:	12078a63          	beqz	a5,80004588 <vTaskPriorityInherit+0x14c>
+		{
+			/* If the holder of the mutex has a priority below the priority of
+			the task attempting to obtain the mutex then it will temporarily
+			inherit the priority of the task attempting to obtain the mutex. */
+			if( pxTCB->uxPriority < pxCurrentTCB->uxPriority )
 80004458:	01c12783          	lw	a5,28(sp)
 8000445c:	02c7a703          	lw	a4,44(a5)
 80004460:	0001d797          	auipc	a5,0x1d
@@ -4579,9 +8129,16 @@ Disassembly of section .text:
 80004468:	0007a783          	lw	a5,0(a5)
 8000446c:	02c7a783          	lw	a5,44(a5)
 80004470:	10f77c63          	bleu	a5,a4,80004588 <vTaskPriorityInherit+0x14c>
+			{
+				/* Adjust the mutex holder state to account for its new
+				priority.  Only reset the event list item value if the value is
+				not	being used for anything else. */
+				if( ( listGET_LIST_ITEM_VALUE( &( pxTCB->xEventListItem ) ) & taskEVENT_LIST_ITEM_VALUE_IN_USE ) == 0UL )
 80004474:	01c12783          	lw	a5,28(sp)
 80004478:	0187a783          	lw	a5,24(a5)
 8000447c:	0207c263          	bltz	a5,800044a0 <vTaskPriorityInherit+0x64>
+				{
+					listSET_LIST_ITEM_VALUE( &( pxTCB->xEventListItem ), ( TickType_t ) configMAX_PRIORITIES - ( TickType_t ) pxCurrentTCB->uxPriority ); /*lint !e961 MISRA exception as the casts are only redundant for some ports. */
 80004480:	0001d797          	auipc	a5,0x1d
 80004484:	a6478793          	addi	a5,a5,-1436 # 80020ee4 <pxCurrentTCB>
 80004488:	0007a783          	lw	a5,0(a5)
@@ -4590,6 +8147,12 @@ Disassembly of section .text:
 80004494:	40f70733          	sub	a4,a4,a5
 80004498:	01c12783          	lw	a5,28(sp)
 8000449c:	00e7ac23          	sw	a4,24(a5)
+					mtCOVERAGE_TEST_MARKER();
+				}
+
+				/* If the task being modified is in the ready state it will need
+				to be moved into a new list. */
+				if( listIS_CONTAINED_WITHIN( &( pxReadyTasksLists[ pxTCB->uxPriority ] ), &( pxTCB->xGenericListItem ) ) != pdFALSE )
 800044a0:	01c12783          	lw	a5,28(sp)
 800044a4:	0147a683          	lw	a3,20(a5)
 800044a8:	01c12783          	lw	a5,28(sp)
@@ -4606,16 +8169,25 @@ Disassembly of section .text:
 800044d4:	0080006f          	j	800044dc <vTaskPriorityInherit+0xa0>
 800044d8:	00000793          	li	a5,0
 800044dc:	08078a63          	beqz	a5,80004570 <vTaskPriorityInherit+0x134>
+				{
+					if( uxListRemove( &( pxTCB->xGenericListItem ) ) == ( UBaseType_t ) 0 )
 800044e0:	01c12783          	lw	a5,28(sp)
 800044e4:	00478793          	addi	a5,a5,4
 800044e8:	00078513          	mv	a0,a5
 800044ec:	d44fc0ef          	jal	ra,80000a30 <uxListRemove>
+					{
+						mtCOVERAGE_TEST_MARKER();
+					}
+
+					/* Inherit the priority before being moved into the new list. */
+					pxTCB->uxPriority = pxCurrentTCB->uxPriority;
 800044f0:	0001d797          	auipc	a5,0x1d
 800044f4:	9f478793          	addi	a5,a5,-1548 # 80020ee4 <pxCurrentTCB>
 800044f8:	0007a783          	lw	a5,0(a5)
 800044fc:	02c7a703          	lw	a4,44(a5)
 80004500:	01c12783          	lw	a5,28(sp)
 80004504:	02e7a623          	sw	a4,44(a5)
+					prvAddTaskToReadyList( pxTCB );
 80004508:	01c12783          	lw	a5,28(sp)
 8000450c:	02c7a703          	lw	a4,44(a5)
 80004510:	0001d797          	auipc	a5,0x1d
@@ -4641,66 +8213,118 @@ Disassembly of section .text:
 80004560:	00078593          	mv	a1,a5
 80004564:	00070513          	mv	a0,a4
 80004568:	b84fc0ef          	jal	ra,800008ec <vListInsertEnd>
+		}
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
 8000456c:	01c0006f          	j	80004588 <vTaskPriorityInherit+0x14c>
+					pxTCB->uxPriority = pxCurrentTCB->uxPriority;
 80004570:	0001d797          	auipc	a5,0x1d
 80004574:	97478793          	addi	a5,a5,-1676 # 80020ee4 <pxCurrentTCB>
 80004578:	0007a783          	lw	a5,0(a5)
 8000457c:	02c7a703          	lw	a4,44(a5)
 80004580:	01c12783          	lw	a5,28(sp)
 80004584:	02e7a623          	sw	a4,44(a5)
+	}
 80004588:	00000013          	nop
 8000458c:	02c12083          	lw	ra,44(sp)
 80004590:	03010113          	addi	sp,sp,48
 80004594:	00008067          	ret
 
 80004598 <xTaskPriorityDisinherit>:
+/*-----------------------------------------------------------*/
+
+#if ( configUSE_MUTEXES == 1 )
+
+	BaseType_t xTaskPriorityDisinherit( TaskHandle_t const pxMutexHolder )
+	{
 80004598:	fd010113          	addi	sp,sp,-48
 8000459c:	02112623          	sw	ra,44(sp)
 800045a0:	00a12623          	sw	a0,12(sp)
+	TCB_t * const pxTCB = ( TCB_t * ) pxMutexHolder;
 800045a4:	00c12783          	lw	a5,12(sp)
 800045a8:	00f12c23          	sw	a5,24(sp)
+	BaseType_t xReturn = pdFALSE;
 800045ac:	00012e23          	sw	zero,28(sp)
+
+		if( pxMutexHolder != NULL )
 800045b0:	00c12783          	lw	a5,12(sp)
 800045b4:	10078663          	beqz	a5,800046c0 <xTaskPriorityDisinherit+0x128>
+		{
+			/* A task can only have an inherited priority if it holds the mutex.
+			If the mutex is held by a task then it cannot be given from an
+			interrupt, and if a mutex is given by the holding task then it must
+			be the running state task. */
+			configASSERT( pxTCB == pxCurrentTCB );
 800045b8:	0001d797          	auipc	a5,0x1d
 800045bc:	92c78793          	addi	a5,a5,-1748 # 80020ee4 <pxCurrentTCB>
 800045c0:	0007a783          	lw	a5,0(a5)
 800045c4:	01812703          	lw	a4,24(sp)
 800045c8:	00f70663          	beq	a4,a5,800045d4 <xTaskPriorityDisinherit+0x3c>
-800045cc:	30047073          	csrci	mstatus,8
+800045cc:	30007073          	csrci	mstatus,0
 800045d0:	0000006f          	j	800045d0 <xTaskPriorityDisinherit+0x38>
+
+			configASSERT( pxTCB->uxMutexesHeld );
 800045d4:	01812783          	lw	a5,24(sp)
 800045d8:	0547a783          	lw	a5,84(a5)
 800045dc:	00079663          	bnez	a5,800045e8 <xTaskPriorityDisinherit+0x50>
-800045e0:	30047073          	csrci	mstatus,8
+800045e0:	30007073          	csrci	mstatus,0
 800045e4:	0000006f          	j	800045e4 <xTaskPriorityDisinherit+0x4c>
+			( pxTCB->uxMutexesHeld )--;
 800045e8:	01812783          	lw	a5,24(sp)
 800045ec:	0547a783          	lw	a5,84(a5)
 800045f0:	fff78713          	addi	a4,a5,-1
 800045f4:	01812783          	lw	a5,24(sp)
 800045f8:	04e7aa23          	sw	a4,84(a5)
+
+			/* Has the holder of the mutex inherited the priority of another
+			task? */
+			if( pxTCB->uxPriority != pxTCB->uxBasePriority )
 800045fc:	01812783          	lw	a5,24(sp)
 80004600:	02c7a703          	lw	a4,44(a5)
 80004604:	01812783          	lw	a5,24(sp)
 80004608:	0507a783          	lw	a5,80(a5)
 8000460c:	0af70a63          	beq	a4,a5,800046c0 <xTaskPriorityDisinherit+0x128>
+			{
+				/* Only disinherit if no other mutexes are held. */
+				if( pxTCB->uxMutexesHeld == ( UBaseType_t ) 0 )
 80004610:	01812783          	lw	a5,24(sp)
 80004614:	0547a783          	lw	a5,84(a5)
 80004618:	0a079463          	bnez	a5,800046c0 <xTaskPriorityDisinherit+0x128>
+					/* A task can only have an inherited priority if it holds
+					the mutex.  If the mutex is held by a task then it cannot be
+					given from an interrupt, and if a mutex is given by the
+					holding	task then it must be the running state task.  Remove
+					the	holding task from the ready	list. */
+					if( uxListRemove( &( pxTCB->xGenericListItem ) ) == ( UBaseType_t ) 0 )
 8000461c:	01812783          	lw	a5,24(sp)
 80004620:	00478793          	addi	a5,a5,4
 80004624:	00078513          	mv	a0,a5
 80004628:	c08fc0ef          	jal	ra,80000a30 <uxListRemove>
+					}
+
+					/* Disinherit the priority before adding the task into the
+					new	ready list. */
+					traceTASK_PRIORITY_DISINHERIT( pxTCB, pxTCB->uxBasePriority );
+					pxTCB->uxPriority = pxTCB->uxBasePriority;
 8000462c:	01812783          	lw	a5,24(sp)
 80004630:	0507a703          	lw	a4,80(a5)
 80004634:	01812783          	lw	a5,24(sp)
 80004638:	02e7a623          	sw	a4,44(a5)
+
+					/* Reset the event list item value.  It cannot be in use for
+					any other purpose if this task is running, and it must be
+					running to give back the mutex. */
+					listSET_LIST_ITEM_VALUE( &( pxTCB->xEventListItem ), ( TickType_t ) configMAX_PRIORITIES - ( TickType_t ) pxTCB->uxPriority ); /*lint !e961 MISRA exception as the casts are only redundant for some ports. */
 8000463c:	01812783          	lw	a5,24(sp)
 80004640:	02c7a783          	lw	a5,44(a5)
 80004644:	00500713          	li	a4,5
 80004648:	40f70733          	sub	a4,a4,a5
 8000464c:	01812783          	lw	a5,24(sp)
 80004650:	00e7ac23          	sw	a4,24(a5)
+					prvAddTaskToReadyList( pxTCB );
 80004654:	01812783          	lw	a5,24(sp)
 80004658:	02c7a703          	lw	a4,44(a5)
 8000465c:	0001d797          	auipc	a5,0x1d
@@ -4726,64 +8350,132 @@ Disassembly of section .text:
 800046ac:	00078593          	mv	a1,a5
 800046b0:	00070513          	mv	a0,a4
 800046b4:	a38fc0ef          	jal	ra,800008ec <vListInsertEnd>
+					in an order different to that in which they were taken.
+					If a context switch did not occur when the first mutex was
+					returned, even if a task was waiting on it, then a context
+					switch should occur when the last mutex is returned whether
+					a task is waiting on it or not. */
+					xReturn = pdTRUE;
 800046b8:	00100793          	li	a5,1
 800046bc:	00f12e23          	sw	a5,28(sp)
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+
+		return xReturn;
 800046c0:	01c12783          	lw	a5,28(sp)
+	}
 800046c4:	00078513          	mv	a0,a5
 800046c8:	02c12083          	lw	ra,44(sp)
 800046cc:	03010113          	addi	sp,sp,48
 800046d0:	00008067          	ret
 
 800046d4 <vTaskEnterCritical>:
-800046d4:	30047073          	csrci	mstatus,8
+
+#if ( portCRITICAL_NESTING_IN_TCB == 1 )
+
+	void vTaskEnterCritical( void )
+	{
+		portDISABLE_INTERRUPTS();
+800046d4:	30007073          	csrci	mstatus,0
+
+		if( xSchedulerRunning != pdFALSE )
 800046d8:	0001d797          	auipc	a5,0x1d
 800046dc:	38478793          	addi	a5,a5,900 # 80021a5c <xSchedulerRunning>
 800046e0:	0007a783          	lw	a5,0(a5)
 800046e4:	02078463          	beqz	a5,8000470c <vTaskEnterCritical+0x38>
+		{
+			( pxCurrentTCB->uxCriticalNesting )++;
 800046e8:	0001c797          	auipc	a5,0x1c
 800046ec:	7fc78793          	addi	a5,a5,2044 # 80020ee4 <pxCurrentTCB>
 800046f0:	0007a783          	lw	a5,0(a5)
 800046f4:	0447a703          	lw	a4,68(a5)
 800046f8:	00170713          	addi	a4,a4,1
 800046fc:	04e7a223          	sw	a4,68(a5)
+			function so	assert() if it is being called from an interrupt
+			context.  Only API functions that end in "FromISR" can be used in an
+			interrupt.  Only assert if the critical nesting count is 1 to
+			protect against recursive calls if the assert function also uses a
+			critical section. */
+			if( pxCurrentTCB->uxCriticalNesting == 1 )
 80004700:	0001c797          	auipc	a5,0x1c
 80004704:	7e478793          	addi	a5,a5,2020 # 80020ee4 <pxCurrentTCB>
 80004708:	0007a783          	lw	a5,0(a5)
+		}
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
 8000470c:	00000013          	nop
 80004710:	00008067          	ret
 
 80004714 <vTaskExitCritical>:
+
+#if ( portCRITICAL_NESTING_IN_TCB == 1 )
+
+	void vTaskExitCritical( void )
+	{
+		if( xSchedulerRunning != pdFALSE )
 80004714:	0001d797          	auipc	a5,0x1d
 80004718:	34878793          	addi	a5,a5,840 # 80021a5c <xSchedulerRunning>
 8000471c:	0007a783          	lw	a5,0(a5)
 80004720:	04078463          	beqz	a5,80004768 <vTaskExitCritical+0x54>
+		{
+			if( pxCurrentTCB->uxCriticalNesting > 0U )
 80004724:	0001c797          	auipc	a5,0x1c
 80004728:	7c078793          	addi	a5,a5,1984 # 80020ee4 <pxCurrentTCB>
 8000472c:	0007a783          	lw	a5,0(a5)
 80004730:	0447a783          	lw	a5,68(a5)
 80004734:	02078a63          	beqz	a5,80004768 <vTaskExitCritical+0x54>
+			{
+				( pxCurrentTCB->uxCriticalNesting )--;
 80004738:	0001c797          	auipc	a5,0x1c
 8000473c:	7ac78793          	addi	a5,a5,1964 # 80020ee4 <pxCurrentTCB>
 80004740:	0007a783          	lw	a5,0(a5)
 80004744:	0447a703          	lw	a4,68(a5)
 80004748:	fff70713          	addi	a4,a4,-1
 8000474c:	04e7a223          	sw	a4,68(a5)
+
+				if( pxCurrentTCB->uxCriticalNesting == 0U )
 80004750:	0001c797          	auipc	a5,0x1c
 80004754:	79478793          	addi	a5,a5,1940 # 80020ee4 <pxCurrentTCB>
 80004758:	0007a783          	lw	a5,0(a5)
 8000475c:	0447a783          	lw	a5,68(a5)
 80004760:	00079463          	bnez	a5,80004768 <vTaskExitCritical+0x54>
+				{
+					portENABLE_INTERRUPTS();
 80004764:	30046073          	csrsi	mstatus,8
+		}
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
 80004768:	00000013          	nop
 8000476c:	00008067          	ret
 
 80004770 <uxTaskResetEventItemValue>:
+
+#endif /* ( ( configGENERATE_RUN_TIME_STATS == 1 ) && ( configUSE_STATS_FORMATTING_FUNCTIONS > 0 ) ) */
+/*-----------------------------------------------------------*/
+
+TickType_t uxTaskResetEventItemValue( void )
+{
 80004770:	ff010113          	addi	sp,sp,-16
+TickType_t uxReturn;
+
+	uxReturn = listGET_LIST_ITEM_VALUE( &( pxCurrentTCB->xEventListItem ) );
 80004774:	0001c797          	auipc	a5,0x1c
 80004778:	77078793          	addi	a5,a5,1904 # 80020ee4 <pxCurrentTCB>
 8000477c:	0007a783          	lw	a5,0(a5)
 80004780:	0187a783          	lw	a5,24(a5)
 80004784:	00f12623          	sw	a5,12(sp)
+
+	/* Reset the event list item to its normal value - so it can be used with
+	queues and semaphores. */
+	listSET_LIST_ITEM_VALUE( &( pxCurrentTCB->xEventListItem ), ( ( TickType_t ) configMAX_PRIORITIES - ( TickType_t ) pxCurrentTCB->uxPriority ) ); /*lint !e961 MISRA exception as the casts are only redundant for some ports. */
 80004788:	0001c797          	auipc	a5,0x1c
 8000478c:	75c78793          	addi	a5,a5,1884 # 80020ee4 <pxCurrentTCB>
 80004790:	0007a783          	lw	a5,0(a5)
@@ -4794,55 +8486,104 @@ Disassembly of section .text:
 800047a4:	00500693          	li	a3,5
 800047a8:	40e68733          	sub	a4,a3,a4
 800047ac:	00e7ac23          	sw	a4,24(a5)
+
+	return uxReturn;
 800047b0:	00c12783          	lw	a5,12(sp)
+}
 800047b4:	00078513          	mv	a0,a5
 800047b8:	01010113          	addi	sp,sp,16
 800047bc:	00008067          	ret
 
 800047c0 <pvTaskIncrementMutexHeldCount>:
+
+	void *pvTaskIncrementMutexHeldCount( void )
+	{
+		/* If xSemaphoreCreateMutex() is called before any tasks have been created
+		then pxCurrentTCB will be NULL. */
+		if( pxCurrentTCB != NULL )
 800047c0:	0001c797          	auipc	a5,0x1c
 800047c4:	72478793          	addi	a5,a5,1828 # 80020ee4 <pxCurrentTCB>
 800047c8:	0007a783          	lw	a5,0(a5)
 800047cc:	00078e63          	beqz	a5,800047e8 <pvTaskIncrementMutexHeldCount+0x28>
+		{
+			( pxCurrentTCB->uxMutexesHeld )++;
 800047d0:	0001c797          	auipc	a5,0x1c
 800047d4:	71478793          	addi	a5,a5,1812 # 80020ee4 <pxCurrentTCB>
 800047d8:	0007a783          	lw	a5,0(a5)
 800047dc:	0547a703          	lw	a4,84(a5)
 800047e0:	00170713          	addi	a4,a4,1
 800047e4:	04e7aa23          	sw	a4,84(a5)
+		}
+
+		return pxCurrentTCB;
 800047e8:	0001c797          	auipc	a5,0x1c
 800047ec:	6fc78793          	addi	a5,a5,1788 # 80020ee4 <pxCurrentTCB>
 800047f0:	0007a783          	lw	a5,0(a5)
+	}
 800047f4:	00078513          	mv	a0,a5
 800047f8:	00008067          	ret
 
 800047fc <ulTaskNotifyTake>:
+/*-----------------------------------------------------------*/
+
+#if( configUSE_TASK_NOTIFICATIONS == 1 )
+
+	uint32_t ulTaskNotifyTake( BaseType_t xClearCountOnExit, TickType_t xTicksToWait )
+	{
 800047fc:	fd010113          	addi	sp,sp,-48
 80004800:	02112623          	sw	ra,44(sp)
 80004804:	00a12623          	sw	a0,12(sp)
 80004808:	00b12423          	sw	a1,8(sp)
+	TickType_t xTimeToWake;
+	uint32_t ulReturn;
+
+		taskENTER_CRITICAL();
 8000480c:	ec9ff0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			/* Only block if the notification count is not already non-zero. */
+			if( pxCurrentTCB->ulNotifiedValue == 0UL )
 80004810:	0001c797          	auipc	a5,0x1c
 80004814:	6d478793          	addi	a5,a5,1748 # 80020ee4 <pxCurrentTCB>
 80004818:	0007a783          	lw	a5,0(a5)
 8000481c:	0587a783          	lw	a5,88(a5)
 80004820:	08079663          	bnez	a5,800048ac <ulTaskNotifyTake+0xb0>
+			{
+				/* Mark this task as waiting for a notification. */
+				pxCurrentTCB->eNotifyState = eWaitingNotification;
 80004824:	0001c797          	auipc	a5,0x1c
 80004828:	6c078793          	addi	a5,a5,1728 # 80020ee4 <pxCurrentTCB>
 8000482c:	0007a783          	lw	a5,0(a5)
 80004830:	00100713          	li	a4,1
 80004834:	04e7ae23          	sw	a4,92(a5)
+
+				if( xTicksToWait > ( TickType_t ) 0 )
 80004838:	00812783          	lw	a5,8(sp)
 8000483c:	06078863          	beqz	a5,800048ac <ulTaskNotifyTake+0xb0>
+				{
+					/* The task is going to block.  First it must be removed
+					from the ready list. */
+					if( uxListRemove( &( pxCurrentTCB->xGenericListItem ) ) == ( UBaseType_t ) 0 )
 80004840:	0001c797          	auipc	a5,0x1c
 80004844:	6a478793          	addi	a5,a5,1700 # 80020ee4 <pxCurrentTCB>
 80004848:	0007a783          	lw	a5,0(a5)
 8000484c:	00478793          	addi	a5,a5,4
 80004850:	00078513          	mv	a0,a5
 80004854:	9dcfc0ef          	jal	ra,80000a30 <uxListRemove>
+						mtCOVERAGE_TEST_MARKER();
+					}
+
+					#if ( INCLUDE_vTaskSuspend == 1 )
+					{
+						if( xTicksToWait == portMAX_DELAY )
 80004858:	00812703          	lw	a4,8(sp)
 8000485c:	fff00793          	li	a5,-1
 80004860:	02f71463          	bne	a4,a5,80004888 <ulTaskNotifyTake+0x8c>
+						{
+							/* Add the task to the suspended task list instead
+							of a delayed task list to ensure the task is not
+							woken by a timing event.  It will block
+							indefinitely. */
+							vListInsertEnd( &xSuspendedTaskList, &( pxCurrentTCB->xGenericListItem ) );
 80004864:	0001c797          	auipc	a5,0x1c
 80004868:	68078793          	addi	a5,a5,1664 # 80020ee4 <pxCurrentTCB>
 8000486c:	0007a783          	lw	a5,0(a5)
@@ -4852,62 +8593,125 @@ Disassembly of section .text:
 8000487c:	1c450513          	addi	a0,a0,452 # 80021a3c <xSuspendedTaskList>
 80004880:	86cfc0ef          	jal	ra,800008ec <vListInsertEnd>
 80004884:	0240006f          	j	800048a8 <ulTaskNotifyTake+0xac>
+						{
+							/* Calculate the time at which the task should be
+							woken if no notification events occur.  This may
+							overflow but this doesn't matter, the scheduler will
+							handle it. */
+							xTimeToWake = xTickCount + xTicksToWait;
 80004888:	0001d797          	auipc	a5,0x1d
 8000488c:	1cc78793          	addi	a5,a5,460 # 80021a54 <xTickCount>
 80004890:	0007a783          	lw	a5,0(a5)
 80004894:	00812703          	lw	a4,8(sp)
 80004898:	00f707b3          	add	a5,a4,a5
 8000489c:	00f12e23          	sw	a5,28(sp)
+							prvAddCurrentTaskToDelayedList( xTimeToWake );
 800048a0:	01c12503          	lw	a0,28(sp)
 800048a4:	ea4ff0ef          	jal	ra,80003f48 <prvAddCurrentTaskToDelayedList>
+
+					/* All ports are written to allow a yield in a critical
+					section (some will yield immediately, others wait until the
+					critical section exits) - but it is not something that
+					application code should ever do. */
+					portYIELD_WITHIN_API();
 800048a8:	cedfb0ef          	jal	ra,80000594 <vPortYield>
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+		taskEXIT_CRITICAL();
 800048ac:	e69ff0ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		taskENTER_CRITICAL();
 800048b0:	e25ff0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			traceTASK_NOTIFY_TAKE();
+			ulReturn = pxCurrentTCB->ulNotifiedValue;
 800048b4:	0001c797          	auipc	a5,0x1c
 800048b8:	63078793          	addi	a5,a5,1584 # 80020ee4 <pxCurrentTCB>
 800048bc:	0007a783          	lw	a5,0(a5)
 800048c0:	0587a783          	lw	a5,88(a5)
 800048c4:	00f12c23          	sw	a5,24(sp)
+
+			if( ulReturn != 0UL )
 800048c8:	01812783          	lw	a5,24(sp)
 800048cc:	02078c63          	beqz	a5,80004904 <ulTaskNotifyTake+0x108>
+			{
+				if( xClearCountOnExit != pdFALSE )
 800048d0:	00c12783          	lw	a5,12(sp)
 800048d4:	00078c63          	beqz	a5,800048ec <ulTaskNotifyTake+0xf0>
+				{
+					pxCurrentTCB->ulNotifiedValue = 0UL;
 800048d8:	0001c797          	auipc	a5,0x1c
 800048dc:	60c78793          	addi	a5,a5,1548 # 80020ee4 <pxCurrentTCB>
 800048e0:	0007a783          	lw	a5,0(a5)
 800048e4:	0407ac23          	sw	zero,88(a5)
 800048e8:	01c0006f          	j	80004904 <ulTaskNotifyTake+0x108>
+				}
+				else
+				{
+					( pxCurrentTCB->ulNotifiedValue )--;
 800048ec:	0001c797          	auipc	a5,0x1c
 800048f0:	5f878793          	addi	a5,a5,1528 # 80020ee4 <pxCurrentTCB>
 800048f4:	0007a783          	lw	a5,0(a5)
 800048f8:	0587a703          	lw	a4,88(a5)
 800048fc:	fff70713          	addi	a4,a4,-1
 80004900:	04e7ac23          	sw	a4,88(a5)
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+
+			pxCurrentTCB->eNotifyState = eNotWaitingNotification;
 80004904:	0001c797          	auipc	a5,0x1c
 80004908:	5e078793          	addi	a5,a5,1504 # 80020ee4 <pxCurrentTCB>
 8000490c:	0007a783          	lw	a5,0(a5)
 80004910:	0407ae23          	sw	zero,92(a5)
+		}
+		taskEXIT_CRITICAL();
 80004914:	e01ff0ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		return ulReturn;
 80004918:	01812783          	lw	a5,24(sp)
+	}
 8000491c:	00078513          	mv	a0,a5
 80004920:	02c12083          	lw	ra,44(sp)
 80004924:	03010113          	addi	sp,sp,48
 80004928:	00008067          	ret
 
 8000492c <xTaskNotifyWait>:
+/*-----------------------------------------------------------*/
+
+#if( configUSE_TASK_NOTIFICATIONS == 1 )
+
+	BaseType_t xTaskNotifyWait( uint32_t ulBitsToClearOnEntry, uint32_t ulBitsToClearOnExit, uint32_t *pulNotificationValue, TickType_t xTicksToWait )
+	{
 8000492c:	fd010113          	addi	sp,sp,-48
 80004930:	02112623          	sw	ra,44(sp)
 80004934:	00a12623          	sw	a0,12(sp)
 80004938:	00b12423          	sw	a1,8(sp)
 8000493c:	00c12223          	sw	a2,4(sp)
 80004940:	00d12023          	sw	a3,0(sp)
+	TickType_t xTimeToWake;
+	BaseType_t xReturn;
+
+		taskENTER_CRITICAL();
 80004944:	d91ff0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			/* Only block if a notification is not already pending. */
+			if( pxCurrentTCB->eNotifyState != eNotified )
 80004948:	0001c797          	auipc	a5,0x1c
 8000494c:	59c78793          	addi	a5,a5,1436 # 80020ee4 <pxCurrentTCB>
 80004950:	0007a783          	lw	a5,0(a5)
 80004954:	05c7a703          	lw	a4,92(a5)
 80004958:	00200793          	li	a5,2
 8000495c:	0af70663          	beq	a4,a5,80004a08 <xTaskNotifyWait+0xdc>
+			{
+				/* Clear bits in the task's notification value as bits may get
+				set	by the notifying task or interrupt.  This can be used to
+				clear the value to zero. */
+				pxCurrentTCB->ulNotifiedValue &= ~ulBitsToClearOnEntry;
 80004960:	0001c797          	auipc	a5,0x1c
 80004964:	58478793          	addi	a5,a5,1412 # 80020ee4 <pxCurrentTCB>
 80004968:	0007a783          	lw	a5,0(a5)
@@ -4916,22 +8720,43 @@ Disassembly of section .text:
 80004974:	fff74713          	not	a4,a4
 80004978:	00e6f733          	and	a4,a3,a4
 8000497c:	04e7ac23          	sw	a4,88(a5)
+
+				/* Mark this task as waiting for a notification. */
+				pxCurrentTCB->eNotifyState = eWaitingNotification;
 80004980:	0001c797          	auipc	a5,0x1c
 80004984:	56478793          	addi	a5,a5,1380 # 80020ee4 <pxCurrentTCB>
 80004988:	0007a783          	lw	a5,0(a5)
 8000498c:	00100713          	li	a4,1
 80004990:	04e7ae23          	sw	a4,92(a5)
+
+				if( xTicksToWait > ( TickType_t ) 0 )
 80004994:	00012783          	lw	a5,0(sp)
 80004998:	06078863          	beqz	a5,80004a08 <xTaskNotifyWait+0xdc>
+				{
+					/* The task is going to block.  First it must be removed
+					from the	ready list. */
+					if( uxListRemove( &( pxCurrentTCB->xGenericListItem ) ) == ( UBaseType_t ) 0 )
 8000499c:	0001c797          	auipc	a5,0x1c
 800049a0:	54878793          	addi	a5,a5,1352 # 80020ee4 <pxCurrentTCB>
 800049a4:	0007a783          	lw	a5,0(a5)
 800049a8:	00478793          	addi	a5,a5,4
 800049ac:	00078513          	mv	a0,a5
 800049b0:	880fc0ef          	jal	ra,80000a30 <uxListRemove>
+						mtCOVERAGE_TEST_MARKER();
+					}
+
+					#if ( INCLUDE_vTaskSuspend == 1 )
+					{
+						if( xTicksToWait == portMAX_DELAY )
 800049b4:	00012703          	lw	a4,0(sp)
 800049b8:	fff00793          	li	a5,-1
 800049bc:	02f71463          	bne	a4,a5,800049e4 <xTaskNotifyWait+0xb8>
+						{
+							/* Add the task to the suspended task list instead
+							of a delayed task list to ensure the task is not
+							woken by a timing event.  It will block
+							indefinitely. */
+							vListInsertEnd( &xSuspendedTaskList, &( pxCurrentTCB->xGenericListItem ) );
 800049c0:	0001c797          	auipc	a5,0x1c
 800049c4:	52478793          	addi	a5,a5,1316 # 80020ee4 <pxCurrentTCB>
 800049c8:	0007a783          	lw	a5,0(a5)
@@ -4941,33 +8766,77 @@ Disassembly of section .text:
 800049d8:	06850513          	addi	a0,a0,104 # 80021a3c <xSuspendedTaskList>
 800049dc:	f11fb0ef          	jal	ra,800008ec <vListInsertEnd>
 800049e0:	0240006f          	j	80004a04 <xTaskNotifyWait+0xd8>
+						{
+							/* Calculate the time at which the task should be
+							woken if no notification events occur.  This may
+							overflow but this doesn't matter, the scheduler will
+							handle it. */
+							xTimeToWake = xTickCount + xTicksToWait;
 800049e4:	0001d797          	auipc	a5,0x1d
 800049e8:	07078793          	addi	a5,a5,112 # 80021a54 <xTickCount>
 800049ec:	0007a783          	lw	a5,0(a5)
 800049f0:	00012703          	lw	a4,0(sp)
 800049f4:	00f707b3          	add	a5,a4,a5
 800049f8:	00f12c23          	sw	a5,24(sp)
+							prvAddCurrentTaskToDelayedList( xTimeToWake );
 800049fc:	01812503          	lw	a0,24(sp)
 80004a00:	d48ff0ef          	jal	ra,80003f48 <prvAddCurrentTaskToDelayedList>
+
+					/* All ports are written to allow a yield in a critical
+					section (some will yield immediately, others wait until the
+					critical section exits) - but it is not something that
+					application code should ever do. */
+					portYIELD_WITHIN_API();
 80004a04:	b91fb0ef          	jal	ra,80000594 <vPortYield>
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+		taskEXIT_CRITICAL();
 80004a08:	d0dff0ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		taskENTER_CRITICAL();
 80004a0c:	cc9ff0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			traceTASK_NOTIFY_WAIT();
+
+			if( pulNotificationValue != NULL )
 80004a10:	00412783          	lw	a5,4(sp)
 80004a14:	00078e63          	beqz	a5,80004a30 <xTaskNotifyWait+0x104>
+			{
+				/* Output the current notification value, which may or may not
+				have changed. */
+				*pulNotificationValue = pxCurrentTCB->ulNotifiedValue;
 80004a18:	0001c797          	auipc	a5,0x1c
 80004a1c:	4cc78793          	addi	a5,a5,1228 # 80020ee4 <pxCurrentTCB>
 80004a20:	0007a783          	lw	a5,0(a5)
 80004a24:	0587a703          	lw	a4,88(a5)
 80004a28:	00412783          	lw	a5,4(sp)
 80004a2c:	00e7a023          	sw	a4,0(a5)
+
+			/* If eNotifyValue is set then either the task never entered the
+			blocked state (because a notification was already pending) or the
+			task unblocked because of a notification.  Otherwise the task
+			unblocked because of a timeout. */
+			if( pxCurrentTCB->eNotifyState == eWaitingNotification )
 80004a30:	0001c797          	auipc	a5,0x1c
 80004a34:	4b478793          	addi	a5,a5,1204 # 80020ee4 <pxCurrentTCB>
 80004a38:	0007a783          	lw	a5,0(a5)
 80004a3c:	05c7a703          	lw	a4,92(a5)
 80004a40:	00100793          	li	a5,1
 80004a44:	00f71663          	bne	a4,a5,80004a50 <xTaskNotifyWait+0x124>
+			{
+				/* A notification was not received. */
+				xReturn = pdFALSE;
 80004a48:	00012e23          	sw	zero,28(sp)
 80004a4c:	02c0006f          	j	80004a78 <xTaskNotifyWait+0x14c>
+			}
+			else
+			{
+				/* A notification was already pending or a notification was
+				received while the task was waiting. */
+				pxCurrentTCB->ulNotifiedValue &= ~ulBitsToClearOnExit;
 80004a50:	0001c797          	auipc	a5,0x1c
 80004a54:	49478793          	addi	a5,a5,1172 # 80020ee4 <pxCurrentTCB>
 80004a58:	0007a783          	lw	a5,0(a5)
@@ -4976,47 +8845,81 @@ Disassembly of section .text:
 80004a64:	fff74713          	not	a4,a4
 80004a68:	00e6f733          	and	a4,a3,a4
 80004a6c:	04e7ac23          	sw	a4,88(a5)
+				xReturn = pdTRUE;
 80004a70:	00100793          	li	a5,1
 80004a74:	00f12e23          	sw	a5,28(sp)
+			}
+
+			pxCurrentTCB->eNotifyState = eNotWaitingNotification;
 80004a78:	0001c797          	auipc	a5,0x1c
 80004a7c:	46c78793          	addi	a5,a5,1132 # 80020ee4 <pxCurrentTCB>
 80004a80:	0007a783          	lw	a5,0(a5)
 80004a84:	0407ae23          	sw	zero,92(a5)
+		}
+		taskEXIT_CRITICAL();
 80004a88:	c8dff0ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		return xReturn;
 80004a8c:	01c12783          	lw	a5,28(sp)
+	}
 80004a90:	00078513          	mv	a0,a5
 80004a94:	02c12083          	lw	ra,44(sp)
 80004a98:	03010113          	addi	sp,sp,48
 80004a9c:	00008067          	ret
 
 80004aa0 <xTaskGenericNotify>:
+/*-----------------------------------------------------------*/
+
+#if( configUSE_TASK_NOTIFICATIONS == 1 )
+
+	BaseType_t xTaskGenericNotify( TaskHandle_t xTaskToNotify, uint32_t ulValue, eNotifyAction eAction, uint32_t *pulPreviousNotificationValue )
+	{
 80004aa0:	fd010113          	addi	sp,sp,-48
 80004aa4:	02112623          	sw	ra,44(sp)
 80004aa8:	00a12623          	sw	a0,12(sp)
 80004aac:	00b12423          	sw	a1,8(sp)
 80004ab0:	00c12223          	sw	a2,4(sp)
 80004ab4:	00d12023          	sw	a3,0(sp)
+	TCB_t * pxTCB;
+	eNotifyValue eOriginalNotifyState;
+	BaseType_t xReturn = pdPASS;
 80004ab8:	00100793          	li	a5,1
 80004abc:	00f12e23          	sw	a5,28(sp)
+
+		configASSERT( xTaskToNotify );
 80004ac0:	00c12783          	lw	a5,12(sp)
 80004ac4:	00079663          	bnez	a5,80004ad0 <xTaskGenericNotify+0x30>
-80004ac8:	30047073          	csrci	mstatus,8
+80004ac8:	30007073          	csrci	mstatus,0
 80004acc:	0000006f          	j	80004acc <xTaskGenericNotify+0x2c>
+		pxTCB = ( TCB_t * ) xTaskToNotify;
 80004ad0:	00c12783          	lw	a5,12(sp)
 80004ad4:	00f12c23          	sw	a5,24(sp)
+
+		taskENTER_CRITICAL();
 80004ad8:	bfdff0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			if( pulPreviousNotificationValue != NULL )
 80004adc:	00012783          	lw	a5,0(sp)
 80004ae0:	00078a63          	beqz	a5,80004af4 <xTaskGenericNotify+0x54>
+			{
+				*pulPreviousNotificationValue = pxTCB->ulNotifiedValue;
 80004ae4:	01812783          	lw	a5,24(sp)
 80004ae8:	0587a703          	lw	a4,88(a5)
 80004aec:	00012783          	lw	a5,0(sp)
 80004af0:	00e7a023          	sw	a4,0(a5)
+			}
+
+			eOriginalNotifyState = pxTCB->eNotifyState;
 80004af4:	01812783          	lw	a5,24(sp)
 80004af8:	05c7a783          	lw	a5,92(a5)
 80004afc:	00f12a23          	sw	a5,20(sp)
+
+			pxTCB->eNotifyState = eNotified;
 80004b00:	01812783          	lw	a5,24(sp)
 80004b04:	00200713          	li	a4,2
 80004b08:	04e7ae23          	sw	a4,92(a5)
+
+			switch( eAction )
 80004b0c:	00412703          	lw	a4,4(sp)
 80004b10:	00400793          	li	a5,4
 80004b14:	08e7ec63          	bltu	a5,a4,80004bac <xTaskGenericNotify+0x10c>
@@ -5030,40 +8933,79 @@ Disassembly of section .text:
 80004b34:	4d878793          	addi	a5,a5,1240 # 80020008 <__rodata_start+0x8>
 80004b38:	00f707b3          	add	a5,a4,a5
 80004b3c:	00078067          	jr	a5
+			{
+				case eSetBits	:
+					pxTCB->ulNotifiedValue |= ulValue;
 80004b40:	01812783          	lw	a5,24(sp)
 80004b44:	0587a703          	lw	a4,88(a5)
 80004b48:	00812783          	lw	a5,8(sp)
 80004b4c:	00f76733          	or	a4,a4,a5
 80004b50:	01812783          	lw	a5,24(sp)
 80004b54:	04e7ac23          	sw	a4,88(a5)
+					break;
 80004b58:	0540006f          	j	80004bac <xTaskGenericNotify+0x10c>
+
+				case eIncrement	:
+					( pxTCB->ulNotifiedValue )++;
 80004b5c:	01812783          	lw	a5,24(sp)
 80004b60:	0587a783          	lw	a5,88(a5)
 80004b64:	00178713          	addi	a4,a5,1
 80004b68:	01812783          	lw	a5,24(sp)
 80004b6c:	04e7ac23          	sw	a4,88(a5)
+					break;
 80004b70:	03c0006f          	j	80004bac <xTaskGenericNotify+0x10c>
+
+				case eSetValueWithOverwrite	:
+					pxTCB->ulNotifiedValue = ulValue;
 80004b74:	01812783          	lw	a5,24(sp)
 80004b78:	00812703          	lw	a4,8(sp)
 80004b7c:	04e7ac23          	sw	a4,88(a5)
+					break;
 80004b80:	02c0006f          	j	80004bac <xTaskGenericNotify+0x10c>
+
+				case eSetValueWithoutOverwrite :
+					if( eOriginalNotifyState != eNotified )
 80004b84:	01412703          	lw	a4,20(sp)
 80004b88:	00200793          	li	a5,2
 80004b8c:	00f70a63          	beq	a4,a5,80004ba0 <xTaskGenericNotify+0x100>
+					{
+						pxTCB->ulNotifiedValue = ulValue;
 80004b90:	01812783          	lw	a5,24(sp)
 80004b94:	00812703          	lw	a4,8(sp)
 80004b98:	04e7ac23          	sw	a4,88(a5)
+					else
+					{
+						/* The value could not be written to the task. */
+						xReturn = pdFAIL;
+					}
+					break;
 80004b9c:	0100006f          	j	80004bac <xTaskGenericNotify+0x10c>
+						xReturn = pdFAIL;
 80004ba0:	00012e23          	sw	zero,28(sp)
+					break;
 80004ba4:	0080006f          	j	80004bac <xTaskGenericNotify+0x10c>
+
+				case eNoAction:
+					/* The task is being notified without its notify value being
+					updated. */
+					break;
 80004ba8:	00000013          	nop
+
+			traceTASK_NOTIFY();
+
+			/* If the task is in the blocked state specifically to wait for a
+			notification then unblock it now. */
+			if( eOriginalNotifyState == eWaitingNotification )
 80004bac:	01412703          	lw	a4,20(sp)
 80004bb0:	00100793          	li	a5,1
 80004bb4:	0af71663          	bne	a4,a5,80004c60 <xTaskGenericNotify+0x1c0>
+			{
+				( void ) uxListRemove( &( pxTCB->xGenericListItem ) );
 80004bb8:	01812783          	lw	a5,24(sp)
 80004bbc:	00478793          	addi	a5,a5,4
 80004bc0:	00078513          	mv	a0,a5
 80004bc4:	e6dfb0ef          	jal	ra,80000a30 <uxListRemove>
+				prvAddTaskToReadyList( pxTCB );
 80004bc8:	01812783          	lw	a5,24(sp)
 80004bcc:	02c7a703          	lw	a4,44(a5)
 80004bd0:	0001d797          	auipc	a5,0x1d
@@ -5089,11 +9031,20 @@ Disassembly of section .text:
 80004c20:	00078593          	mv	a1,a5
 80004c24:	00070513          	mv	a0,a4
 80004c28:	cc5fb0ef          	jal	ra,800008ec <vListInsertEnd>
+
+				/* The task should not have been on an event list. */
+				configASSERT( listLIST_ITEM_CONTAINER( &( pxTCB->xEventListItem ) ) == NULL );
 80004c2c:	01812783          	lw	a5,24(sp)
 80004c30:	0287a783          	lw	a5,40(a5)
 80004c34:	00078663          	beqz	a5,80004c40 <xTaskGenericNotify+0x1a0>
-80004c38:	30047073          	csrci	mstatus,8
+80004c38:	30007073          	csrci	mstatus,0
 80004c3c:	0000006f          	j	80004c3c <xTaskGenericNotify+0x19c>
+					earliest possible time. */
+					prvResetNextTaskUnblockTime();
+				}
+				#endif
+
+				if( pxTCB->uxPriority > pxCurrentTCB->uxPriority )
 80004c40:	01812783          	lw	a5,24(sp)
 80004c44:	02c7a703          	lw	a4,44(a5)
 80004c48:	0001c797          	auipc	a5,0x1c
@@ -5101,15 +9052,34 @@ Disassembly of section .text:
 80004c50:	0007a783          	lw	a5,0(a5)
 80004c54:	02c7a783          	lw	a5,44(a5)
 80004c58:	00e7f463          	bleu	a4,a5,80004c60 <xTaskGenericNotify+0x1c0>
+				{
+					/* The notified task has a priority above the currently
+					executing task so a yield is required. */
+					taskYIELD_IF_USING_PREEMPTION();
 80004c5c:	939fb0ef          	jal	ra,80000594 <vPortYield>
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+		taskEXIT_CRITICAL();
 80004c60:	ab5ff0ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		return xReturn;
 80004c64:	01c12783          	lw	a5,28(sp)
+	}
 80004c68:	00078513          	mv	a0,a5
 80004c6c:	02c12083          	lw	ra,44(sp)
 80004c70:	03010113          	addi	sp,sp,48
 80004c74:	00008067          	ret
 
 80004c78 <xTaskGenericNotifyFromISR>:
+/*-----------------------------------------------------------*/
+
+#if( configUSE_TASK_NOTIFICATIONS == 1 )
+
+	BaseType_t xTaskGenericNotifyFromISR( TaskHandle_t xTaskToNotify, uint32_t ulValue, eNotifyAction eAction, uint32_t *pulPreviousNotificationValue, BaseType_t *pxHigherPriorityTaskWoken )
+	{
 80004c78:	fc010113          	addi	sp,sp,-64
 80004c7c:	02112e23          	sw	ra,60(sp)
 80004c80:	00a12e23          	sw	a0,28(sp)
@@ -5117,29 +9087,53 @@ Disassembly of section .text:
 80004c88:	00c12a23          	sw	a2,20(sp)
 80004c8c:	00d12823          	sw	a3,16(sp)
 80004c90:	00e12623          	sw	a4,12(sp)
+	TCB_t * pxTCB;
+	eNotifyValue eOriginalNotifyState;
+	BaseType_t xReturn = pdPASS;
 80004c94:	00100793          	li	a5,1
 80004c98:	02f12623          	sw	a5,44(sp)
+	UBaseType_t uxSavedInterruptStatus;
+
+		configASSERT( xTaskToNotify );
 80004c9c:	01c12783          	lw	a5,28(sp)
 80004ca0:	00079663          	bnez	a5,80004cac <xTaskGenericNotifyFromISR+0x34>
-80004ca4:	30047073          	csrci	mstatus,8
+80004ca4:	30007073          	csrci	mstatus,0
 80004ca8:	0000006f          	j	80004ca8 <xTaskGenericNotifyFromISR+0x30>
+		simple as possible.  More information (albeit Cortex-M specific) is
+		provided on the following link:
+		http://www.freertos.org/RTOS-Cortex-M3-M4.html */
+		portASSERT_IF_INTERRUPT_PRIORITY_INVALID();
+
+		pxTCB = ( TCB_t * ) xTaskToNotify;
 80004cac:	01c12783          	lw	a5,28(sp)
 80004cb0:	02f12423          	sw	a5,40(sp)
+
+		uxSavedInterruptStatus = portSET_INTERRUPT_MASK_FROM_ISR();
 80004cb4:	af1fb0ef          	jal	ra,800007a4 <vPortSetInterruptMask>
 80004cb8:	00050793          	mv	a5,a0
 80004cbc:	02f12223          	sw	a5,36(sp)
+		{
+			if( pulPreviousNotificationValue != NULL )
 80004cc0:	01012783          	lw	a5,16(sp)
 80004cc4:	00078a63          	beqz	a5,80004cd8 <xTaskGenericNotifyFromISR+0x60>
+			{
+				*pulPreviousNotificationValue = pxTCB->ulNotifiedValue;
 80004cc8:	02812783          	lw	a5,40(sp)
 80004ccc:	0587a703          	lw	a4,88(a5)
 80004cd0:	01012783          	lw	a5,16(sp)
 80004cd4:	00e7a023          	sw	a4,0(a5)
+			}
+
+			eOriginalNotifyState = pxTCB->eNotifyState;
 80004cd8:	02812783          	lw	a5,40(sp)
 80004cdc:	05c7a783          	lw	a5,92(a5)
 80004ce0:	02f12023          	sw	a5,32(sp)
+			pxTCB->eNotifyState = eNotified;
 80004ce4:	02812783          	lw	a5,40(sp)
 80004ce8:	00200713          	li	a4,2
 80004cec:	04e7ae23          	sw	a4,92(a5)
+
+			switch( eAction )
 80004cf0:	01412703          	lw	a4,20(sp)
 80004cf4:	00400793          	li	a5,4
 80004cf8:	08e7ec63          	bltu	a5,a4,80004d90 <xTaskGenericNotifyFromISR+0x118>
@@ -5153,49 +9147,93 @@ Disassembly of section .text:
 80004d18:	30878793          	addi	a5,a5,776 # 8002001c <__rodata_start+0x1c>
 80004d1c:	00f707b3          	add	a5,a4,a5
 80004d20:	00078067          	jr	a5
+			{
+				case eSetBits	:
+					pxTCB->ulNotifiedValue |= ulValue;
 80004d24:	02812783          	lw	a5,40(sp)
 80004d28:	0587a703          	lw	a4,88(a5)
 80004d2c:	01812783          	lw	a5,24(sp)
 80004d30:	00f76733          	or	a4,a4,a5
 80004d34:	02812783          	lw	a5,40(sp)
 80004d38:	04e7ac23          	sw	a4,88(a5)
+					break;
 80004d3c:	0540006f          	j	80004d90 <xTaskGenericNotifyFromISR+0x118>
+
+				case eIncrement	:
+					( pxTCB->ulNotifiedValue )++;
 80004d40:	02812783          	lw	a5,40(sp)
 80004d44:	0587a783          	lw	a5,88(a5)
 80004d48:	00178713          	addi	a4,a5,1
 80004d4c:	02812783          	lw	a5,40(sp)
 80004d50:	04e7ac23          	sw	a4,88(a5)
+					break;
 80004d54:	03c0006f          	j	80004d90 <xTaskGenericNotifyFromISR+0x118>
+
+				case eSetValueWithOverwrite	:
+					pxTCB->ulNotifiedValue = ulValue;
 80004d58:	02812783          	lw	a5,40(sp)
 80004d5c:	01812703          	lw	a4,24(sp)
 80004d60:	04e7ac23          	sw	a4,88(a5)
+					break;
 80004d64:	02c0006f          	j	80004d90 <xTaskGenericNotifyFromISR+0x118>
+
+				case eSetValueWithoutOverwrite :
+					if( eOriginalNotifyState != eNotified )
 80004d68:	02012703          	lw	a4,32(sp)
 80004d6c:	00200793          	li	a5,2
 80004d70:	00f70a63          	beq	a4,a5,80004d84 <xTaskGenericNotifyFromISR+0x10c>
+					{
+						pxTCB->ulNotifiedValue = ulValue;
 80004d74:	02812783          	lw	a5,40(sp)
 80004d78:	01812703          	lw	a4,24(sp)
 80004d7c:	04e7ac23          	sw	a4,88(a5)
+					else
+					{
+						/* The value could not be written to the task. */
+						xReturn = pdFAIL;
+					}
+					break;
 80004d80:	0100006f          	j	80004d90 <xTaskGenericNotifyFromISR+0x118>
+						xReturn = pdFAIL;
 80004d84:	02012623          	sw	zero,44(sp)
+					break;
 80004d88:	0080006f          	j	80004d90 <xTaskGenericNotifyFromISR+0x118>
+
+				case eNoAction :
+					/* The task is being notified without its notify value being
+					updated. */
+					break;
 80004d8c:	00000013          	nop
+
+			traceTASK_NOTIFY_FROM_ISR();
+
+			/* If the task is in the blocked state specifically to wait for a
+			notification then unblock it now. */
+			if( eOriginalNotifyState == eWaitingNotification )
 80004d90:	02012703          	lw	a4,32(sp)
 80004d94:	00100793          	li	a5,1
 80004d98:	0ef71463          	bne	a4,a5,80004e80 <xTaskGenericNotifyFromISR+0x208>
+			{
+				/* The task should not have been on an event list. */
+				configASSERT( listLIST_ITEM_CONTAINER( &( pxTCB->xEventListItem ) ) == NULL );
 80004d9c:	02812783          	lw	a5,40(sp)
 80004da0:	0287a783          	lw	a5,40(a5)
 80004da4:	00078663          	beqz	a5,80004db0 <xTaskGenericNotifyFromISR+0x138>
-80004da8:	30047073          	csrci	mstatus,8
+80004da8:	30007073          	csrci	mstatus,0
 80004dac:	0000006f          	j	80004dac <xTaskGenericNotifyFromISR+0x134>
+
+				if( uxSchedulerSuspended == ( UBaseType_t ) pdFALSE )
 80004db0:	0001d797          	auipc	a5,0x1d
 80004db4:	cc478793          	addi	a5,a5,-828 # 80021a74 <uxSchedulerSuspended>
 80004db8:	0007a783          	lw	a5,0(a5)
 80004dbc:	06079e63          	bnez	a5,80004e38 <xTaskGenericNotifyFromISR+0x1c0>
+				{
+					( void ) uxListRemove( &( pxTCB->xGenericListItem ) );
 80004dc0:	02812783          	lw	a5,40(sp)
 80004dc4:	00478793          	addi	a5,a5,4
 80004dc8:	00078513          	mv	a0,a5
 80004dcc:	c65fb0ef          	jal	ra,80000a30 <uxListRemove>
+					prvAddTaskToReadyList( pxTCB );
 80004dd0:	02812783          	lw	a5,40(sp)
 80004dd4:	02c7a703          	lw	a4,44(a5)
 80004dd8:	0001d797          	auipc	a5,0x1d
@@ -5222,12 +9260,21 @@ Disassembly of section .text:
 80004e2c:	00070513          	mv	a0,a4
 80004e30:	abdfb0ef          	jal	ra,800008ec <vListInsertEnd>
 80004e34:	01c0006f          	j	80004e50 <xTaskGenericNotifyFromISR+0x1d8>
+				}
+				else
+				{
+					/* The delayed and ready lists cannot be accessed, so hold
+					this task pending until the scheduler is resumed. */
+					vListInsertEnd( &( xPendingReadyList ), &( pxTCB->xEventListItem ) );
 80004e38:	02812783          	lw	a5,40(sp)
 80004e3c:	01878793          	addi	a5,a5,24
 80004e40:	00078593          	mv	a1,a5
 80004e44:	0001d517          	auipc	a0,0x1d
 80004e48:	bcc50513          	addi	a0,a0,-1076 # 80021a10 <xPendingReadyList>
 80004e4c:	aa1fb0ef          	jal	ra,800008ec <vListInsertEnd>
+				}
+
+				if( pxTCB->uxPriority > pxCurrentTCB->uxPriority )
 80004e50:	02812783          	lw	a5,40(sp)
 80004e54:	02c7a703          	lw	a4,44(a5)
 80004e58:	0001c797          	auipc	a5,0x1c
@@ -5235,61 +9282,116 @@ Disassembly of section .text:
 80004e60:	0007a783          	lw	a5,0(a5)
 80004e64:	02c7a783          	lw	a5,44(a5)
 80004e68:	00e7fc63          	bleu	a4,a5,80004e80 <xTaskGenericNotifyFromISR+0x208>
+				{
+					/* The notified task has a priority above the currently
+					executing task so a yield is required. */
+					if( pxHigherPriorityTaskWoken != NULL )
 80004e6c:	00c12783          	lw	a5,12(sp)
 80004e70:	00078863          	beqz	a5,80004e80 <xTaskGenericNotifyFromISR+0x208>
+					{
+						*pxHigherPriorityTaskWoken = pdTRUE;
 80004e74:	00c12783          	lw	a5,12(sp)
 80004e78:	00100713          	li	a4,1
 80004e7c:	00e7a023          	sw	a4,0(a5)
+				{
+					mtCOVERAGE_TEST_MARKER();
+				}
+			}
+		}
+		portCLEAR_INTERRUPT_MASK_FROM_ISR( uxSavedInterruptStatus );
 80004e80:	02412783          	lw	a5,36(sp)
 80004e84:	00078513          	mv	a0,a5
 80004e88:	901fb0ef          	jal	ra,80000788 <vPortClearInterruptMask>
+
+		return xReturn;
 80004e8c:	02c12783          	lw	a5,44(sp)
+	}
 80004e90:	00078513          	mv	a0,a5
 80004e94:	03c12083          	lw	ra,60(sp)
 80004e98:	04010113          	addi	sp,sp,64
 80004e9c:	00008067          	ret
 
 80004ea0 <vTaskNotifyGiveFromISR>:
+/*-----------------------------------------------------------*/
+
+#if( configUSE_TASK_NOTIFICATIONS == 1 )
+
+	void vTaskNotifyGiveFromISR( TaskHandle_t xTaskToNotify, BaseType_t *pxHigherPriorityTaskWoken )
+	{
 80004ea0:	fd010113          	addi	sp,sp,-48
 80004ea4:	02112623          	sw	ra,44(sp)
 80004ea8:	00a12623          	sw	a0,12(sp)
 80004eac:	00b12423          	sw	a1,8(sp)
+	TCB_t * pxTCB;
+	eNotifyValue eOriginalNotifyState;
+	UBaseType_t uxSavedInterruptStatus;
+
+		configASSERT( xTaskToNotify );
 80004eb0:	00c12783          	lw	a5,12(sp)
 80004eb4:	00079663          	bnez	a5,80004ec0 <vTaskNotifyGiveFromISR+0x20>
-80004eb8:	30047073          	csrci	mstatus,8
+80004eb8:	30007073          	csrci	mstatus,0
 80004ebc:	0000006f          	j	80004ebc <vTaskNotifyGiveFromISR+0x1c>
+		simple as possible.  More information (albeit Cortex-M specific) is
+		provided on the following link:
+		http://www.freertos.org/RTOS-Cortex-M3-M4.html */
+		portASSERT_IF_INTERRUPT_PRIORITY_INVALID();
+
+		pxTCB = ( TCB_t * ) xTaskToNotify;
 80004ec0:	00c12783          	lw	a5,12(sp)
 80004ec4:	00f12e23          	sw	a5,28(sp)
+
+		uxSavedInterruptStatus = portSET_INTERRUPT_MASK_FROM_ISR();
 80004ec8:	8ddfb0ef          	jal	ra,800007a4 <vPortSetInterruptMask>
 80004ecc:	00050793          	mv	a5,a0
 80004ed0:	00f12c23          	sw	a5,24(sp)
+		{
+			eOriginalNotifyState = pxTCB->eNotifyState;
 80004ed4:	01c12783          	lw	a5,28(sp)
 80004ed8:	05c7a783          	lw	a5,92(a5)
 80004edc:	00f12a23          	sw	a5,20(sp)
+			pxTCB->eNotifyState = eNotified;
 80004ee0:	01c12783          	lw	a5,28(sp)
 80004ee4:	00200713          	li	a4,2
 80004ee8:	04e7ae23          	sw	a4,92(a5)
+
+			/* 'Giving' is equivalent to incrementing a count in a counting
+			semaphore. */
+			( pxTCB->ulNotifiedValue )++;
 80004eec:	01c12783          	lw	a5,28(sp)
 80004ef0:	0587a783          	lw	a5,88(a5)
 80004ef4:	00178713          	addi	a4,a5,1
 80004ef8:	01c12783          	lw	a5,28(sp)
 80004efc:	04e7ac23          	sw	a4,88(a5)
+
+			traceTASK_NOTIFY_GIVE_FROM_ISR();
+
+			/* If the task is in the blocked state specifically to wait for a
+			notification then unblock it now. */
+			if( eOriginalNotifyState == eWaitingNotification )
 80004f00:	01412703          	lw	a4,20(sp)
 80004f04:	00100793          	li	a5,1
 80004f08:	0ef71463          	bne	a4,a5,80004ff0 <vTaskNotifyGiveFromISR+0x150>
+			{
+				/* The task should not have been on an event list. */
+				configASSERT( listLIST_ITEM_CONTAINER( &( pxTCB->xEventListItem ) ) == NULL );
 80004f0c:	01c12783          	lw	a5,28(sp)
 80004f10:	0287a783          	lw	a5,40(a5)
 80004f14:	00078663          	beqz	a5,80004f20 <vTaskNotifyGiveFromISR+0x80>
-80004f18:	30047073          	csrci	mstatus,8
+80004f18:	30007073          	csrci	mstatus,0
 80004f1c:	0000006f          	j	80004f1c <vTaskNotifyGiveFromISR+0x7c>
+
+				if( uxSchedulerSuspended == ( UBaseType_t ) pdFALSE )
 80004f20:	0001d797          	auipc	a5,0x1d
 80004f24:	b5478793          	addi	a5,a5,-1196 # 80021a74 <uxSchedulerSuspended>
 80004f28:	0007a783          	lw	a5,0(a5)
 80004f2c:	06079e63          	bnez	a5,80004fa8 <vTaskNotifyGiveFromISR+0x108>
+				{
+					( void ) uxListRemove( &( pxTCB->xGenericListItem ) );
 80004f30:	01c12783          	lw	a5,28(sp)
 80004f34:	00478793          	addi	a5,a5,4
 80004f38:	00078513          	mv	a0,a5
 80004f3c:	af5fb0ef          	jal	ra,80000a30 <uxListRemove>
+					prvAddTaskToReadyList( pxTCB );
 80004f40:	01c12783          	lw	a5,28(sp)
 80004f44:	02c7a703          	lw	a4,44(a5)
 80004f48:	0001d797          	auipc	a5,0x1d
@@ -5316,12 +9418,21 @@ Disassembly of section .text:
 80004f9c:	00070513          	mv	a0,a4
 80004fa0:	94dfb0ef          	jal	ra,800008ec <vListInsertEnd>
 80004fa4:	01c0006f          	j	80004fc0 <vTaskNotifyGiveFromISR+0x120>
+				}
+				else
+				{
+					/* The delayed and ready lists cannot be accessed, so hold
+					this task pending until the scheduler is resumed. */
+					vListInsertEnd( &( xPendingReadyList ), &( pxTCB->xEventListItem ) );
 80004fa8:	01c12783          	lw	a5,28(sp)
 80004fac:	01878793          	addi	a5,a5,24
 80004fb0:	00078593          	mv	a1,a5
 80004fb4:	0001d517          	auipc	a0,0x1d
 80004fb8:	a5c50513          	addi	a0,a0,-1444 # 80021a10 <xPendingReadyList>
 80004fbc:	931fb0ef          	jal	ra,800008ec <vListInsertEnd>
+				}
+
+				if( pxTCB->uxPriority > pxCurrentTCB->uxPriority )
 80004fc0:	01c12783          	lw	a5,28(sp)
 80004fc4:	02c7a703          	lw	a4,44(a5)
 80004fc8:	0001c797          	auipc	a5,0x1c
@@ -5329,25 +9440,52 @@ Disassembly of section .text:
 80004fd0:	0007a783          	lw	a5,0(a5)
 80004fd4:	02c7a783          	lw	a5,44(a5)
 80004fd8:	00e7fc63          	bleu	a4,a5,80004ff0 <vTaskNotifyGiveFromISR+0x150>
+				{
+					/* The notified task has a priority above the currently
+					executing task so a yield is required. */
+					if( pxHigherPriorityTaskWoken != NULL )
 80004fdc:	00812783          	lw	a5,8(sp)
 80004fe0:	00078863          	beqz	a5,80004ff0 <vTaskNotifyGiveFromISR+0x150>
+					{
+						*pxHigherPriorityTaskWoken = pdTRUE;
 80004fe4:	00812783          	lw	a5,8(sp)
 80004fe8:	00100713          	li	a4,1
 80004fec:	00e7a023          	sw	a4,0(a5)
+				{
+					mtCOVERAGE_TEST_MARKER();
+				}
+			}
+		}
+		portCLEAR_INTERRUPT_MASK_FROM_ISR( uxSavedInterruptStatus );
 80004ff0:	01812783          	lw	a5,24(sp)
 80004ff4:	00078513          	mv	a0,a5
 80004ff8:	f90fb0ef          	jal	ra,80000788 <vPortClearInterruptMask>
+	}
 80004ffc:	00000013          	nop
 80005000:	02c12083          	lw	ra,44(sp)
 80005004:	03010113          	addi	sp,sp,48
 80005008:	00008067          	ret
 
 8000500c <xTaskNotifyStateClear>:
+/*-----------------------------------------------------------*/
+
+#if( configUSE_TASK_NOTIFICATIONS == 1 )
+
+	BaseType_t xTaskNotifyStateClear( TaskHandle_t xTask )
+	{
 8000500c:	fd010113          	addi	sp,sp,-48
 80005010:	02112623          	sw	ra,44(sp)
 80005014:	00a12623          	sw	a0,12(sp)
+	TCB_t *pxTCB;
+	BaseType_t xReturn;
+
+		pxTCB = ( TCB_t * ) xTask;
 80005018:	00c12783          	lw	a5,12(sp)
 8000501c:	00f12c23          	sw	a5,24(sp)
+
+		/* If null is passed in here then it is the calling task that is having
+		its notification state cleared. */
+		pxTCB = prvGetTCBFromHandle( pxTCB );
 80005020:	01812783          	lw	a5,24(sp)
 80005024:	00079a63          	bnez	a5,80005038 <xTaskNotifyStateClear+0x2c>
 80005028:	0001c797          	auipc	a5,0x1c
@@ -5356,33 +9494,71 @@ Disassembly of section .text:
 80005034:	0080006f          	j	8000503c <xTaskNotifyStateClear+0x30>
 80005038:	01812783          	lw	a5,24(sp)
 8000503c:	00f12c23          	sw	a5,24(sp)
+
+		taskENTER_CRITICAL();
 80005040:	e94ff0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+		{
+			if( pxTCB->eNotifyState == eNotified )
 80005044:	01812783          	lw	a5,24(sp)
 80005048:	05c7a703          	lw	a4,92(a5)
 8000504c:	00200793          	li	a5,2
 80005050:	00f71c63          	bne	a4,a5,80005068 <xTaskNotifyStateClear+0x5c>
+			{
+				pxTCB->eNotifyState = eNotWaitingNotification;
 80005054:	01812783          	lw	a5,24(sp)
 80005058:	0407ae23          	sw	zero,92(a5)
+				xReturn = pdPASS;
 8000505c:	00100793          	li	a5,1
 80005060:	00f12e23          	sw	a5,28(sp)
 80005064:	0080006f          	j	8000506c <xTaskNotifyStateClear+0x60>
+			}
+			else
+			{
+				xReturn = pdFAIL;
 80005068:	00012e23          	sw	zero,28(sp)
+			}
+		}
+		taskEXIT_CRITICAL();
 8000506c:	ea8ff0ef          	jal	ra,80004714 <vTaskExitCritical>
+
+		return xReturn;
 80005070:	01c12783          	lw	a5,28(sp)
+	}
 80005074:	00078513          	mv	a0,a5
 80005078:	02c12083          	lw	ra,44(sp)
 8000507c:	03010113          	addi	sp,sp,48
 80005080:	00008067          	ret
 
 80005084 <xTimerCreateTimerTask>:
+static void prvProcessTimerOrBlockTask( const TickType_t xNextExpireTime, BaseType_t xListWasEmpty ) PRIVILEGED_FUNCTION;
+
+/*-----------------------------------------------------------*/
+
+BaseType_t xTimerCreateTimerTask( void )
+{
 80005084:	fe010113          	addi	sp,sp,-32
 80005088:	00112e23          	sw	ra,28(sp)
+BaseType_t xReturn = pdFAIL;
 8000508c:	00012623          	sw	zero,12(sp)
+
+	/* This function is called when the scheduler is started if
+	configUSE_TIMERS is set to 1.  Check that the infrastructure used by the
+	timer service task has been created/initialised.  If timers have already
+	been created then the initialisation will already have been performed. */
+	prvCheckForValidListAndQueue();
 80005090:	0b5000ef          	jal	ra,80005944 <prvCheckForValidListAndQueue>
+
+	if( xTimerQueue != NULL )
 80005094:	0001d797          	auipc	a5,0x1d
 80005098:	a1478793          	addi	a5,a5,-1516 # 80021aa8 <xTimerQueue>
 8000509c:	0007a783          	lw	a5,0(a5)
 800050a0:	02078a63          	beqz	a5,800050d4 <xTimerCreateTimerTask+0x50>
+			xReturn = xTaskCreate( prvTimerTask, "Tmr Svc", ( uint16_t ) configTIMER_TASK_STACK_DEPTH, NULL, ( ( UBaseType_t ) configTIMER_TASK_PRIORITY ) | portPRIVILEGE_BIT, &xTimerTaskHandle );
+		}
+		#else
+		{
+			/* Create the timer task without storing its handle. */
+			xReturn = xTaskCreate( prvTimerTask, "Tmr Svc", ( uint16_t ) configTIMER_TASK_STACK_DEPTH, NULL, ( ( UBaseType_t ) configTIMER_TASK_PRIORITY ) | portPRIVILEGE_BIT, NULL);
 800050a4:	00000893          	li	a7,0
 800050a8:	00000813          	li	a6,0
 800050ac:	00000793          	li	a5,0
@@ -5395,17 +9571,29 @@ Disassembly of section .text:
 800050c8:	2e850513          	addi	a0,a0,744 # 800053ac <prvTimerTask>
 800050cc:	ef1fc0ef          	jal	ra,80001fbc <xTaskGenericCreate>
 800050d0:	00a12623          	sw	a0,12(sp)
+	else
+	{
+		mtCOVERAGE_TEST_MARKER();
+	}
+
+	configASSERT( xReturn );
 800050d4:	00c12783          	lw	a5,12(sp)
 800050d8:	00079663          	bnez	a5,800050e4 <xTimerCreateTimerTask+0x60>
-800050dc:	30047073          	csrci	mstatus,8
+800050dc:	30007073          	csrci	mstatus,0
 800050e0:	0000006f          	j	800050e0 <xTimerCreateTimerTask+0x5c>
+	return xReturn;
 800050e4:	00c12783          	lw	a5,12(sp)
+}
 800050e8:	00078513          	mv	a0,a5
 800050ec:	01c12083          	lw	ra,28(sp)
 800050f0:	02010113          	addi	sp,sp,32
 800050f4:	00008067          	ret
 
 800050f8 <xTimerCreate>:
+/*-----------------------------------------------------------*/
+
+TimerHandle_t xTimerCreate( const char * const pcTimerName, const TickType_t xTimerPeriodInTicks, const UBaseType_t uxAutoReload, void * const pvTimerID, TimerCallbackFunction_t pxCallbackFunction ) /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+{
 800050f8:	fc010113          	addi	sp,sp,-64
 800050fc:	02112e23          	sw	ra,60(sp)
 80005100:	00a12e23          	sw	a0,28(sp)
@@ -5413,46 +9601,82 @@ Disassembly of section .text:
 80005108:	00c12a23          	sw	a2,20(sp)
 8000510c:	00d12823          	sw	a3,16(sp)
 80005110:	00e12623          	sw	a4,12(sp)
+Timer_t *pxNewTimer;
+
+	/* Allocate the timer structure. */
+	if( xTimerPeriodInTicks == ( TickType_t ) 0U )
 80005114:	01812783          	lw	a5,24(sp)
 80005118:	00079663          	bnez	a5,80005124 <xTimerCreate+0x2c>
+	{
+		pxNewTimer = NULL;
 8000511c:	02012623          	sw	zero,44(sp)
 80005120:	0680006f          	j	80005188 <xTimerCreate+0x90>
+	}
+	else
+	{
+		pxNewTimer = ( Timer_t * ) pvPortMalloc( sizeof( Timer_t ) );
 80005124:	02c00513          	li	a0,44
 80005128:	1f0010ef          	jal	ra,80006318 <pvPortMalloc>
 8000512c:	02a12623          	sw	a0,44(sp)
+		if( pxNewTimer != NULL )
 80005130:	02c12783          	lw	a5,44(sp)
 80005134:	04078a63          	beqz	a5,80005188 <xTimerCreate+0x90>
+		{
+			/* Ensure the infrastructure used by the timer service task has been
+			created/initialised. */
+			prvCheckForValidListAndQueue();
 80005138:	00d000ef          	jal	ra,80005944 <prvCheckForValidListAndQueue>
+
+			/* Initialise the timer structure members using the function parameters. */
+			pxNewTimer->pcTimerName = pcTimerName;
 8000513c:	02c12783          	lw	a5,44(sp)
 80005140:	01c12703          	lw	a4,28(sp)
 80005144:	00e7a023          	sw	a4,0(a5)
+			pxNewTimer->xTimerPeriodInTicks = xTimerPeriodInTicks;
 80005148:	02c12783          	lw	a5,44(sp)
 8000514c:	01812703          	lw	a4,24(sp)
 80005150:	00e7ac23          	sw	a4,24(a5)
+			pxNewTimer->uxAutoReload = uxAutoReload;
 80005154:	02c12783          	lw	a5,44(sp)
 80005158:	01412703          	lw	a4,20(sp)
 8000515c:	00e7ae23          	sw	a4,28(a5)
+			pxNewTimer->pvTimerID = pvTimerID;
 80005160:	02c12783          	lw	a5,44(sp)
 80005164:	01012703          	lw	a4,16(sp)
 80005168:	02e7a023          	sw	a4,32(a5)
+			pxNewTimer->pxCallbackFunction = pxCallbackFunction;
 8000516c:	02c12783          	lw	a5,44(sp)
 80005170:	00c12703          	lw	a4,12(sp)
 80005174:	02e7a223          	sw	a4,36(a5)
+			vListInitialiseItem( &( pxNewTimer->xTimerListItem ) );
 80005178:	02c12783          	lw	a5,44(sp)
 8000517c:	00478793          	addi	a5,a5,4
 80005180:	00078513          	mv	a0,a5
 80005184:	f4cfb0ef          	jal	ra,800008d0 <vListInitialiseItem>
+			traceTIMER_CREATE_FAILED();
+		}
+	}
+
+	/* 0 is not a valid value for xTimerPeriodInTicks. */
+	configASSERT( ( xTimerPeriodInTicks > 0 ) );
 80005188:	01812783          	lw	a5,24(sp)
 8000518c:	00079663          	bnez	a5,80005198 <xTimerCreate+0xa0>
-80005190:	30047073          	csrci	mstatus,8
+80005190:	30007073          	csrci	mstatus,0
 80005194:	0000006f          	j	80005194 <xTimerCreate+0x9c>
+
+	return ( TimerHandle_t ) pxNewTimer;
 80005198:	02c12783          	lw	a5,44(sp)
+}
 8000519c:	00078513          	mv	a0,a5
 800051a0:	03c12083          	lw	ra,60(sp)
 800051a4:	04010113          	addi	sp,sp,64
 800051a8:	00008067          	ret
 
 800051ac <xTimerGenericCommand>:
+/*-----------------------------------------------------------*/
+
+BaseType_t xTimerGenericCommand( TimerHandle_t xTimer, const BaseType_t xCommandID, const TickType_t xOptionalValue, BaseType_t * const pxHigherPriorityTaskWoken, const TickType_t xTicksToWait )
+{
 800051ac:	fc010113          	addi	sp,sp,-64
 800051b0:	02112e23          	sw	ra,60(sp)
 800051b4:	00a12e23          	sw	a0,28(sp)
@@ -5460,28 +9684,47 @@ Disassembly of section .text:
 800051bc:	00c12a23          	sw	a2,20(sp)
 800051c0:	00d12823          	sw	a3,16(sp)
 800051c4:	00e12623          	sw	a4,12(sp)
+BaseType_t xReturn = pdFAIL;
 800051c8:	02012623          	sw	zero,44(sp)
+DaemonTaskMessage_t xMessage;
+
+	configASSERT( xTimer );
 800051cc:	01c12783          	lw	a5,28(sp)
 800051d0:	00079663          	bnez	a5,800051dc <xTimerGenericCommand+0x30>
-800051d4:	30047073          	csrci	mstatus,8
+800051d4:	30007073          	csrci	mstatus,0
 800051d8:	0000006f          	j	800051d8 <xTimerGenericCommand+0x2c>
+
+	/* Send a message to the timer service task to perform a particular action
+	on a particular timer definition. */
+	if( xTimerQueue != NULL )
 800051dc:	0001d797          	auipc	a5,0x1d
 800051e0:	8cc78793          	addi	a5,a5,-1844 # 80021aa8 <xTimerQueue>
 800051e4:	0007a783          	lw	a5,0(a5)
 800051e8:	0a078c63          	beqz	a5,800052a0 <xTimerGenericCommand+0xf4>
+	{
+		/* Send a command to the timer service task to start the xTimer timer. */
+		xMessage.xMessageID = xCommandID;
 800051ec:	01812783          	lw	a5,24(sp)
 800051f0:	02f12023          	sw	a5,32(sp)
+		xMessage.u.xTimerParameters.xMessageValue = xOptionalValue;
 800051f4:	01412783          	lw	a5,20(sp)
 800051f8:	02f12223          	sw	a5,36(sp)
+		xMessage.u.xTimerParameters.pxTimer = ( Timer_t * ) xTimer;
 800051fc:	01c12783          	lw	a5,28(sp)
 80005200:	02f12423          	sw	a5,40(sp)
+
+		if( xCommandID < tmrFIRST_FROM_ISR_COMMAND )
 80005204:	01812703          	lw	a4,24(sp)
 80005208:	00500793          	li	a5,5
 8000520c:	06e7c663          	blt	a5,a4,80005278 <xTimerGenericCommand+0xcc>
+		{
+			if( xTaskGetSchedulerState() == taskSCHEDULER_RUNNING )
 80005210:	9dcff0ef          	jal	ra,800043ec <xTaskGetSchedulerState>
 80005214:	00050713          	mv	a4,a0
 80005218:	00200793          	li	a5,2
 8000521c:	02f71863          	bne	a4,a5,8000524c <xTimerGenericCommand+0xa0>
+			{
+				xReturn = xQueueSendToBack( xTimerQueue, &xMessage, xTicksToWait );
 80005220:	0001d797          	auipc	a5,0x1d
 80005224:	88878793          	addi	a5,a5,-1912 # 80021aa8 <xTimerQueue>
 80005228:	0007a783          	lw	a5,0(a5)
@@ -5493,6 +9736,10 @@ Disassembly of section .text:
 80005240:	d21fb0ef          	jal	ra,80000f60 <xQueueGenericSend>
 80005244:	02a12623          	sw	a0,44(sp)
 80005248:	0580006f          	j	800052a0 <xTimerGenericCommand+0xf4>
+			}
+			else
+			{
+				xReturn = xQueueSendToBack( xTimerQueue, &xMessage, tmrNO_DELAY );
 8000524c:	0001d797          	auipc	a5,0x1d
 80005250:	85c78793          	addi	a5,a5,-1956 # 80021aa8 <xTimerQueue>
 80005254:	0007a783          	lw	a5,0(a5)
@@ -5504,6 +9751,11 @@ Disassembly of section .text:
 8000526c:	cf5fb0ef          	jal	ra,80000f60 <xQueueGenericSend>
 80005270:	02a12623          	sw	a0,44(sp)
 80005274:	02c0006f          	j	800052a0 <xTimerGenericCommand+0xf4>
+			}
+		}
+		else
+		{
+			xReturn = xQueueSendToBackFromISR( xTimerQueue, &xMessage, pxHigherPriorityTaskWoken );
 80005278:	0001d797          	auipc	a5,0x1d
 8000527c:	83078793          	addi	a5,a5,-2000 # 80021aa8 <xTimerQueue>
 80005280:	0007a783          	lw	a5,0(a5)
@@ -5514,46 +9766,84 @@ Disassembly of section .text:
 80005294:	00078513          	mv	a0,a5
 80005298:	f09fb0ef          	jal	ra,800011a0 <xQueueGenericSendFromISR>
 8000529c:	02a12623          	sw	a0,44(sp)
+	else
+	{
+		mtCOVERAGE_TEST_MARKER();
+	}
+
+	return xReturn;
 800052a0:	02c12783          	lw	a5,44(sp)
+}
 800052a4:	00078513          	mv	a0,a5
 800052a8:	03c12083          	lw	ra,60(sp)
 800052ac:	04010113          	addi	sp,sp,64
 800052b0:	00008067          	ret
 
 800052b4 <pcTimerGetTimerName>:
+
+#endif
+/*-----------------------------------------------------------*/
+
+const char * pcTimerGetTimerName( TimerHandle_t xTimer )
+{
 800052b4:	fe010113          	addi	sp,sp,-32
 800052b8:	00a12623          	sw	a0,12(sp)
+Timer_t *pxTimer = ( Timer_t * ) xTimer;
 800052bc:	00c12783          	lw	a5,12(sp)
 800052c0:	00f12e23          	sw	a5,28(sp)
+
+	configASSERT( xTimer );
 800052c4:	00c12783          	lw	a5,12(sp)
 800052c8:	00079663          	bnez	a5,800052d4 <pcTimerGetTimerName+0x20>
-800052cc:	30047073          	csrci	mstatus,8
+800052cc:	30007073          	csrci	mstatus,0
 800052d0:	0000006f          	j	800052d0 <pcTimerGetTimerName+0x1c>
+	return pxTimer->pcTimerName;
 800052d4:	01c12783          	lw	a5,28(sp)
 800052d8:	0007a783          	lw	a5,0(a5)
+}
 800052dc:	00078513          	mv	a0,a5
 800052e0:	02010113          	addi	sp,sp,32
 800052e4:	00008067          	ret
 
 800052e8 <prvProcessExpiredTimer>:
+/*-----------------------------------------------------------*/
+
+static void prvProcessExpiredTimer( const TickType_t xNextExpireTime, const TickType_t xTimeNow )
+{
 800052e8:	fd010113          	addi	sp,sp,-48
 800052ec:	02112623          	sw	ra,44(sp)
 800052f0:	00a12623          	sw	a0,12(sp)
 800052f4:	00b12423          	sw	a1,8(sp)
+BaseType_t xResult;
+Timer_t * const pxTimer = ( Timer_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxCurrentTimerList );
 800052f8:	0001c797          	auipc	a5,0x1c
 800052fc:	7a878793          	addi	a5,a5,1960 # 80021aa0 <pxCurrentTimerList>
 80005300:	0007a783          	lw	a5,0(a5)
 80005304:	00c7a783          	lw	a5,12(a5)
 80005308:	00c7a783          	lw	a5,12(a5)
 8000530c:	00f12e23          	sw	a5,28(sp)
+
+	/* Remove the timer from the list of active timers.  A check has already
+	been performed to ensure the list is not empty. */
+	( void ) uxListRemove( &( pxTimer->xTimerListItem ) );
 80005310:	01c12783          	lw	a5,28(sp)
 80005314:	00478793          	addi	a5,a5,4
 80005318:	00078513          	mv	a0,a5
 8000531c:	f14fb0ef          	jal	ra,80000a30 <uxListRemove>
+	traceTIMER_EXPIRED( pxTimer );
+
+	/* If the timer is an auto reload timer then calculate the next
+	expiry time and re-insert the timer in the list of active timers. */
+	if( pxTimer->uxAutoReload == ( UBaseType_t ) pdTRUE )
 80005320:	01c12783          	lw	a5,28(sp)
 80005324:	01c7a703          	lw	a4,28(a5)
 80005328:	00100793          	li	a5,1
 8000532c:	06f71063          	bne	a4,a5,8000538c <prvProcessExpiredTimer+0xa4>
+	{
+		/* The timer is inserted into a list using a time relative to anything
+		other than the current time.  It will therefore be inserted into the
+		correct list relative to the time this task thinks it is now. */
+		if( prvInsertTimerInActiveList( pxTimer, ( xNextExpireTime + pxTimer->xTimerPeriodInTicks ), xTimeNow, xNextExpireTime ) == pdTRUE )
 80005330:	01c12783          	lw	a5,28(sp)
 80005334:	0187a703          	lw	a4,24(a5)
 80005338:	00c12783          	lw	a5,12(sp)
@@ -5566,6 +9856,10 @@ Disassembly of section .text:
 80005354:	00050713          	mv	a4,a0
 80005358:	00100793          	li	a5,1
 8000535c:	02f71863          	bne	a4,a5,8000538c <prvProcessExpiredTimer+0xa4>
+		{
+			/* The timer expired before it was added to the active timer
+			list.  Reload it now.  */
+			xResult = xTimerGenericCommand( pxTimer, tmrCOMMAND_START_DONT_TRACE, xNextExpireTime, NULL, tmrNO_DELAY );
 80005360:	00000713          	li	a4,0
 80005364:	00000693          	li	a3,0
 80005368:	00c12603          	lw	a2,12(sp)
@@ -5573,58 +9867,115 @@ Disassembly of section .text:
 80005370:	01c12503          	lw	a0,28(sp)
 80005374:	e39ff0ef          	jal	ra,800051ac <xTimerGenericCommand>
 80005378:	00a12c23          	sw	a0,24(sp)
+			configASSERT( xResult );
 8000537c:	01812783          	lw	a5,24(sp)
 80005380:	00079663          	bnez	a5,8000538c <prvProcessExpiredTimer+0xa4>
-80005384:	30047073          	csrci	mstatus,8
+80005384:	30007073          	csrci	mstatus,0
 80005388:	0000006f          	j	80005388 <prvProcessExpiredTimer+0xa0>
+	{
+		mtCOVERAGE_TEST_MARKER();
+	}
+
+	/* Call the timer callback. */
+	pxTimer->pxCallbackFunction( ( TimerHandle_t ) pxTimer );
 8000538c:	01c12783          	lw	a5,28(sp)
 80005390:	0247a783          	lw	a5,36(a5)
 80005394:	01c12503          	lw	a0,28(sp)
 80005398:	000780e7          	jalr	a5
+}
 8000539c:	00000013          	nop
 800053a0:	02c12083          	lw	ra,44(sp)
 800053a4:	03010113          	addi	sp,sp,48
 800053a8:	00008067          	ret
 
 800053ac <prvTimerTask>:
+/*-----------------------------------------------------------*/
+
+static void prvTimerTask( void *pvParameters )
+{
 800053ac:	fd010113          	addi	sp,sp,-48
 800053b0:	02112623          	sw	ra,44(sp)
 800053b4:	00a12623          	sw	a0,12(sp)
+
+	for( ;; )
+	{
+		/* Query the timers list to see if it contains any timers, and if so,
+		obtain the time at which the next timer will expire. */
+		xNextExpireTime = prvGetNextExpireTime( &xListWasEmpty );
 800053b8:	01810793          	addi	a5,sp,24
 800053bc:	00078513          	mv	a0,a5
 800053c0:	0e8000ef          	jal	ra,800054a8 <prvGetNextExpireTime>
 800053c4:	00a12e23          	sw	a0,28(sp)
+
+		/* If a timer has expired, process it.  Otherwise, block this task
+		until either a timer does expire, or a command is received. */
+		prvProcessTimerOrBlockTask( xNextExpireTime, xListWasEmpty );
 800053c8:	01812783          	lw	a5,24(sp)
 800053cc:	00078593          	mv	a1,a5
 800053d0:	01c12503          	lw	a0,28(sp)
 800053d4:	00c000ef          	jal	ra,800053e0 <prvProcessTimerOrBlockTask>
+
+		/* Empty the command queue. */
+		prvProcessReceivedCommands();
 800053d8:	280000ef          	jal	ra,80005658 <prvProcessReceivedCommands>
+		xNextExpireTime = prvGetNextExpireTime( &xListWasEmpty );
 800053dc:	fddff06f          	j	800053b8 <prvTimerTask+0xc>
 
 800053e0 <prvProcessTimerOrBlockTask>:
+	}
+}
+/*-----------------------------------------------------------*/
+
+static void prvProcessTimerOrBlockTask( const TickType_t xNextExpireTime, BaseType_t xListWasEmpty )
+{
 800053e0:	fd010113          	addi	sp,sp,-48
 800053e4:	02112623          	sw	ra,44(sp)
 800053e8:	00a12623          	sw	a0,12(sp)
 800053ec:	00b12423          	sw	a1,8(sp)
+TickType_t xTimeNow;
+BaseType_t xTimerListsWereSwitched;
+
+	vTaskSuspendAll();
 800053f0:	981fd0ef          	jal	ra,80002d70 <vTaskSuspendAll>
+		/* Obtain the time now to make an assessment as to whether the timer
+		has expired or not.  If obtaining the time causes the lists to switch
+		then don't process this timer as any timers that remained in the list
+		when the lists were switched will have been processed within the
+		prvSampleTimeNow() function. */
+		xTimeNow = prvSampleTimeNow( &xTimerListsWereSwitched );
 800053f4:	01810793          	addi	a5,sp,24
 800053f8:	00078513          	mv	a0,a5
 800053fc:	114000ef          	jal	ra,80005510 <prvSampleTimeNow>
 80005400:	00a12e23          	sw	a0,28(sp)
+		if( xTimerListsWereSwitched == pdFALSE )
 80005404:	01812783          	lw	a5,24(sp)
 80005408:	08079663          	bnez	a5,80005494 <prvProcessTimerOrBlockTask+0xb4>
+		{
+			/* The tick count has not overflowed, has the timer expired? */
+			if( ( xListWasEmpty == pdFALSE ) && ( xNextExpireTime <= xTimeNow ) )
 8000540c:	00812783          	lw	a5,8(sp)
 80005410:	02079263          	bnez	a5,80005434 <prvProcessTimerOrBlockTask+0x54>
 80005414:	00c12703          	lw	a4,12(sp)
 80005418:	01c12783          	lw	a5,28(sp)
 8000541c:	00e7ec63          	bltu	a5,a4,80005434 <prvProcessTimerOrBlockTask+0x54>
+			{
+				( void ) xTaskResumeAll();
 80005420:	975fd0ef          	jal	ra,80002d94 <xTaskResumeAll>
+				prvProcessExpiredTimer( xNextExpireTime, xTimeNow );
 80005424:	01c12583          	lw	a1,28(sp)
 80005428:	00c12503          	lw	a0,12(sp)
 8000542c:	ebdff0ef          	jal	ra,800052e8 <prvProcessExpiredTimer>
+		else
+		{
+			( void ) xTaskResumeAll();
+		}
+	}
+}
 80005430:	0680006f          	j	80005498 <prvProcessTimerOrBlockTask+0xb8>
+				if( xListWasEmpty != pdFALSE )
 80005434:	00812783          	lw	a5,8(sp)
 80005438:	02078063          	beqz	a5,80005458 <prvProcessTimerOrBlockTask+0x78>
+					xListWasEmpty = listLIST_IS_EMPTY( pxOverflowTimerList );
 8000543c:	0001c797          	auipc	a5,0x1c
 80005440:	66878793          	addi	a5,a5,1640 # 80021aa4 <pxOverflowTimerList>
 80005444:	0007a783          	lw	a5,0(a5)
@@ -5632,6 +9983,7 @@ Disassembly of section .text:
 8000544c:	0017b793          	seqz	a5,a5
 80005450:	0ff7f793          	andi	a5,a5,255
 80005454:	00f12423          	sw	a5,8(sp)
+				vQueueWaitForMessageRestricted( xTimerQueue, ( xNextExpireTime - xTimeNow ), xListWasEmpty );
 80005458:	0001c797          	auipc	a5,0x1c
 8000545c:	65078793          	addi	a5,a5,1616 # 80021aa8 <xTimerQueue>
 80005460:	0007a683          	lw	a3,0(a5)
@@ -5642,20 +9994,35 @@ Disassembly of section .text:
 80005474:	00078593          	mv	a1,a5
 80005478:	00068513          	mv	a0,a3
 8000547c:	ab1fc0ef          	jal	ra,80001f2c <vQueueWaitForMessageRestricted>
+				if( xTaskResumeAll() == pdFALSE )
 80005480:	915fd0ef          	jal	ra,80002d94 <xTaskResumeAll>
 80005484:	00050793          	mv	a5,a0
 80005488:	00079863          	bnez	a5,80005498 <prvProcessTimerOrBlockTask+0xb8>
+					portYIELD_WITHIN_API();
 8000548c:	908fb0ef          	jal	ra,80000594 <vPortYield>
+}
 80005490:	0080006f          	j	80005498 <prvProcessTimerOrBlockTask+0xb8>
+			( void ) xTaskResumeAll();
 80005494:	901fd0ef          	jal	ra,80002d94 <xTaskResumeAll>
+}
 80005498:	00000013          	nop
 8000549c:	02c12083          	lw	ra,44(sp)
 800054a0:	03010113          	addi	sp,sp,48
 800054a4:	00008067          	ret
 
 800054a8 <prvGetNextExpireTime>:
+/*-----------------------------------------------------------*/
+
+static TickType_t prvGetNextExpireTime( BaseType_t * const pxListWasEmpty )
+{
 800054a8:	fe010113          	addi	sp,sp,-32
 800054ac:	00a12623          	sw	a0,12(sp)
+	the timer with the nearest expiry time will expire.  If there are no
+	active timers then just set the next expire time to 0.  That will cause
+	this task to unblock when the tick count overflows, at which point the
+	timer lists will be switched and the next expiry time can be
+	re-assessed.  */
+	*pxListWasEmpty = listLIST_IS_EMPTY( pxCurrentTimerList );
 800054b0:	0001c797          	auipc	a5,0x1c
 800054b4:	5f078793          	addi	a5,a5,1520 # 80021aa0 <pxCurrentTimerList>
 800054b8:	0007a783          	lw	a5,0(a5)
@@ -5665,9 +10032,12 @@ Disassembly of section .text:
 800054c8:	00078713          	mv	a4,a5
 800054cc:	00c12783          	lw	a5,12(sp)
 800054d0:	00e7a023          	sw	a4,0(a5)
+	if( *pxListWasEmpty == pdFALSE )
 800054d4:	00c12783          	lw	a5,12(sp)
 800054d8:	0007a783          	lw	a5,0(a5)
 800054dc:	02079063          	bnez	a5,800054fc <prvGetNextExpireTime+0x54>
+	{
+		xNextExpireTime = listGET_ITEM_VALUE_OF_HEAD_ENTRY( pxCurrentTimerList );
 800054e0:	0001c797          	auipc	a5,0x1c
 800054e4:	5c078793          	addi	a5,a5,1472 # 80021aa0 <pxCurrentTimerList>
 800054e8:	0007a783          	lw	a5,0(a5)
@@ -5675,66 +10045,120 @@ Disassembly of section .text:
 800054f0:	0007a783          	lw	a5,0(a5)
 800054f4:	00f12e23          	sw	a5,28(sp)
 800054f8:	0080006f          	j	80005500 <prvGetNextExpireTime+0x58>
+	}
+	else
+	{
+		/* Ensure the task unblocks when the tick count rolls over. */
+		xNextExpireTime = ( TickType_t ) 0U;
 800054fc:	00012e23          	sw	zero,28(sp)
+	}
+
+	return xNextExpireTime;
 80005500:	01c12783          	lw	a5,28(sp)
+}
 80005504:	00078513          	mv	a0,a5
 80005508:	02010113          	addi	sp,sp,32
 8000550c:	00008067          	ret
 
 80005510 <prvSampleTimeNow>:
+/*-----------------------------------------------------------*/
+
+static TickType_t prvSampleTimeNow( BaseType_t * const pxTimerListsWereSwitched )
+{
 80005510:	fd010113          	addi	sp,sp,-48
 80005514:	02112623          	sw	ra,44(sp)
 80005518:	00a12623          	sw	a0,12(sp)
+TickType_t xTimeNow;
+PRIVILEGED_DATA static TickType_t xLastTime = ( TickType_t ) 0U; /*lint !e956 Variable is only accessible to one task. */
+
+	xTimeNow = xTaskGetTickCount();
 8000551c:	a49fd0ef          	jal	ra,80002f64 <xTaskGetTickCount>
 80005520:	00a12e23          	sw	a0,28(sp)
+
+	if( xTimeNow < xLastTime )
 80005524:	0001c797          	auipc	a5,0x1c
 80005528:	58878793          	addi	a5,a5,1416 # 80021aac <xLastTime.2060>
 8000552c:	0007a783          	lw	a5,0(a5)
 80005530:	01c12703          	lw	a4,28(sp)
 80005534:	00f77c63          	bleu	a5,a4,8000554c <prvSampleTimeNow+0x3c>
+	{
+		prvSwitchTimerLists();
 80005538:	2bc000ef          	jal	ra,800057f4 <prvSwitchTimerLists>
+		*pxTimerListsWereSwitched = pdTRUE;
 8000553c:	00c12783          	lw	a5,12(sp)
 80005540:	00100713          	li	a4,1
 80005544:	00e7a023          	sw	a4,0(a5)
 80005548:	00c0006f          	j	80005554 <prvSampleTimeNow+0x44>
+	}
+	else
+	{
+		*pxTimerListsWereSwitched = pdFALSE;
 8000554c:	00c12783          	lw	a5,12(sp)
 80005550:	0007a023          	sw	zero,0(a5)
+	}
+
+	xLastTime = xTimeNow;
 80005554:	0001c797          	auipc	a5,0x1c
 80005558:	55878793          	addi	a5,a5,1368 # 80021aac <xLastTime.2060>
 8000555c:	01c12703          	lw	a4,28(sp)
 80005560:	00e7a023          	sw	a4,0(a5)
+
+	return xTimeNow;
 80005564:	01c12783          	lw	a5,28(sp)
+}
 80005568:	00078513          	mv	a0,a5
 8000556c:	02c12083          	lw	ra,44(sp)
 80005570:	03010113          	addi	sp,sp,48
 80005574:	00008067          	ret
 
 80005578 <prvInsertTimerInActiveList>:
+/*-----------------------------------------------------------*/
+
+static BaseType_t prvInsertTimerInActiveList( Timer_t * const pxTimer, const TickType_t xNextExpiryTime, const TickType_t xTimeNow, const TickType_t xCommandTime )
+{
 80005578:	fd010113          	addi	sp,sp,-48
 8000557c:	02112623          	sw	ra,44(sp)
 80005580:	00a12623          	sw	a0,12(sp)
 80005584:	00b12423          	sw	a1,8(sp)
 80005588:	00c12223          	sw	a2,4(sp)
 8000558c:	00d12023          	sw	a3,0(sp)
+BaseType_t xProcessTimerNow = pdFALSE;
 80005590:	00012e23          	sw	zero,28(sp)
+
+	listSET_LIST_ITEM_VALUE( &( pxTimer->xTimerListItem ), xNextExpiryTime );
 80005594:	00c12783          	lw	a5,12(sp)
 80005598:	00812703          	lw	a4,8(sp)
 8000559c:	00e7a223          	sw	a4,4(a5)
+	listSET_LIST_ITEM_OWNER( &( pxTimer->xTimerListItem ), pxTimer );
 800055a0:	00c12783          	lw	a5,12(sp)
 800055a4:	00c12703          	lw	a4,12(sp)
 800055a8:	00e7a823          	sw	a4,16(a5)
+
+	if( xNextExpiryTime <= xTimeNow )
 800055ac:	00812703          	lw	a4,8(sp)
 800055b0:	00412783          	lw	a5,4(sp)
 800055b4:	04e7e663          	bltu	a5,a4,80005600 <prvInsertTimerInActiveList+0x88>
+	{
+		/* Has the expiry time elapsed between the command to start/reset a
+		timer was issued, and the time the command was processed? */
+		if( ( xTimeNow - xCommandTime ) >= pxTimer->xTimerPeriodInTicks )
 800055b8:	00412703          	lw	a4,4(sp)
 800055bc:	00012783          	lw	a5,0(sp)
 800055c0:	40f70733          	sub	a4,a4,a5
 800055c4:	00c12783          	lw	a5,12(sp)
 800055c8:	0187a783          	lw	a5,24(a5)
 800055cc:	00f76863          	bltu	a4,a5,800055dc <prvInsertTimerInActiveList+0x64>
+		{
+			/* The time between a command being issued and the command being
+			processed actually exceeds the timers period.  */
+			xProcessTimerNow = pdTRUE;
 800055d0:	00100793          	li	a5,1
 800055d4:	00f12e23          	sw	a5,28(sp)
 800055d8:	06c0006f          	j	80005644 <prvInsertTimerInActiveList+0xcc>
+		}
+		else
+		{
+			vListInsert( pxOverflowTimerList, &( pxTimer->xTimerListItem ) );
 800055dc:	0001c797          	auipc	a5,0x1c
 800055e0:	4c878793          	addi	a5,a5,1224 # 80021aa4 <pxOverflowTimerList>
 800055e4:	0007a703          	lw	a4,0(a5)
@@ -5744,15 +10168,29 @@ Disassembly of section .text:
 800055f4:	00070513          	mv	a0,a4
 800055f8:	b70fb0ef          	jal	ra,80000968 <vListInsert>
 800055fc:	0480006f          	j	80005644 <prvInsertTimerInActiveList+0xcc>
+		}
+	}
+	else
+	{
+		if( ( xTimeNow < xCommandTime ) && ( xNextExpiryTime >= xCommandTime ) )
 80005600:	00412703          	lw	a4,4(sp)
 80005604:	00012783          	lw	a5,0(sp)
 80005608:	00f77e63          	bleu	a5,a4,80005624 <prvInsertTimerInActiveList+0xac>
 8000560c:	00812703          	lw	a4,8(sp)
 80005610:	00012783          	lw	a5,0(sp)
 80005614:	00f76863          	bltu	a4,a5,80005624 <prvInsertTimerInActiveList+0xac>
+		{
+			/* If, since the command was issued, the tick count has overflowed
+			but the expiry time has not, then the timer must have already passed
+			its expiry time and should be processed immediately. */
+			xProcessTimerNow = pdTRUE;
 80005618:	00100793          	li	a5,1
 8000561c:	00f12e23          	sw	a5,28(sp)
 80005620:	0240006f          	j	80005644 <prvInsertTimerInActiveList+0xcc>
+		}
+		else
+		{
+			vListInsert( pxCurrentTimerList, &( pxTimer->xTimerListItem ) );
 80005624:	0001c797          	auipc	a5,0x1c
 80005628:	47c78793          	addi	a5,a5,1148 # 80021aa0 <pxCurrentTimerList>
 8000562c:	0007a703          	lw	a4,0(a5)
@@ -5761,31 +10199,69 @@ Disassembly of section .text:
 80005638:	00078593          	mv	a1,a5
 8000563c:	00070513          	mv	a0,a4
 80005640:	b28fb0ef          	jal	ra,80000968 <vListInsert>
+		}
+	}
+
+	return xProcessTimerNow;
 80005644:	01c12783          	lw	a5,28(sp)
+}
 80005648:	00078513          	mv	a0,a5
 8000564c:	02c12083          	lw	ra,44(sp)
 80005650:	03010113          	addi	sp,sp,48
 80005654:	00008067          	ret
 
 80005658 <prvProcessReceivedCommands>:
+/*-----------------------------------------------------------*/
+
+static void	prvProcessReceivedCommands( void )
+{
 80005658:	fd010113          	addi	sp,sp,-48
 8000565c:	02112623          	sw	ra,44(sp)
+DaemonTaskMessage_t xMessage;
+Timer_t *pxTimer;
+BaseType_t xTimerListsWereSwitched, xResult;
+TickType_t xTimeNow;
+
+	while( xQueueReceive( xTimerQueue, &xMessage, tmrNO_DELAY ) != pdFAIL ) /*lint !e603 xMessage does not have to be initialised as it is passed out, not in, and it is not used unless xQueueReceive() returns pdTRUE. */
 80005660:	1580006f          	j	800057b8 <prvProcessReceivedCommands+0x160>
+		}
+		#endif /* INCLUDE_xTimerPendFunctionCall */
+
+		/* Commands that are positive are timer commands rather than pended
+		function calls. */
+		if( xMessage.xMessageID >= ( BaseType_t ) 0 )
 80005664:	00812783          	lw	a5,8(sp)
 80005668:	1407c663          	bltz	a5,800057b4 <prvProcessReceivedCommands+0x15c>
+		{
+			/* The messages uses the xTimerParameters member to work on a
+			software timer. */
+			pxTimer = xMessage.u.xTimerParameters.pxTimer;
 8000566c:	01012783          	lw	a5,16(sp)
 80005670:	00f12e23          	sw	a5,28(sp)
+
+			if( listIS_CONTAINED_WITHIN( NULL, &( pxTimer->xTimerListItem ) ) == pdFALSE )
 80005674:	01c12783          	lw	a5,28(sp)
 80005678:	0147a783          	lw	a5,20(a5)
 8000567c:	00078a63          	beqz	a5,80005690 <prvProcessReceivedCommands+0x38>
+			{
+				/* The timer is in a list, remove it. */
+				( void ) uxListRemove( &( pxTimer->xTimerListItem ) );
 80005680:	01c12783          	lw	a5,28(sp)
 80005684:	00478793          	addi	a5,a5,4
 80005688:	00078513          	mv	a0,a5
 8000568c:	ba4fb0ef          	jal	ra,80000a30 <uxListRemove>
+			it must be present in the function call.  prvSampleTimeNow() must be
+			called after the message is received from xTimerQueue so there is no
+			possibility of a higher priority task adding a message to the message
+			queue with a time that is ahead of the timer daemon task (because it
+			pre-empted the timer daemon task after the xTimeNow value was set). */
+			xTimeNow = prvSampleTimeNow( &xTimerListsWereSwitched );
 80005690:	00410793          	addi	a5,sp,4
 80005694:	00078513          	mv	a0,a5
 80005698:	e79ff0ef          	jal	ra,80005510 <prvSampleTimeNow>
 8000569c:	00a12c23          	sw	a0,24(sp)
+
+			switch( xMessage.xMessageID )
 800056a0:	00812783          	lw	a5,8(sp)
 800056a4:	00900713          	li	a4,9
 800056a8:	10f76863          	bltu	a4,a5,800057b8 <prvProcessReceivedCommands+0x160>
@@ -5798,6 +10274,12 @@ Disassembly of section .text:
 800056c4:	97878793          	addi	a5,a5,-1672 # 80020038 <__rodata_start+0x38>
 800056c8:	00f707b3          	add	a5,a4,a5
 800056cc:	00078067          	jr	a5
+			    case tmrCOMMAND_START_FROM_ISR :
+			    case tmrCOMMAND_RESET :
+			    case tmrCOMMAND_RESET_FROM_ISR :
+				case tmrCOMMAND_START_DONT_TRACE :
+					/* Start or restart a timer. */
+					if( prvInsertTimerInActiveList( pxTimer,  xMessage.u.xTimerParameters.xMessageValue + pxTimer->xTimerPeriodInTicks, xTimeNow, xMessage.u.xTimerParameters.xMessageValue ) == pdTRUE )
 800056d0:	00c12703          	lw	a4,12(sp)
 800056d4:	01c12783          	lw	a5,28(sp)
 800056d8:	0187a783          	lw	a5,24(a5)
@@ -5811,14 +10293,23 @@ Disassembly of section .text:
 800056f8:	00050713          	mv	a4,a0
 800056fc:	00100793          	li	a5,1
 80005700:	0af71c63          	bne	a4,a5,800057b8 <prvProcessReceivedCommands+0x160>
+					{
+						/* The timer expired before it was added to the active
+						timer list.  Process it now. */
+						pxTimer->pxCallbackFunction( ( TimerHandle_t ) pxTimer );
 80005704:	01c12783          	lw	a5,28(sp)
 80005708:	0247a783          	lw	a5,36(a5)
 8000570c:	01c12503          	lw	a0,28(sp)
 80005710:	000780e7          	jalr	a5
+						traceTIMER_EXPIRED( pxTimer );
+
+						if( pxTimer->uxAutoReload == ( UBaseType_t ) pdTRUE )
 80005714:	01c12783          	lw	a5,28(sp)
 80005718:	01c7a703          	lw	a4,28(a5)
 8000571c:	00100793          	li	a5,1
 80005720:	08f71c63          	bne	a4,a5,800057b8 <prvProcessReceivedCommands+0x160>
+						{
+							xResult = xTimerGenericCommand( pxTimer, tmrCOMMAND_START_DONT_TRACE, xMessage.u.xTimerParameters.xMessageValue + pxTimer->xTimerPeriodInTicks, NULL, tmrNO_DELAY );
 80005724:	00c12703          	lw	a4,12(sp)
 80005728:	01c12783          	lw	a5,28(sp)
 8000572c:	0187a783          	lw	a5,24(a5)
@@ -5830,18 +10321,32 @@ Disassembly of section .text:
 80005744:	01c12503          	lw	a0,28(sp)
 80005748:	a65ff0ef          	jal	ra,800051ac <xTimerGenericCommand>
 8000574c:	00a12a23          	sw	a0,20(sp)
+							configASSERT( xResult );
 80005750:	01412783          	lw	a5,20(sp)
 80005754:	06079263          	bnez	a5,800057b8 <prvProcessReceivedCommands+0x160>
-80005758:	30047073          	csrci	mstatus,8
+80005758:	30007073          	csrci	mstatus,0
 8000575c:	0000006f          	j	8000575c <prvProcessReceivedCommands+0x104>
+					There is nothing to do here. */
+					break;
+
+				case tmrCOMMAND_CHANGE_PERIOD :
+				case tmrCOMMAND_CHANGE_PERIOD_FROM_ISR :
+					pxTimer->xTimerPeriodInTicks = xMessage.u.xTimerParameters.xMessageValue;
 80005760:	00c12703          	lw	a4,12(sp)
 80005764:	01c12783          	lw	a5,28(sp)
 80005768:	00e7ac23          	sw	a4,24(a5)
+					configASSERT( ( pxTimer->xTimerPeriodInTicks > 0 ) );
 8000576c:	01c12783          	lw	a5,28(sp)
 80005770:	0187a783          	lw	a5,24(a5)
 80005774:	00079663          	bnez	a5,80005780 <prvProcessReceivedCommands+0x128>
-80005778:	30047073          	csrci	mstatus,8
+80005778:	30007073          	csrci	mstatus,0
 8000577c:	0000006f          	j	8000577c <prvProcessReceivedCommands+0x124>
+					longer or shorter than the old one.  The command time is
+					therefore set to the current time, and as the period cannot be
+					zero the next expiry time can only be in the future, meaning
+					(unlike for the xTimerStart() case above) there is no fail case
+					that needs to be handled here. */
+					( void ) prvInsertTimerInActiveList( pxTimer, ( xTimeNow + pxTimer->xTimerPeriodInTicks ), xTimeNow, xTimeNow );
 80005780:	01c12783          	lw	a5,28(sp)
 80005784:	0187a703          	lw	a4,24(a5)
 80005788:	01812783          	lw	a5,24(sp)
@@ -5851,11 +10356,25 @@ Disassembly of section .text:
 80005798:	00078593          	mv	a1,a5
 8000579c:	01c12503          	lw	a0,28(sp)
 800057a0:	dd9ff0ef          	jal	ra,80005578 <prvInsertTimerInActiveList>
+					break;
 800057a4:	0140006f          	j	800057b8 <prvProcessReceivedCommands+0x160>
+
+				case tmrCOMMAND_DELETE :
+					/* The timer has already been removed from the active list,
+					just free up the memory. */
+					vPortFree( pxTimer );
 800057a8:	01c12503          	lw	a0,28(sp)
 800057ac:	569000ef          	jal	ra,80006514 <vPortFree>
+					break;
 800057b0:	0080006f          	j	800057b8 <prvProcessReceivedCommands+0x160>
+
+				default	:
+					/* Don't expect to get here. */
+					break;
+			}
+		}
 800057b4:	00000013          	nop
+	while( xQueueReceive( xTimerQueue, &xMessage, tmrNO_DELAY ) != pdFAIL ) /*lint !e603 xMessage does not have to be initialised as it is passed out, not in, and it is not used unless xQueueReceive() returns pdTRUE. */
 800057b8:	0001c797          	auipc	a5,0x1c
 800057bc:	2f078793          	addi	a5,a5,752 # 80021aa8 <xTimerQueue>
 800057c0:	0007a783          	lw	a5,0(a5)
@@ -5867,53 +10386,90 @@ Disassembly of section .text:
 800057d8:	c55fb0ef          	jal	ra,8000142c <xQueueGenericReceive>
 800057dc:	00050793          	mv	a5,a0
 800057e0:	e80792e3          	bnez	a5,80005664 <prvProcessReceivedCommands+0xc>
+	}
+}
 800057e4:	00000013          	nop
 800057e8:	02c12083          	lw	ra,44(sp)
 800057ec:	03010113          	addi	sp,sp,48
 800057f0:	00008067          	ret
 
 800057f4 <prvSwitchTimerLists>:
+/*-----------------------------------------------------------*/
+
+static void prvSwitchTimerLists( void )
+{
 800057f4:	fd010113          	addi	sp,sp,-48
 800057f8:	02112623          	sw	ra,44(sp)
+
+	/* The tick count has overflowed.  The timer lists must be switched.
+	If there are any timers still referenced from the current timer list
+	then they must have expired and should be processed before the lists
+	are switched. */
+	while( listLIST_IS_EMPTY( pxCurrentTimerList ) == pdFALSE )
 800057fc:	0ec0006f          	j	800058e8 <prvSwitchTimerLists+0xf4>
+	{
+		xNextExpireTime = listGET_ITEM_VALUE_OF_HEAD_ENTRY( pxCurrentTimerList );
 80005800:	0001c797          	auipc	a5,0x1c
 80005804:	2a078793          	addi	a5,a5,672 # 80021aa0 <pxCurrentTimerList>
 80005808:	0007a783          	lw	a5,0(a5)
 8000580c:	00c7a783          	lw	a5,12(a5)
 80005810:	0007a783          	lw	a5,0(a5)
 80005814:	00f12c23          	sw	a5,24(sp)
+
+		/* Remove the timer from the list. */
+		pxTimer = ( Timer_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxCurrentTimerList );
 80005818:	0001c797          	auipc	a5,0x1c
 8000581c:	28878793          	addi	a5,a5,648 # 80021aa0 <pxCurrentTimerList>
 80005820:	0007a783          	lw	a5,0(a5)
 80005824:	00c7a783          	lw	a5,12(a5)
 80005828:	00c7a783          	lw	a5,12(a5)
 8000582c:	00f12a23          	sw	a5,20(sp)
+		( void ) uxListRemove( &( pxTimer->xTimerListItem ) );
 80005830:	01412783          	lw	a5,20(sp)
 80005834:	00478793          	addi	a5,a5,4
 80005838:	00078513          	mv	a0,a5
 8000583c:	9f4fb0ef          	jal	ra,80000a30 <uxListRemove>
+		traceTIMER_EXPIRED( pxTimer );
+
+		/* Execute its callback, then send a command to restart the timer if
+		it is an auto-reload timer.  It cannot be restarted here as the lists
+		have not yet been switched. */
+		pxTimer->pxCallbackFunction( ( TimerHandle_t ) pxTimer );
 80005840:	01412783          	lw	a5,20(sp)
 80005844:	0247a783          	lw	a5,36(a5)
 80005848:	01412503          	lw	a0,20(sp)
 8000584c:	000780e7          	jalr	a5
+
+		if( pxTimer->uxAutoReload == ( UBaseType_t ) pdTRUE )
 80005850:	01412783          	lw	a5,20(sp)
 80005854:	01c7a703          	lw	a4,28(a5)
 80005858:	00100793          	li	a5,1
 8000585c:	08f71663          	bne	a4,a5,800058e8 <prvSwitchTimerLists+0xf4>
+			the timer going into the same timer list then it has already expired
+			and the timer should be re-inserted into the current list so it is
+			processed again within this loop.  Otherwise a command should be sent
+			to restart the timer to ensure it is only inserted into a list after
+			the lists have been swapped. */
+			xReloadTime = ( xNextExpireTime + pxTimer->xTimerPeriodInTicks );
 80005860:	01412783          	lw	a5,20(sp)
 80005864:	0187a783          	lw	a5,24(a5)
 80005868:	01812703          	lw	a4,24(sp)
 8000586c:	00f707b3          	add	a5,a4,a5
 80005870:	00f12823          	sw	a5,16(sp)
+			if( xReloadTime > xNextExpireTime )
 80005874:	01012703          	lw	a4,16(sp)
 80005878:	01812783          	lw	a5,24(sp)
 8000587c:	04e7f063          	bleu	a4,a5,800058bc <prvSwitchTimerLists+0xc8>
+			{
+				listSET_LIST_ITEM_VALUE( &( pxTimer->xTimerListItem ), xReloadTime );
 80005880:	01412783          	lw	a5,20(sp)
 80005884:	01012703          	lw	a4,16(sp)
 80005888:	00e7a223          	sw	a4,4(a5)
+				listSET_LIST_ITEM_OWNER( &( pxTimer->xTimerListItem ), pxTimer );
 8000588c:	01412783          	lw	a5,20(sp)
 80005890:	01412703          	lw	a4,20(sp)
 80005894:	00e7a823          	sw	a4,16(a5)
+				vListInsert( pxCurrentTimerList, &( pxTimer->xTimerListItem ) );
 80005898:	0001c797          	auipc	a5,0x1c
 8000589c:	20878793          	addi	a5,a5,520 # 80021aa0 <pxCurrentTimerList>
 800058a0:	0007a703          	lw	a4,0(a5)
@@ -5923,6 +10479,10 @@ Disassembly of section .text:
 800058b0:	00070513          	mv	a0,a4
 800058b4:	8b4fb0ef          	jal	ra,80000968 <vListInsert>
 800058b8:	0300006f          	j	800058e8 <prvSwitchTimerLists+0xf4>
+			}
+			else
+			{
+				xResult = xTimerGenericCommand( pxTimer, tmrCOMMAND_START_DONT_TRACE, xNextExpireTime, NULL, tmrNO_DELAY );
 800058bc:	00000713          	li	a4,0
 800058c0:	00000693          	li	a3,0
 800058c4:	01812603          	lw	a2,24(sp)
@@ -5930,58 +10490,85 @@ Disassembly of section .text:
 800058cc:	01412503          	lw	a0,20(sp)
 800058d0:	8ddff0ef          	jal	ra,800051ac <xTimerGenericCommand>
 800058d4:	00a12623          	sw	a0,12(sp)
+				configASSERT( xResult );
 800058d8:	00c12783          	lw	a5,12(sp)
 800058dc:	00079663          	bnez	a5,800058e8 <prvSwitchTimerLists+0xf4>
-800058e0:	30047073          	csrci	mstatus,8
+800058e0:	30007073          	csrci	mstatus,0
 800058e4:	0000006f          	j	800058e4 <prvSwitchTimerLists+0xf0>
+	while( listLIST_IS_EMPTY( pxCurrentTimerList ) == pdFALSE )
 800058e8:	0001c797          	auipc	a5,0x1c
 800058ec:	1b878793          	addi	a5,a5,440 # 80021aa0 <pxCurrentTimerList>
 800058f0:	0007a783          	lw	a5,0(a5)
 800058f4:	0007a783          	lw	a5,0(a5)
 800058f8:	f00794e3          	bnez	a5,80005800 <prvSwitchTimerLists+0xc>
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
+
+	pxTemp = pxCurrentTimerList;
 800058fc:	0001c797          	auipc	a5,0x1c
 80005900:	1a478793          	addi	a5,a5,420 # 80021aa0 <pxCurrentTimerList>
 80005904:	0007a783          	lw	a5,0(a5)
 80005908:	00f12e23          	sw	a5,28(sp)
+	pxCurrentTimerList = pxOverflowTimerList;
 8000590c:	0001c797          	auipc	a5,0x1c
 80005910:	19878793          	addi	a5,a5,408 # 80021aa4 <pxOverflowTimerList>
 80005914:	0007a703          	lw	a4,0(a5)
 80005918:	0001c797          	auipc	a5,0x1c
 8000591c:	18878793          	addi	a5,a5,392 # 80021aa0 <pxCurrentTimerList>
 80005920:	00e7a023          	sw	a4,0(a5)
+	pxOverflowTimerList = pxTemp;
 80005924:	0001c797          	auipc	a5,0x1c
 80005928:	18078793          	addi	a5,a5,384 # 80021aa4 <pxOverflowTimerList>
 8000592c:	01c12703          	lw	a4,28(sp)
 80005930:	00e7a023          	sw	a4,0(a5)
+}
 80005934:	00000013          	nop
 80005938:	02c12083          	lw	ra,44(sp)
 8000593c:	03010113          	addi	sp,sp,48
 80005940:	00008067          	ret
 
 80005944 <prvCheckForValidListAndQueue>:
+/*-----------------------------------------------------------*/
+
+static void prvCheckForValidListAndQueue( void )
+{
 80005944:	ff010113          	addi	sp,sp,-16
 80005948:	00112623          	sw	ra,12(sp)
+	/* Check that the list from which active timers are referenced, and the
+	queue used to communicate with the timer service, have been
+	initialised. */
+	taskENTER_CRITICAL();
 8000594c:	d89fe0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		if( xTimerQueue == NULL )
 80005950:	0001c797          	auipc	a5,0x1c
 80005954:	15878793          	addi	a5,a5,344 # 80021aa8 <xTimerQueue>
 80005958:	0007a783          	lw	a5,0(a5)
 8000595c:	0a079463          	bnez	a5,80005a04 <prvCheckForValidListAndQueue+0xc0>
+		{
+			vListInitialise( &xActiveTimerList1 );
 80005960:	0001c517          	auipc	a0,0x1c
 80005964:	11850513          	addi	a0,a0,280 # 80021a78 <xActiveTimerList1>
 80005968:	f11fa0ef          	jal	ra,80000878 <vListInitialise>
+			vListInitialise( &xActiveTimerList2 );
 8000596c:	0001c517          	auipc	a0,0x1c
 80005970:	12050513          	addi	a0,a0,288 # 80021a8c <xActiveTimerList2>
 80005974:	f05fa0ef          	jal	ra,80000878 <vListInitialise>
+			pxCurrentTimerList = &xActiveTimerList1;
 80005978:	0001c797          	auipc	a5,0x1c
 8000597c:	12878793          	addi	a5,a5,296 # 80021aa0 <pxCurrentTimerList>
 80005980:	0001c717          	auipc	a4,0x1c
 80005984:	0f870713          	addi	a4,a4,248 # 80021a78 <xActiveTimerList1>
 80005988:	00e7a023          	sw	a4,0(a5)
+			pxOverflowTimerList = &xActiveTimerList2;
 8000598c:	0001c797          	auipc	a5,0x1c
 80005990:	11878793          	addi	a5,a5,280 # 80021aa4 <pxOverflowTimerList>
 80005994:	0001c717          	auipc	a4,0x1c
 80005998:	0f870713          	addi	a4,a4,248 # 80021a8c <xActiveTimerList2>
 8000599c:	00e7a023          	sw	a4,0(a5)
+			xTimerQueue = xQueueCreate( ( UBaseType_t ) configTIMER_QUEUE_LENGTH, sizeof( DaemonTaskMessage_t ) );
 800059a0:	00000613          	li	a2,0
 800059a4:	00c00593          	li	a1,12
 800059a8:	00200513          	li	a0,2
@@ -5990,16 +10577,23 @@ Disassembly of section .text:
 800059b4:	0001c797          	auipc	a5,0x1c
 800059b8:	0f478793          	addi	a5,a5,244 # 80021aa8 <xTimerQueue>
 800059bc:	00e7a023          	sw	a4,0(a5)
+			configASSERT( xTimerQueue );
 800059c0:	0001c797          	auipc	a5,0x1c
 800059c4:	0e878793          	addi	a5,a5,232 # 80021aa8 <xTimerQueue>
 800059c8:	0007a783          	lw	a5,0(a5)
 800059cc:	00079663          	bnez	a5,800059d8 <prvCheckForValidListAndQueue+0x94>
-800059d0:	30047073          	csrci	mstatus,8
+800059d0:	30007073          	csrci	mstatus,0
 800059d4:	0000006f          	j	800059d4 <prvCheckForValidListAndQueue+0x90>
+
+			#if ( configQUEUE_REGISTRY_SIZE > 0 )
+			{
+				if( xTimerQueue != NULL )
 800059d8:	0001c797          	auipc	a5,0x1c
 800059dc:	0d078793          	addi	a5,a5,208 # 80021aa8 <xTimerQueue>
 800059e0:	0007a783          	lw	a5,0(a5)
 800059e4:	02078063          	beqz	a5,80005a04 <prvCheckForValidListAndQueue+0xc0>
+				{
+					vQueueAddToRegistry( xTimerQueue, "TmrQ" );
 800059e8:	0001c797          	auipc	a5,0x1c
 800059ec:	0c078793          	addi	a5,a5,192 # 80021aa8 <xTimerQueue>
 800059f0:	0007a783          	lw	a5,0(a5)
@@ -6007,117 +10601,210 @@ Disassembly of section .text:
 800059f8:	66c58593          	addi	a1,a1,1644 # 80020060 <__rodata_start+0x60>
 800059fc:	00078513          	mv	a0,a5
 80005a00:	c2cfc0ef          	jal	ra,80001e2c <vQueueAddToRegistry>
+		else
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
+	taskEXIT_CRITICAL();
 80005a04:	d11fe0ef          	jal	ra,80004714 <vTaskExitCritical>
+}
 80005a08:	00000013          	nop
 80005a0c:	00c12083          	lw	ra,12(sp)
 80005a10:	01010113          	addi	sp,sp,16
 80005a14:	00008067          	ret
 
 80005a18 <xTimerIsTimerActive>:
+/*-----------------------------------------------------------*/
+
+BaseType_t xTimerIsTimerActive( TimerHandle_t xTimer )
+{
 80005a18:	fd010113          	addi	sp,sp,-48
 80005a1c:	02112623          	sw	ra,44(sp)
 80005a20:	00a12623          	sw	a0,12(sp)
+BaseType_t xTimerIsInActiveList;
+Timer_t *pxTimer = ( Timer_t * ) xTimer;
 80005a24:	00c12783          	lw	a5,12(sp)
 80005a28:	00f12e23          	sw	a5,28(sp)
+
+	configASSERT( xTimer );
 80005a2c:	00c12783          	lw	a5,12(sp)
 80005a30:	00079663          	bnez	a5,80005a3c <xTimerIsTimerActive+0x24>
-80005a34:	30047073          	csrci	mstatus,8
+80005a34:	30007073          	csrci	mstatus,0
 80005a38:	0000006f          	j	80005a38 <xTimerIsTimerActive+0x20>
+
+	/* Is the timer in the list of active timers? */
+	taskENTER_CRITICAL();
 80005a3c:	c99fe0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		/* Checking to see if it is in the NULL list in effect checks to see if
+		it is referenced from either the current or the overflow timer lists in
+		one go, but the logic has to be reversed, hence the '!'. */
+		xTimerIsInActiveList = ( BaseType_t ) !( listIS_CONTAINED_WITHIN( NULL, &( pxTimer->xTimerListItem ) ) );
 80005a40:	01c12783          	lw	a5,28(sp)
 80005a44:	0147a783          	lw	a5,20(a5)
 80005a48:	00f037b3          	snez	a5,a5
 80005a4c:	0ff7f793          	andi	a5,a5,255
 80005a50:	00f12c23          	sw	a5,24(sp)
+	}
+	taskEXIT_CRITICAL();
 80005a54:	cc1fe0ef          	jal	ra,80004714 <vTaskExitCritical>
+
+	return xTimerIsInActiveList;
 80005a58:	01812783          	lw	a5,24(sp)
+} /*lint !e818 Can't be pointer to const due to the typedef. */
 80005a5c:	00078513          	mv	a0,a5
 80005a60:	02c12083          	lw	ra,44(sp)
 80005a64:	03010113          	addi	sp,sp,48
 80005a68:	00008067          	ret
 
 80005a6c <pvTimerGetTimerID>:
+/*-----------------------------------------------------------*/
+
+void *pvTimerGetTimerID( const TimerHandle_t xTimer )
+{
 80005a6c:	fd010113          	addi	sp,sp,-48
 80005a70:	02112623          	sw	ra,44(sp)
 80005a74:	00a12623          	sw	a0,12(sp)
+Timer_t * const pxTimer = ( Timer_t * ) xTimer;
 80005a78:	00c12783          	lw	a5,12(sp)
 80005a7c:	00f12e23          	sw	a5,28(sp)
+void *pvReturn;
+
+	configASSERT( xTimer );
 80005a80:	00c12783          	lw	a5,12(sp)
 80005a84:	00079663          	bnez	a5,80005a90 <pvTimerGetTimerID+0x24>
-80005a88:	30047073          	csrci	mstatus,8
+80005a88:	30007073          	csrci	mstatus,0
 80005a8c:	0000006f          	j	80005a8c <pvTimerGetTimerID+0x20>
+
+	taskENTER_CRITICAL();
 80005a90:	c45fe0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		pvReturn = pxTimer->pvTimerID;
 80005a94:	01c12783          	lw	a5,28(sp)
 80005a98:	0207a783          	lw	a5,32(a5)
 80005a9c:	00f12c23          	sw	a5,24(sp)
+	}
+	taskEXIT_CRITICAL();
 80005aa0:	c75fe0ef          	jal	ra,80004714 <vTaskExitCritical>
+
+	return pvReturn;
 80005aa4:	01812783          	lw	a5,24(sp)
+}
 80005aa8:	00078513          	mv	a0,a5
 80005aac:	02c12083          	lw	ra,44(sp)
 80005ab0:	03010113          	addi	sp,sp,48
 80005ab4:	00008067          	ret
 
 80005ab8 <vTimerSetTimerID>:
+/*-----------------------------------------------------------*/
+
+void vTimerSetTimerID( TimerHandle_t xTimer, void *pvNewID )
+{
 80005ab8:	fd010113          	addi	sp,sp,-48
 80005abc:	02112623          	sw	ra,44(sp)
 80005ac0:	00a12623          	sw	a0,12(sp)
 80005ac4:	00b12423          	sw	a1,8(sp)
+Timer_t * const pxTimer = ( Timer_t * ) xTimer;
 80005ac8:	00c12783          	lw	a5,12(sp)
 80005acc:	00f12e23          	sw	a5,28(sp)
+
+	configASSERT( xTimer );
 80005ad0:	00c12783          	lw	a5,12(sp)
 80005ad4:	00079663          	bnez	a5,80005ae0 <vTimerSetTimerID+0x28>
-80005ad8:	30047073          	csrci	mstatus,8
+80005ad8:	30007073          	csrci	mstatus,0
 80005adc:	0000006f          	j	80005adc <vTimerSetTimerID+0x24>
+
+	taskENTER_CRITICAL();
 80005ae0:	bf5fe0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		pxTimer->pvTimerID = pvNewID;
 80005ae4:	01c12783          	lw	a5,28(sp)
 80005ae8:	00812703          	lw	a4,8(sp)
 80005aec:	02e7a023          	sw	a4,32(a5)
+	}
+	taskEXIT_CRITICAL();
 80005af0:	c25fe0ef          	jal	ra,80004714 <vTaskExitCritical>
+}
 80005af4:	00000013          	nop
 80005af8:	02c12083          	lw	ra,44(sp)
 80005afc:	03010113          	addi	sp,sp,48
 80005b00:	00008067          	ret
 
 80005b04 <xEventGroupCreate>:
+static BaseType_t prvTestWaitCondition( const EventBits_t uxCurrentEventBits, const EventBits_t uxBitsToWaitFor, const BaseType_t xWaitForAllBits );
+
+/*-----------------------------------------------------------*/
+
+EventGroupHandle_t xEventGroupCreate( void )
+{
 80005b04:	fe010113          	addi	sp,sp,-32
 80005b08:	00112e23          	sw	ra,28(sp)
+EventGroup_t *pxEventBits;
+
+	pxEventBits = ( EventGroup_t * ) pvPortMalloc( sizeof( EventGroup_t ) );
 80005b0c:	01c00513          	li	a0,28
 80005b10:	009000ef          	jal	ra,80006318 <pvPortMalloc>
 80005b14:	00a12623          	sw	a0,12(sp)
+	if( pxEventBits != NULL )
 80005b18:	00c12783          	lw	a5,12(sp)
 80005b1c:	00078e63          	beqz	a5,80005b38 <xEventGroupCreate+0x34>
+	{
+		pxEventBits->uxEventBits = 0;
 80005b20:	00c12783          	lw	a5,12(sp)
 80005b24:	0007a023          	sw	zero,0(a5)
+		vListInitialise( &( pxEventBits->xTasksWaitingForBits ) );
 80005b28:	00c12783          	lw	a5,12(sp)
 80005b2c:	00478793          	addi	a5,a5,4
 80005b30:	00078513          	mv	a0,a5
 80005b34:	d45fa0ef          	jal	ra,80000878 <vListInitialise>
+	else
+	{
+		traceEVENT_GROUP_CREATE_FAILED();
+	}
+
+	return ( EventGroupHandle_t ) pxEventBits;
 80005b38:	00c12783          	lw	a5,12(sp)
+}
 80005b3c:	00078513          	mv	a0,a5
 80005b40:	01c12083          	lw	ra,28(sp)
 80005b44:	02010113          	addi	sp,sp,32
 80005b48:	00008067          	ret
 
 80005b4c <xEventGroupSync>:
+/*-----------------------------------------------------------*/
+
+EventBits_t xEventGroupSync( EventGroupHandle_t xEventGroup, const EventBits_t uxBitsToSet, const EventBits_t uxBitsToWaitFor, TickType_t xTicksToWait )
+{
 80005b4c:	fc010113          	addi	sp,sp,-64
 80005b50:	02112e23          	sw	ra,60(sp)
 80005b54:	00a12623          	sw	a0,12(sp)
 80005b58:	00b12423          	sw	a1,8(sp)
 80005b5c:	00c12223          	sw	a2,4(sp)
 80005b60:	00d12023          	sw	a3,0(sp)
+EventBits_t uxOriginalBitValue, uxReturn;
+EventGroup_t *pxEventBits = ( EventGroup_t * ) xEventGroup;
 80005b64:	00c12783          	lw	a5,12(sp)
 80005b68:	02f12423          	sw	a5,40(sp)
+BaseType_t xAlreadyYielded;
+BaseType_t xTimeoutOccurred = pdFALSE;
 80005b6c:	02012223          	sw	zero,36(sp)
+
+	configASSERT( ( uxBitsToWaitFor & eventEVENT_BITS_CONTROL_BYTES ) == 0 );
 80005b70:	00412703          	lw	a4,4(sp)
 80005b74:	ff0007b7          	lui	a5,0xff000
 80005b78:	00f777b3          	and	a5,a4,a5
 80005b7c:	00078663          	beqz	a5,80005b88 <xEventGroupSync+0x3c>
-80005b80:	30047073          	csrci	mstatus,8
+80005b80:	30007073          	csrci	mstatus,0
 80005b84:	0000006f          	j	80005b84 <xEventGroupSync+0x38>
+	configASSERT( uxBitsToWaitFor != 0 );
 80005b88:	00412783          	lw	a5,4(sp)
 80005b8c:	00079663          	bnez	a5,80005b98 <xEventGroupSync+0x4c>
-80005b90:	30047073          	csrci	mstatus,8
+80005b90:	30007073          	csrci	mstatus,0
 80005b94:	0000006f          	j	80005b94 <xEventGroupSync+0x48>
+	#if ( ( INCLUDE_xTaskGetSchedulerState == 1 ) || ( configUSE_TIMERS == 1 ) )
+	{
+		configASSERT( !( ( xTaskGetSchedulerState() == taskSCHEDULER_SUSPENDED ) && ( xTicksToWait != 0 ) ) );
 80005b98:	855fe0ef          	jal	ra,800043ec <xTaskGetSchedulerState>
 80005b9c:	00050793          	mv	a5,a0
 80005ba0:	00079663          	bnez	a5,80005bac <xEventGroupSync+0x60>
@@ -6127,15 +10814,25 @@ Disassembly of section .text:
 80005bb0:	0080006f          	j	80005bb8 <xEventGroupSync+0x6c>
 80005bb4:	00000793          	li	a5,0
 80005bb8:	00079663          	bnez	a5,80005bc4 <xEventGroupSync+0x78>
-80005bbc:	30047073          	csrci	mstatus,8
+80005bbc:	30007073          	csrci	mstatus,0
 80005bc0:	0000006f          	j	80005bc0 <xEventGroupSync+0x74>
+	}
+	#endif
+
+	vTaskSuspendAll();
 80005bc4:	9acfd0ef          	jal	ra,80002d70 <vTaskSuspendAll>
+	{
+		uxOriginalBitValue = pxEventBits->uxEventBits;
 80005bc8:	02812783          	lw	a5,40(sp)
 80005bcc:	0007a783          	lw	a5,0(a5) # ff000000 <__stack+0x7efc33f4>
 80005bd0:	02f12023          	sw	a5,32(sp)
+
+		( void ) xEventGroupSetBits( xEventGroup, uxBitsToSet );
 80005bd4:	00812583          	lw	a1,8(sp)
 80005bd8:	00c12503          	lw	a0,12(sp)
 80005bdc:	418000ef          	jal	ra,80005ff4 <xEventGroupSetBits>
+
+		if( ( ( uxOriginalBitValue | uxBitsToSet ) & uxBitsToWaitFor ) == uxBitsToWaitFor )
 80005be0:	02012703          	lw	a4,32(sp)
 80005be4:	00812783          	lw	a5,8(sp)
 80005be8:	00f76733          	or	a4,a4,a5
@@ -6143,10 +10840,17 @@ Disassembly of section .text:
 80005bf0:	00f777b3          	and	a5,a4,a5
 80005bf4:	00412703          	lw	a4,4(sp)
 80005bf8:	02f71c63          	bne	a4,a5,80005c30 <xEventGroupSync+0xe4>
+		{
+			/* All the rendezvous bits are now set - no need to block. */
+			uxReturn = ( uxOriginalBitValue | uxBitsToSet );
 80005bfc:	02012703          	lw	a4,32(sp)
 80005c00:	00812783          	lw	a5,8(sp)
 80005c04:	00f767b3          	or	a5,a4,a5
 80005c08:	02f12623          	sw	a5,44(sp)
+
+			/* Rendezvous always clear the bits.  They will have been cleared
+			already unless this is the only task in the rendezvous. */
+			pxEventBits->uxEventBits &= ~uxBitsToWaitFor;
 80005c0c:	02812783          	lw	a5,40(sp)
 80005c10:	0007a703          	lw	a4,0(a5)
 80005c14:	00412783          	lw	a5,4(sp)
@@ -6154,10 +10858,22 @@ Disassembly of section .text:
 80005c1c:	00f77733          	and	a4,a4,a5
 80005c20:	02812783          	lw	a5,40(sp)
 80005c24:	00e7a023          	sw	a4,0(a5)
+
+			xTicksToWait = 0;
 80005c28:	00012023          	sw	zero,0(sp)
 80005c2c:	0440006f          	j	80005c70 <xEventGroupSync+0x124>
+		}
+		else
+		{
+			if( xTicksToWait != ( TickType_t ) 0 )
 80005c30:	00012783          	lw	a5,0(sp)
 80005c34:	02078863          	beqz	a5,80005c64 <xEventGroupSync+0x118>
+				traceEVENT_GROUP_SYNC_BLOCK( xEventGroup, uxBitsToSet, uxBitsToWaitFor );
+
+				/* Store the bits that the calling task is waiting for in the
+				task's event list item so the kernel knows when a match is
+				found.  Then enter the blocked state. */
+				vTaskPlaceOnUnorderedEventList( &( pxEventBits->xTasksWaitingForBits ), ( uxBitsToWaitFor | eventCLEAR_EVENTS_ON_EXIT_BIT | eventWAIT_FOR_ALL_BITS ), xTicksToWait );
 80005c38:	02812783          	lw	a5,40(sp)
 80005c3c:	00478693          	addi	a3,a5,4
 80005c40:	00412703          	lw	a4,4(sp)
@@ -6167,33 +10883,76 @@ Disassembly of section .text:
 80005c50:	00078593          	mv	a1,a5
 80005c54:	00068513          	mv	a0,a3
 80005c58:	a4dfd0ef          	jal	ra,800036a4 <vTaskPlaceOnUnorderedEventList>
+
+				/* This assignment is obsolete as uxReturn will get set after
+				the task unblocks, but some compilers mistakenly generate a
+				warning about uxReturn being returned without being set if the
+				assignment is omitted. */
+				uxReturn = 0;
 80005c5c:	02012623          	sw	zero,44(sp)
 80005c60:	0100006f          	j	80005c70 <xEventGroupSync+0x124>
+			}
+			else
+			{
+				/* The rendezvous bits were not set, but no block time was
+				specified - just return the current event bit value. */
+				uxReturn = pxEventBits->uxEventBits;
 80005c64:	02812783          	lw	a5,40(sp)
 80005c68:	0007a783          	lw	a5,0(a5) # 5000000 <_HEAP_SIZE+0x4fff000>
 80005c6c:	02f12623          	sw	a5,44(sp)
+			}
+		}
+	}
+	xAlreadyYielded = xTaskResumeAll();
 80005c70:	924fd0ef          	jal	ra,80002d94 <xTaskResumeAll>
 80005c74:	00a12e23          	sw	a0,28(sp)
+
+	if( xTicksToWait != ( TickType_t ) 0 )
 80005c78:	00012783          	lw	a5,0(sp)
 80005c7c:	08078463          	beqz	a5,80005d04 <xEventGroupSync+0x1b8>
+	{
+		if( xAlreadyYielded == pdFALSE )
 80005c80:	01c12783          	lw	a5,28(sp)
 80005c84:	00079463          	bnez	a5,80005c8c <xEventGroupSync+0x140>
+		{
+			portYIELD_WITHIN_API();
 80005c88:	90dfa0ef          	jal	ra,80000594 <vPortYield>
+
+		/* The task blocked to wait for its required bits to be set - at this
+		point either the required bits were set or the block time expired.  If
+		the required bits were set they will have been stored in the task's
+		event list item, and they should now be retrieved then cleared. */
+		uxReturn = uxTaskResetEventItemValue();
 80005c8c:	ae5fe0ef          	jal	ra,80004770 <uxTaskResetEventItemValue>
 80005c90:	02a12623          	sw	a0,44(sp)
+
+		if( ( uxReturn & eventUNBLOCKED_DUE_TO_BIT_SET ) == ( EventBits_t ) 0 )
 80005c94:	02c12703          	lw	a4,44(sp)
 80005c98:	020007b7          	lui	a5,0x2000
 80005c9c:	00f777b3          	and	a5,a4,a5
 80005ca0:	04079863          	bnez	a5,80005cf0 <xEventGroupSync+0x1a4>
+		{
+			/* The task timed out, just return the current event bit value. */
+			taskENTER_CRITICAL();
 80005ca4:	a31fe0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+			{
+				uxReturn = pxEventBits->uxEventBits;
 80005ca8:	02812783          	lw	a5,40(sp)
 80005cac:	0007a783          	lw	a5,0(a5) # 2000000 <_HEAP_SIZE+0x1fff000>
 80005cb0:	02f12623          	sw	a5,44(sp)
+
+				/* Although the task got here because it timed out before the
+				bits it was waiting for were set, it is possible that since it
+				unblocked another task has set the bits.  If this is the case
+				then it needs to clear the bits before exiting. */
+				if( ( uxReturn & uxBitsToWaitFor ) == uxBitsToWaitFor )
 80005cb4:	02c12703          	lw	a4,44(sp)
 80005cb8:	00412783          	lw	a5,4(sp)
 80005cbc:	00f777b3          	and	a5,a4,a5
 80005cc0:	00412703          	lw	a4,4(sp)
 80005cc4:	02f71063          	bne	a4,a5,80005ce4 <xEventGroupSync+0x198>
+				{
+					pxEventBits->uxEventBits &= ~uxBitsToWaitFor;
 80005cc8:	02812783          	lw	a5,40(sp)
 80005ccc:	0007a703          	lw	a4,0(a5)
 80005cd0:	00412783          	lw	a5,4(sp)
@@ -6201,21 +10960,45 @@ Disassembly of section .text:
 80005cd8:	00f77733          	and	a4,a4,a5
 80005cdc:	02812783          	lw	a5,40(sp)
 80005ce0:	00e7a023          	sw	a4,0(a5)
+				else
+				{
+					mtCOVERAGE_TEST_MARKER();
+				}
+			}
+			taskEXIT_CRITICAL();
 80005ce4:	a31fe0ef          	jal	ra,80004714 <vTaskExitCritical>
+
+			xTimeoutOccurred = pdTRUE;
 80005ce8:	00100793          	li	a5,1
 80005cec:	02f12223          	sw	a5,36(sp)
+			/* The task unblocked because the bits were set. */
+		}
+
+		/* Control bits might be set as the task had blocked should not be
+		returned. */
+		uxReturn &= ~eventEVENT_BITS_CONTROL_BYTES;
 80005cf0:	02c12703          	lw	a4,44(sp)
 80005cf4:	010007b7          	lui	a5,0x1000
 80005cf8:	fff78793          	addi	a5,a5,-1 # ffffff <_HEAP_SIZE+0xffefff>
 80005cfc:	00f777b3          	and	a5,a4,a5
 80005d00:	02f12623          	sw	a5,44(sp)
+	}
+
+	traceEVENT_GROUP_SYNC_END( xEventGroup, uxBitsToSet, uxBitsToWaitFor, xTimeoutOccurred );
+
+	return uxReturn;
 80005d04:	02c12783          	lw	a5,44(sp)
+}
 80005d08:	00078513          	mv	a0,a5
 80005d0c:	03c12083          	lw	ra,60(sp)
 80005d10:	04010113          	addi	sp,sp,64
 80005d14:	00008067          	ret
 
 80005d18 <xEventGroupWaitBits>:
+/*-----------------------------------------------------------*/
+
+EventBits_t xEventGroupWaitBits( EventGroupHandle_t xEventGroup, const EventBits_t uxBitsToWaitFor, const BaseType_t xClearOnExit, const BaseType_t xWaitForAllBits, TickType_t xTicksToWait )
+{
 80005d18:	fb010113          	addi	sp,sp,-80
 80005d1c:	04112623          	sw	ra,76(sp)
 80005d20:	00a12e23          	sw	a0,28(sp)
@@ -6223,24 +11006,37 @@ Disassembly of section .text:
 80005d28:	00c12a23          	sw	a2,20(sp)
 80005d2c:	00d12823          	sw	a3,16(sp)
 80005d30:	00e12623          	sw	a4,12(sp)
+EventGroup_t *pxEventBits = ( EventGroup_t * ) xEventGroup;
 80005d34:	01c12783          	lw	a5,28(sp)
 80005d38:	02f12a23          	sw	a5,52(sp)
+EventBits_t uxReturn, uxControlBits = 0;
 80005d3c:	02012c23          	sw	zero,56(sp)
+BaseType_t xWaitConditionMet, xAlreadyYielded;
+BaseType_t xTimeoutOccurred = pdFALSE;
 80005d40:	02012823          	sw	zero,48(sp)
+
+	/* Check the user is not attempting to wait on the bits used by the kernel
+	itself, and that at least one bit is being requested. */
+	configASSERT( xEventGroup );
 80005d44:	01c12783          	lw	a5,28(sp)
 80005d48:	00079663          	bnez	a5,80005d54 <xEventGroupWaitBits+0x3c>
-80005d4c:	30047073          	csrci	mstatus,8
+80005d4c:	30007073          	csrci	mstatus,0
 80005d50:	0000006f          	j	80005d50 <xEventGroupWaitBits+0x38>
+	configASSERT( ( uxBitsToWaitFor & eventEVENT_BITS_CONTROL_BYTES ) == 0 );
 80005d54:	01812703          	lw	a4,24(sp)
 80005d58:	ff0007b7          	lui	a5,0xff000
 80005d5c:	00f777b3          	and	a5,a4,a5
 80005d60:	00078663          	beqz	a5,80005d6c <xEventGroupWaitBits+0x54>
-80005d64:	30047073          	csrci	mstatus,8
+80005d64:	30007073          	csrci	mstatus,0
 80005d68:	0000006f          	j	80005d68 <xEventGroupWaitBits+0x50>
+	configASSERT( uxBitsToWaitFor != 0 );
 80005d6c:	01812783          	lw	a5,24(sp)
 80005d70:	00079663          	bnez	a5,80005d7c <xEventGroupWaitBits+0x64>
-80005d74:	30047073          	csrci	mstatus,8
+80005d74:	30007073          	csrci	mstatus,0
 80005d78:	0000006f          	j	80005d78 <xEventGroupWaitBits+0x60>
+	#if ( ( INCLUDE_xTaskGetSchedulerState == 1 ) || ( configUSE_TIMERS == 1 ) )
+	{
+		configASSERT( !( ( xTaskGetSchedulerState() == taskSCHEDULER_SUSPENDED ) && ( xTicksToWait != 0 ) ) );
 80005d7c:	e70fe0ef          	jal	ra,800043ec <xTaskGetSchedulerState>
 80005d80:	00050793          	mv	a5,a0
 80005d84:	00079663          	bnez	a5,80005d90 <xEventGroupWaitBits+0x78>
@@ -6250,24 +11046,45 @@ Disassembly of section .text:
 80005d94:	0080006f          	j	80005d9c <xEventGroupWaitBits+0x84>
 80005d98:	00000793          	li	a5,0
 80005d9c:	00079663          	bnez	a5,80005da8 <xEventGroupWaitBits+0x90>
-80005da0:	30047073          	csrci	mstatus,8
+80005da0:	30007073          	csrci	mstatus,0
 80005da4:	0000006f          	j	80005da4 <xEventGroupWaitBits+0x8c>
+	}
+	#endif
+
+	vTaskSuspendAll();
 80005da8:	fc9fc0ef          	jal	ra,80002d70 <vTaskSuspendAll>
+	{
+		const EventBits_t uxCurrentEventBits = pxEventBits->uxEventBits;
 80005dac:	03412783          	lw	a5,52(sp)
 80005db0:	0007a783          	lw	a5,0(a5) # ff000000 <__stack+0x7efc33f4>
 80005db4:	02f12623          	sw	a5,44(sp)
+
+		/* Check to see if the wait condition is already met or not. */
+		xWaitConditionMet = prvTestWaitCondition( uxCurrentEventBits, uxBitsToWaitFor, xWaitForAllBits );
 80005db8:	01012603          	lw	a2,16(sp)
 80005dbc:	01812583          	lw	a1,24(sp)
 80005dc0:	02c12503          	lw	a0,44(sp)
 80005dc4:	4b4000ef          	jal	ra,80006278 <prvTestWaitCondition>
 80005dc8:	02a12423          	sw	a0,40(sp)
+
+		if( xWaitConditionMet != pdFALSE )
 80005dcc:	02812783          	lw	a5,40(sp)
 80005dd0:	02078c63          	beqz	a5,80005e08 <xEventGroupWaitBits+0xf0>
+		{
+			/* The wait condition has already been met so there is no need to
+			block. */
+			uxReturn = uxCurrentEventBits;
 80005dd4:	02c12783          	lw	a5,44(sp)
 80005dd8:	02f12e23          	sw	a5,60(sp)
+			xTicksToWait = ( TickType_t ) 0;
 80005ddc:	00012623          	sw	zero,12(sp)
+
+			/* Clear the wait bits if requested to do so. */
+			if( xClearOnExit != pdFALSE )
 80005de0:	01412783          	lw	a5,20(sp)
 80005de4:	08078863          	beqz	a5,80005e74 <xEventGroupWaitBits+0x15c>
+			{
+				pxEventBits->uxEventBits &= ~uxBitsToWaitFor;
 80005de8:	03412783          	lw	a5,52(sp)
 80005dec:	0007a703          	lw	a4,0(a5)
 80005df0:	01812783          	lw	a5,24(sp)
@@ -6276,23 +11093,55 @@ Disassembly of section .text:
 80005dfc:	03412783          	lw	a5,52(sp)
 80005e00:	00e7a023          	sw	a4,0(a5)
 80005e04:	0700006f          	j	80005e74 <xEventGroupWaitBits+0x15c>
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+		else if( xTicksToWait == ( TickType_t ) 0 )
 80005e08:	00c12783          	lw	a5,12(sp)
 80005e0c:	00079863          	bnez	a5,80005e1c <xEventGroupWaitBits+0x104>
+		{
+			/* The wait condition has not been met, but no block time was
+			specified, so just return the current value. */
+			uxReturn = uxCurrentEventBits;
 80005e10:	02c12783          	lw	a5,44(sp)
 80005e14:	02f12e23          	sw	a5,60(sp)
 80005e18:	05c0006f          	j	80005e74 <xEventGroupWaitBits+0x15c>
+		{
+			/* The task is going to block to wait for its required bits to be
+			set.  uxControlBits are used to remember the specified behaviour of
+			this call to xEventGroupWaitBits() - for use when the event bits
+			unblock the task. */
+			if( xClearOnExit != pdFALSE )
 80005e1c:	01412783          	lw	a5,20(sp)
 80005e20:	00078a63          	beqz	a5,80005e34 <xEventGroupWaitBits+0x11c>
+			{
+				uxControlBits |= eventCLEAR_EVENTS_ON_EXIT_BIT;
 80005e24:	03812703          	lw	a4,56(sp)
 80005e28:	010007b7          	lui	a5,0x1000
 80005e2c:	00f767b3          	or	a5,a4,a5
 80005e30:	02f12c23          	sw	a5,56(sp)
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+
+			if( xWaitForAllBits != pdFALSE )
 80005e34:	01012783          	lw	a5,16(sp)
 80005e38:	00078a63          	beqz	a5,80005e4c <xEventGroupWaitBits+0x134>
+			{
+				uxControlBits |= eventWAIT_FOR_ALL_BITS;
 80005e3c:	03812703          	lw	a4,56(sp)
 80005e40:	040007b7          	lui	a5,0x4000
 80005e44:	00f767b3          	or	a5,a4,a5
 80005e48:	02f12c23          	sw	a5,56(sp)
+			}
+
+			/* Store the bits that the calling task is waiting for in the
+			task's event list item so the kernel knows when a match is
+			found.  Then enter the blocked state. */
+			vTaskPlaceOnUnorderedEventList( &( pxEventBits->xTasksWaitingForBits ), ( uxBitsToWaitFor | uxControlBits ), xTicksToWait );
 80005e4c:	03412783          	lw	a5,52(sp)
 80005e50:	00478693          	addi	a3,a5,4 # 4000004 <_HEAP_SIZE+0x3fff004>
 80005e54:	01812703          	lw	a4,24(sp)
@@ -6302,32 +11151,69 @@ Disassembly of section .text:
 80005e64:	00078593          	mv	a1,a5
 80005e68:	00068513          	mv	a0,a3
 80005e6c:	839fd0ef          	jal	ra,800036a4 <vTaskPlaceOnUnorderedEventList>
+
+			/* This is obsolete as it will get set after the task unblocks, but
+			some compilers mistakenly generate a warning about the variable
+			being returned without being set if it is not done. */
+			uxReturn = 0;
 80005e70:	02012e23          	sw	zero,60(sp)
+
+			traceEVENT_GROUP_WAIT_BITS_BLOCK( xEventGroup, uxBitsToWaitFor );
+		}
+	}
+	xAlreadyYielded = xTaskResumeAll();
 80005e74:	f21fc0ef          	jal	ra,80002d94 <xTaskResumeAll>
 80005e78:	02a12223          	sw	a0,36(sp)
+
+	if( xTicksToWait != ( TickType_t ) 0 )
 80005e7c:	00c12783          	lw	a5,12(sp)
 80005e80:	08078863          	beqz	a5,80005f10 <xEventGroupWaitBits+0x1f8>
+	{
+		if( xAlreadyYielded == pdFALSE )
 80005e84:	02412783          	lw	a5,36(sp)
 80005e88:	00079463          	bnez	a5,80005e90 <xEventGroupWaitBits+0x178>
+		{
+			portYIELD_WITHIN_API();
 80005e8c:	f08fa0ef          	jal	ra,80000594 <vPortYield>
+
+		/* The task blocked to wait for its required bits to be set - at this
+		point either the required bits were set or the block time expired.  If
+		the required bits were set they will have been stored in the task's
+		event list item, and they should now be retrieved then cleared. */
+		uxReturn = uxTaskResetEventItemValue();
 80005e90:	8e1fe0ef          	jal	ra,80004770 <uxTaskResetEventItemValue>
 80005e94:	02a12e23          	sw	a0,60(sp)
+
+		if( ( uxReturn & eventUNBLOCKED_DUE_TO_BIT_SET ) == ( EventBits_t ) 0 )
 80005e98:	03c12703          	lw	a4,60(sp)
 80005e9c:	020007b7          	lui	a5,0x2000
 80005ea0:	00f777b3          	and	a5,a4,a5
 80005ea4:	04079c63          	bnez	a5,80005efc <xEventGroupWaitBits+0x1e4>
+		{
+			taskENTER_CRITICAL();
 80005ea8:	82dfe0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+			{
+				/* The task timed out, just return the current event bit value. */
+				uxReturn = pxEventBits->uxEventBits;
 80005eac:	03412783          	lw	a5,52(sp)
 80005eb0:	0007a783          	lw	a5,0(a5) # 2000000 <_HEAP_SIZE+0x1fff000>
 80005eb4:	02f12e23          	sw	a5,60(sp)
+
+				/* It is possible that the event bits were updated between this
+				task leaving the Blocked state and running again. */
+				if( prvTestWaitCondition( uxReturn, uxBitsToWaitFor, xWaitForAllBits ) != pdFALSE )
 80005eb8:	01012603          	lw	a2,16(sp)
 80005ebc:	01812583          	lw	a1,24(sp)
 80005ec0:	03c12503          	lw	a0,60(sp)
 80005ec4:	3b4000ef          	jal	ra,80006278 <prvTestWaitCondition>
 80005ec8:	00050793          	mv	a5,a0
 80005ecc:	02078463          	beqz	a5,80005ef4 <xEventGroupWaitBits+0x1dc>
+				{
+					if( xClearOnExit != pdFALSE )
 80005ed0:	01412783          	lw	a5,20(sp)
 80005ed4:	02078063          	beqz	a5,80005ef4 <xEventGroupWaitBits+0x1dc>
+					{
+						pxEventBits->uxEventBits &= ~uxBitsToWaitFor;
 80005ed8:	03412783          	lw	a5,52(sp)
 80005edc:	0007a703          	lw	a4,0(a5)
 80005ee0:	01812783          	lw	a5,24(sp)
@@ -6335,40 +11221,82 @@ Disassembly of section .text:
 80005ee8:	00f77733          	and	a4,a4,a5
 80005eec:	03412783          	lw	a5,52(sp)
 80005ef0:	00e7a023          	sw	a4,0(a5)
+				else
+				{
+					mtCOVERAGE_TEST_MARKER();
+				}
+			}
+			taskEXIT_CRITICAL();
 80005ef4:	821fe0ef          	jal	ra,80004714 <vTaskExitCritical>
+
+			/* Prevent compiler warnings when trace macros are not used. */
+			xTimeoutOccurred = pdFALSE;
 80005ef8:	02012823          	sw	zero,48(sp)
+		{
+			/* The task unblocked because the bits were set. */
+		}
+
+		/* The task blocked so control bits may have been set. */
+		uxReturn &= ~eventEVENT_BITS_CONTROL_BYTES;
 80005efc:	03c12703          	lw	a4,60(sp)
 80005f00:	010007b7          	lui	a5,0x1000
 80005f04:	fff78793          	addi	a5,a5,-1 # ffffff <_HEAP_SIZE+0xffefff>
 80005f08:	00f777b3          	and	a5,a4,a5
 80005f0c:	02f12e23          	sw	a5,60(sp)
+	}
+	traceEVENT_GROUP_WAIT_BITS_END( xEventGroup, uxBitsToWaitFor, xTimeoutOccurred );
+
+	return uxReturn;
 80005f10:	03c12783          	lw	a5,60(sp)
+}
 80005f14:	00078513          	mv	a0,a5
 80005f18:	04c12083          	lw	ra,76(sp)
 80005f1c:	05010113          	addi	sp,sp,80
 80005f20:	00008067          	ret
 
 80005f24 <xEventGroupClearBits>:
+/*-----------------------------------------------------------*/
+
+EventBits_t xEventGroupClearBits( EventGroupHandle_t xEventGroup, const EventBits_t uxBitsToClear )
+{
 80005f24:	fd010113          	addi	sp,sp,-48
 80005f28:	02112623          	sw	ra,44(sp)
 80005f2c:	00a12623          	sw	a0,12(sp)
 80005f30:	00b12423          	sw	a1,8(sp)
+EventGroup_t *pxEventBits = ( EventGroup_t * ) xEventGroup;
 80005f34:	00c12783          	lw	a5,12(sp)
 80005f38:	00f12e23          	sw	a5,28(sp)
+EventBits_t uxReturn;
+
+	/* Check the user is not attempting to clear the bits used by the kernel
+	itself. */
+	configASSERT( xEventGroup );
 80005f3c:	00c12783          	lw	a5,12(sp)
 80005f40:	00079663          	bnez	a5,80005f4c <xEventGroupClearBits+0x28>
-80005f44:	30047073          	csrci	mstatus,8
+80005f44:	30007073          	csrci	mstatus,0
 80005f48:	0000006f          	j	80005f48 <xEventGroupClearBits+0x24>
+	configASSERT( ( uxBitsToClear & eventEVENT_BITS_CONTROL_BYTES ) == 0 );
 80005f4c:	00812703          	lw	a4,8(sp)
 80005f50:	ff0007b7          	lui	a5,0xff000
 80005f54:	00f777b3          	and	a5,a4,a5
 80005f58:	00078663          	beqz	a5,80005f64 <xEventGroupClearBits+0x40>
-80005f5c:	30047073          	csrci	mstatus,8
+80005f5c:	30007073          	csrci	mstatus,0
 80005f60:	0000006f          	j	80005f60 <xEventGroupClearBits+0x3c>
+
+	taskENTER_CRITICAL();
 80005f64:	f70fe0ef          	jal	ra,800046d4 <vTaskEnterCritical>
+	{
+		traceEVENT_GROUP_CLEAR_BITS( xEventGroup, uxBitsToClear );
+
+		/* The value returned is the event group value prior to the bits being
+		cleared. */
+		uxReturn = pxEventBits->uxEventBits;
 80005f68:	01c12783          	lw	a5,28(sp)
 80005f6c:	0007a783          	lw	a5,0(a5) # ff000000 <__stack+0x7efc33f4>
 80005f70:	00f12c23          	sw	a5,24(sp)
+
+		/* Clear the bits. */
+		pxEventBits->uxEventBits &= ~uxBitsToClear;
 80005f74:	01c12783          	lw	a5,28(sp)
 80005f78:	0007a703          	lw	a4,0(a5)
 80005f7c:	00812783          	lw	a5,8(sp)
@@ -6376,116 +11304,209 @@ Disassembly of section .text:
 80005f84:	00f77733          	and	a4,a4,a5
 80005f88:	01c12783          	lw	a5,28(sp)
 80005f8c:	00e7a023          	sw	a4,0(a5)
+	}
+	taskEXIT_CRITICAL();
 80005f90:	f84fe0ef          	jal	ra,80004714 <vTaskExitCritical>
+
+	return uxReturn;
 80005f94:	01812783          	lw	a5,24(sp)
+}
 80005f98:	00078513          	mv	a0,a5
 80005f9c:	02c12083          	lw	ra,44(sp)
 80005fa0:	03010113          	addi	sp,sp,48
 80005fa4:	00008067          	ret
 
 80005fa8 <xEventGroupGetBitsFromISR>:
+
+#endif
+/*-----------------------------------------------------------*/
+
+EventBits_t xEventGroupGetBitsFromISR( EventGroupHandle_t xEventGroup )
+{
 80005fa8:	fd010113          	addi	sp,sp,-48
 80005fac:	02112623          	sw	ra,44(sp)
 80005fb0:	00a12623          	sw	a0,12(sp)
+UBaseType_t uxSavedInterruptStatus;
+EventGroup_t *pxEventBits = ( EventGroup_t * ) xEventGroup;
 80005fb4:	00c12783          	lw	a5,12(sp)
 80005fb8:	00f12e23          	sw	a5,28(sp)
+EventBits_t uxReturn;
+
+	uxSavedInterruptStatus = portSET_INTERRUPT_MASK_FROM_ISR();
 80005fbc:	fe8fa0ef          	jal	ra,800007a4 <vPortSetInterruptMask>
 80005fc0:	00050793          	mv	a5,a0
 80005fc4:	00f12c23          	sw	a5,24(sp)
+	{
+		uxReturn = pxEventBits->uxEventBits;
 80005fc8:	01c12783          	lw	a5,28(sp)
 80005fcc:	0007a783          	lw	a5,0(a5)
 80005fd0:	00f12a23          	sw	a5,20(sp)
+	}
+	portCLEAR_INTERRUPT_MASK_FROM_ISR( uxSavedInterruptStatus );
 80005fd4:	01812783          	lw	a5,24(sp)
 80005fd8:	00078513          	mv	a0,a5
 80005fdc:	facfa0ef          	jal	ra,80000788 <vPortClearInterruptMask>
+
+	return uxReturn;
 80005fe0:	01412783          	lw	a5,20(sp)
+}
 80005fe4:	00078513          	mv	a0,a5
 80005fe8:	02c12083          	lw	ra,44(sp)
 80005fec:	03010113          	addi	sp,sp,48
 80005ff0:	00008067          	ret
 
 80005ff4 <xEventGroupSetBits>:
+/*-----------------------------------------------------------*/
+
+EventBits_t xEventGroupSetBits( EventGroupHandle_t xEventGroup, const EventBits_t uxBitsToSet )
+{
 80005ff4:	fb010113          	addi	sp,sp,-80
 80005ff8:	04112623          	sw	ra,76(sp)
 80005ffc:	00a12623          	sw	a0,12(sp)
 80006000:	00b12423          	sw	a1,8(sp)
+ListItem_t *pxListItem, *pxNext;
+ListItem_t const *pxListEnd;
+List_t *pxList;
+EventBits_t uxBitsToClear = 0, uxBitsWaitedFor, uxControlBits;
 80006004:	02012c23          	sw	zero,56(sp)
+EventGroup_t *pxEventBits = ( EventGroup_t * ) xEventGroup;
 80006008:	00c12783          	lw	a5,12(sp)
 8000600c:	02f12823          	sw	a5,48(sp)
+BaseType_t xMatchFound = pdFALSE;
 80006010:	02012a23          	sw	zero,52(sp)
+
+	/* Check the user is not attempting to set the bits used by the kernel
+	itself. */
+	configASSERT( xEventGroup );
 80006014:	00c12783          	lw	a5,12(sp)
 80006018:	00079663          	bnez	a5,80006024 <xEventGroupSetBits+0x30>
-8000601c:	30047073          	csrci	mstatus,8
+8000601c:	30007073          	csrci	mstatus,0
 80006020:	0000006f          	j	80006020 <xEventGroupSetBits+0x2c>
+	configASSERT( ( uxBitsToSet & eventEVENT_BITS_CONTROL_BYTES ) == 0 );
 80006024:	00812703          	lw	a4,8(sp)
 80006028:	ff0007b7          	lui	a5,0xff000
 8000602c:	00f777b3          	and	a5,a4,a5
 80006030:	00078663          	beqz	a5,8000603c <xEventGroupSetBits+0x48>
-80006034:	30047073          	csrci	mstatus,8
+80006034:	30007073          	csrci	mstatus,0
 80006038:	0000006f          	j	80006038 <xEventGroupSetBits+0x44>
+
+	pxList = &( pxEventBits->xTasksWaitingForBits );
 8000603c:	03012783          	lw	a5,48(sp)
 80006040:	00478793          	addi	a5,a5,4 # ff000004 <__stack+0x7efc33f8>
 80006044:	02f12623          	sw	a5,44(sp)
+	pxListEnd = listGET_END_MARKER( pxList ); /*lint !e826 !e740 The mini list structure is used as the list end to save RAM.  This is checked and valid. */
 80006048:	02c12783          	lw	a5,44(sp)
 8000604c:	00878793          	addi	a5,a5,8
 80006050:	02f12423          	sw	a5,40(sp)
+	vTaskSuspendAll();
 80006054:	d1dfc0ef          	jal	ra,80002d70 <vTaskSuspendAll>
+	{
+		traceEVENT_GROUP_SET_BITS( xEventGroup, uxBitsToSet );
+
+		pxListItem = listGET_HEAD_ENTRY( pxList );
 80006058:	02c12783          	lw	a5,44(sp)
 8000605c:	00c7a783          	lw	a5,12(a5)
 80006060:	02f12e23          	sw	a5,60(sp)
+
+		/* Set the bits. */
+		pxEventBits->uxEventBits |= uxBitsToSet;
 80006064:	03012783          	lw	a5,48(sp)
 80006068:	0007a703          	lw	a4,0(a5)
 8000606c:	00812783          	lw	a5,8(sp)
 80006070:	00f76733          	or	a4,a4,a5
 80006074:	03012783          	lw	a5,48(sp)
 80006078:	00e7a023          	sw	a4,0(a5)
+
+		/* See if the new bit value should unblock any tasks. */
+		while( pxListItem != pxListEnd )
 8000607c:	0e00006f          	j	8000615c <xEventGroupSetBits+0x168>
+		{
+			pxNext = listGET_NEXT( pxListItem );
 80006080:	03c12783          	lw	a5,60(sp)
 80006084:	0047a783          	lw	a5,4(a5)
 80006088:	02f12223          	sw	a5,36(sp)
+			uxBitsWaitedFor = listGET_LIST_ITEM_VALUE( pxListItem );
 8000608c:	03c12783          	lw	a5,60(sp)
 80006090:	0007a783          	lw	a5,0(a5)
 80006094:	02f12023          	sw	a5,32(sp)
+			xMatchFound = pdFALSE;
 80006098:	02012a23          	sw	zero,52(sp)
+
+			/* Split the bits waited for from the control bits. */
+			uxControlBits = uxBitsWaitedFor & eventEVENT_BITS_CONTROL_BYTES;
 8000609c:	02012703          	lw	a4,32(sp)
 800060a0:	ff0007b7          	lui	a5,0xff000
 800060a4:	00f777b3          	and	a5,a4,a5
 800060a8:	00f12e23          	sw	a5,28(sp)
+			uxBitsWaitedFor &= ~eventEVENT_BITS_CONTROL_BYTES;
 800060ac:	02012703          	lw	a4,32(sp)
 800060b0:	010007b7          	lui	a5,0x1000
 800060b4:	fff78793          	addi	a5,a5,-1 # ffffff <_HEAP_SIZE+0xffefff>
 800060b8:	00f777b3          	and	a5,a4,a5
 800060bc:	02f12023          	sw	a5,32(sp)
+
+			if( ( uxControlBits & eventWAIT_FOR_ALL_BITS ) == ( EventBits_t ) 0 )
 800060c0:	01c12703          	lw	a4,28(sp)
 800060c4:	040007b7          	lui	a5,0x4000
 800060c8:	00f777b3          	and	a5,a4,a5
 800060cc:	02079263          	bnez	a5,800060f0 <xEventGroupSetBits+0xfc>
+			{
+				/* Just looking for single bit being set. */
+				if( ( uxBitsWaitedFor & pxEventBits->uxEventBits ) != ( EventBits_t ) 0 )
 800060d0:	03012783          	lw	a5,48(sp)
 800060d4:	0007a703          	lw	a4,0(a5) # 4000000 <_HEAP_SIZE+0x3fff000>
 800060d8:	02012783          	lw	a5,32(sp)
 800060dc:	00f777b3          	and	a5,a4,a5
 800060e0:	02078863          	beqz	a5,80006110 <xEventGroupSetBits+0x11c>
+				{
+					xMatchFound = pdTRUE;
 800060e4:	00100793          	li	a5,1
 800060e8:	02f12a23          	sw	a5,52(sp)
 800060ec:	0240006f          	j	80006110 <xEventGroupSetBits+0x11c>
+				else
+				{
+					mtCOVERAGE_TEST_MARKER();
+				}
+			}
+			else if( ( uxBitsWaitedFor & pxEventBits->uxEventBits ) == uxBitsWaitedFor )
 800060f0:	03012783          	lw	a5,48(sp)
 800060f4:	0007a703          	lw	a4,0(a5)
 800060f8:	02012783          	lw	a5,32(sp)
 800060fc:	00f777b3          	and	a5,a4,a5
 80006100:	02012703          	lw	a4,32(sp)
 80006104:	00f71663          	bne	a4,a5,80006110 <xEventGroupSetBits+0x11c>
+			{
+				/* All bits are set. */
+				xMatchFound = pdTRUE;
 80006108:	00100793          	li	a5,1
 8000610c:	02f12a23          	sw	a5,52(sp)
+			else
+			{
+				/* Need all bits to be set, but not all the bits were set. */
+			}
+
+			if( xMatchFound != pdFALSE )
 80006110:	03412783          	lw	a5,52(sp)
 80006114:	04078063          	beqz	a5,80006154 <xEventGroupSetBits+0x160>
+			{
+				/* The bits match.  Should the bits be cleared on exit? */
+				if( ( uxControlBits & eventCLEAR_EVENTS_ON_EXIT_BIT ) != ( EventBits_t ) 0 )
 80006118:	01c12703          	lw	a4,28(sp)
 8000611c:	010007b7          	lui	a5,0x1000
 80006120:	00f777b3          	and	a5,a4,a5
 80006124:	00078a63          	beqz	a5,80006138 <xEventGroupSetBits+0x144>
+				{
+					uxBitsToClear |= uxBitsWaitedFor;
 80006128:	03812703          	lw	a4,56(sp)
 8000612c:	02012783          	lw	a5,32(sp)
 80006130:	00f767b3          	or	a5,a4,a5
 80006134:	02f12c23          	sw	a5,56(sp)
+				/* Store the actual event flag value in the task's event list
+				item before removing the task from the event list.  The
+				eventUNBLOCKED_DUE_TO_BIT_SET bit is set so the task knows
+				that is was unblocked due to its required bits matching, rather
+				than because it timed out. */
+				( void ) xTaskRemoveFromUnorderedEventList( pxListItem, pxEventBits->uxEventBits | eventUNBLOCKED_DUE_TO_BIT_SET );
 80006138:	03012783          	lw	a5,48(sp)
 8000613c:	0007a703          	lw	a4,0(a5) # 1000000 <_HEAP_SIZE+0xfff000>
 80006140:	020007b7          	lui	a5,0x2000
@@ -6493,11 +11514,23 @@ Disassembly of section .text:
 80006148:	00078593          	mv	a1,a5
 8000614c:	03c12503          	lw	a0,60(sp)
 80006150:	825fd0ef          	jal	ra,80003974 <xTaskRemoveFromUnorderedEventList>
+			}
+
+			/* Move onto the next list item.  Note pxListItem->pxNext is not
+			used here as the list item may have been removed from the event list
+			and inserted into the ready/pending reading list. */
+			pxListItem = pxNext;
 80006154:	02412783          	lw	a5,36(sp)
 80006158:	02f12e23          	sw	a5,60(sp)
+		while( pxListItem != pxListEnd )
 8000615c:	03c12703          	lw	a4,60(sp)
 80006160:	02812783          	lw	a5,40(sp)
 80006164:	f0f71ee3          	bne	a4,a5,80006080 <xEventGroupSetBits+0x8c>
+		}
+
+		/* Clear any bits that matched when the eventCLEAR_EVENTS_ON_EXIT_BIT
+		bit was set in the control word. */
+		pxEventBits->uxEventBits &= ~uxBitsToClear;
 80006168:	03012783          	lw	a5,48(sp)
 8000616c:	0007a703          	lw	a4,0(a5) # 2000000 <_HEAP_SIZE+0x1fff000>
 80006170:	03812783          	lw	a5,56(sp)
@@ -6505,166 +11538,304 @@ Disassembly of section .text:
 80006178:	00f77733          	and	a4,a4,a5
 8000617c:	03012783          	lw	a5,48(sp)
 80006180:	00e7a023          	sw	a4,0(a5)
+	}
+	( void ) xTaskResumeAll();
 80006184:	c11fc0ef          	jal	ra,80002d94 <xTaskResumeAll>
+
+	return pxEventBits->uxEventBits;
 80006188:	03012783          	lw	a5,48(sp)
 8000618c:	0007a783          	lw	a5,0(a5)
+}
 80006190:	00078513          	mv	a0,a5
 80006194:	04c12083          	lw	ra,76(sp)
 80006198:	05010113          	addi	sp,sp,80
 8000619c:	00008067          	ret
 
 800061a0 <vEventGroupDelete>:
+/*-----------------------------------------------------------*/
+
+void vEventGroupDelete( EventGroupHandle_t xEventGroup )
+{
 800061a0:	fd010113          	addi	sp,sp,-48
 800061a4:	02112623          	sw	ra,44(sp)
 800061a8:	00a12623          	sw	a0,12(sp)
+EventGroup_t *pxEventBits = ( EventGroup_t * ) xEventGroup;
 800061ac:	00c12783          	lw	a5,12(sp)
 800061b0:	00f12e23          	sw	a5,28(sp)
+const List_t *pxTasksWaitingForBits = &( pxEventBits->xTasksWaitingForBits );
 800061b4:	01c12783          	lw	a5,28(sp)
 800061b8:	00478793          	addi	a5,a5,4
 800061bc:	00f12c23          	sw	a5,24(sp)
+
+	vTaskSuspendAll();
 800061c0:	bb1fc0ef          	jal	ra,80002d70 <vTaskSuspendAll>
+	{
+		traceEVENT_GROUP_DELETE( xEventGroup );
+
+		while( listCURRENT_LIST_LENGTH( pxTasksWaitingForBits ) > ( UBaseType_t ) 0 )
 800061c4:	0340006f          	j	800061f8 <vEventGroupDelete+0x58>
+		{
+			/* Unblock the task, returning 0 as the event list is being deleted
+			and	cannot therefore have any bits set. */
+			configASSERT( pxTasksWaitingForBits->xListEnd.pxNext != ( ListItem_t * ) &( pxTasksWaitingForBits->xListEnd ) );
 800061c8:	01812783          	lw	a5,24(sp)
 800061cc:	00c7a703          	lw	a4,12(a5)
 800061d0:	01812783          	lw	a5,24(sp)
 800061d4:	00878793          	addi	a5,a5,8
 800061d8:	00f71663          	bne	a4,a5,800061e4 <vEventGroupDelete+0x44>
-800061dc:	30047073          	csrci	mstatus,8
+800061dc:	30007073          	csrci	mstatus,0
 800061e0:	0000006f          	j	800061e0 <vEventGroupDelete+0x40>
+			( void ) xTaskRemoveFromUnorderedEventList( pxTasksWaitingForBits->xListEnd.pxNext, eventUNBLOCKED_DUE_TO_BIT_SET );
 800061e4:	01812783          	lw	a5,24(sp)
 800061e8:	00c7a783          	lw	a5,12(a5)
 800061ec:	020005b7          	lui	a1,0x2000
 800061f0:	00078513          	mv	a0,a5
 800061f4:	f80fd0ef          	jal	ra,80003974 <xTaskRemoveFromUnorderedEventList>
+		while( listCURRENT_LIST_LENGTH( pxTasksWaitingForBits ) > ( UBaseType_t ) 0 )
 800061f8:	01812783          	lw	a5,24(sp)
 800061fc:	0007a783          	lw	a5,0(a5)
 80006200:	fc0794e3          	bnez	a5,800061c8 <vEventGroupDelete+0x28>
+		}
+
+		vPortFree( pxEventBits );
 80006204:	01c12503          	lw	a0,28(sp)
 80006208:	30c000ef          	jal	ra,80006514 <vPortFree>
+	}
+	( void ) xTaskResumeAll();
 8000620c:	b89fc0ef          	jal	ra,80002d94 <xTaskResumeAll>
+}
 80006210:	00000013          	nop
 80006214:	02c12083          	lw	ra,44(sp)
 80006218:	03010113          	addi	sp,sp,48
 8000621c:	00008067          	ret
 
 80006220 <vEventGroupSetBitsCallback>:
+/*-----------------------------------------------------------*/
+
+/* For internal use only - execute a 'set bits' command that was pended from
+an interrupt. */
+void vEventGroupSetBitsCallback( void *pvEventGroup, const uint32_t ulBitsToSet )
+{
 80006220:	fe010113          	addi	sp,sp,-32
 80006224:	00112e23          	sw	ra,28(sp)
 80006228:	00a12623          	sw	a0,12(sp)
 8000622c:	00b12423          	sw	a1,8(sp)
+	( void ) xEventGroupSetBits( pvEventGroup, ( EventBits_t ) ulBitsToSet );
 80006230:	00812583          	lw	a1,8(sp)
 80006234:	00c12503          	lw	a0,12(sp)
 80006238:	dbdff0ef          	jal	ra,80005ff4 <xEventGroupSetBits>
+}
 8000623c:	00000013          	nop
 80006240:	01c12083          	lw	ra,28(sp)
 80006244:	02010113          	addi	sp,sp,32
 80006248:	00008067          	ret
 
 8000624c <vEventGroupClearBitsCallback>:
+/*-----------------------------------------------------------*/
+
+/* For internal use only - execute a 'clear bits' command that was pended from
+an interrupt. */
+void vEventGroupClearBitsCallback( void *pvEventGroup, const uint32_t ulBitsToClear )
+{
 8000624c:	fe010113          	addi	sp,sp,-32
 80006250:	00112e23          	sw	ra,28(sp)
 80006254:	00a12623          	sw	a0,12(sp)
 80006258:	00b12423          	sw	a1,8(sp)
+	( void ) xEventGroupClearBits( pvEventGroup, ( EventBits_t ) ulBitsToClear );
 8000625c:	00812583          	lw	a1,8(sp)
 80006260:	00c12503          	lw	a0,12(sp)
 80006264:	cc1ff0ef          	jal	ra,80005f24 <xEventGroupClearBits>
+}
 80006268:	00000013          	nop
 8000626c:	01c12083          	lw	ra,28(sp)
 80006270:	02010113          	addi	sp,sp,32
 80006274:	00008067          	ret
 
 80006278 <prvTestWaitCondition>:
+/*-----------------------------------------------------------*/
+
+static BaseType_t prvTestWaitCondition( const EventBits_t uxCurrentEventBits, const EventBits_t uxBitsToWaitFor, const BaseType_t xWaitForAllBits )
+{
 80006278:	fe010113          	addi	sp,sp,-32
 8000627c:	00a12623          	sw	a0,12(sp)
 80006280:	00b12423          	sw	a1,8(sp)
 80006284:	00c12223          	sw	a2,4(sp)
+BaseType_t xWaitConditionMet = pdFALSE;
 80006288:	00012e23          	sw	zero,28(sp)
+
+	if( xWaitForAllBits == pdFALSE )
 8000628c:	00412783          	lw	a5,4(sp)
 80006290:	02079063          	bnez	a5,800062b0 <prvTestWaitCondition+0x38>
+	{
+		/* Task only has to wait for one bit within uxBitsToWaitFor to be
+		set.  Is one already set? */
+		if( ( uxCurrentEventBits & uxBitsToWaitFor ) != ( EventBits_t ) 0 )
 80006294:	00c12703          	lw	a4,12(sp)
 80006298:	00812783          	lw	a5,8(sp)
 8000629c:	00f777b3          	and	a5,a4,a5
 800062a0:	02078663          	beqz	a5,800062cc <prvTestWaitCondition+0x54>
+		{
+			xWaitConditionMet = pdTRUE;
 800062a4:	00100793          	li	a5,1
 800062a8:	00f12e23          	sw	a5,28(sp)
 800062ac:	0200006f          	j	800062cc <prvTestWaitCondition+0x54>
+	}
+	else
+	{
+		/* Task has to wait for all the bits in uxBitsToWaitFor to be set.
+		Are they set already? */
+		if( ( uxCurrentEventBits & uxBitsToWaitFor ) == uxBitsToWaitFor )
 800062b0:	00c12703          	lw	a4,12(sp)
 800062b4:	00812783          	lw	a5,8(sp)
 800062b8:	00f777b3          	and	a5,a4,a5
 800062bc:	00812703          	lw	a4,8(sp)
 800062c0:	00f71663          	bne	a4,a5,800062cc <prvTestWaitCondition+0x54>
+		{
+			xWaitConditionMet = pdTRUE;
 800062c4:	00100793          	li	a5,1
 800062c8:	00f12e23          	sw	a5,28(sp)
+		{
+			mtCOVERAGE_TEST_MARKER();
+		}
+	}
+
+	return xWaitConditionMet;
 800062cc:	01c12783          	lw	a5,28(sp)
+}
 800062d0:	00078513          	mv	a0,a5
 800062d4:	02010113          	addi	sp,sp,32
 800062d8:	00008067          	ret
 
 800062dc <uxEventGroupGetNumber>:
+/*-----------------------------------------------------------*/
+
+#if (configUSE_TRACE_FACILITY == 1)
+
+	UBaseType_t uxEventGroupGetNumber( void* xEventGroup )
+	{
 800062dc:	fe010113          	addi	sp,sp,-32
 800062e0:	00a12623          	sw	a0,12(sp)
+	UBaseType_t xReturn;
+	EventGroup_t *pxEventBits = ( EventGroup_t * ) xEventGroup;
 800062e4:	00c12783          	lw	a5,12(sp)
 800062e8:	00f12c23          	sw	a5,24(sp)
+
+		if( xEventGroup == NULL )
 800062ec:	00c12783          	lw	a5,12(sp)
 800062f0:	00079663          	bnez	a5,800062fc <uxEventGroupGetNumber+0x20>
+		{
+			xReturn = 0;
 800062f4:	00012e23          	sw	zero,28(sp)
 800062f8:	0100006f          	j	80006308 <uxEventGroupGetNumber+0x2c>
+		}
+		else
+		{
+			xReturn = pxEventBits->uxEventGroupNumber;
 800062fc:	01812783          	lw	a5,24(sp)
 80006300:	0187a783          	lw	a5,24(a5)
 80006304:	00f12e23          	sw	a5,28(sp)
+		}
+
+		return xReturn;
 80006308:	01c12783          	lw	a5,28(sp)
+	}
 8000630c:	00078513          	mv	a0,a5
 80006310:	02010113          	addi	sp,sp,32
 80006314:	00008067          	ret
 
 80006318 <pvPortMalloc>:
+}
+/*-----------------------------------------------------------*/
+
+
+void *pvPortMalloc( size_t xWantedSize )
+{
 80006318:	fc010113          	addi	sp,sp,-64
 8000631c:	02112e23          	sw	ra,60(sp)
 80006320:	00a12623          	sw	a0,12(sp)
+BlockLink_t *pxBlock, *pxPreviousBlock, *pxNewBlockLink;
+static BaseType_t xHeapHasBeenInitialised = pdFALSE;
+void *pvReturn = NULL;
 80006324:	02012223          	sw	zero,36(sp)
+
+	vTaskSuspendAll();
 80006328:	a49fc0ef          	jal	ra,80002d70 <vTaskSuspendAll>
+	{
+		/* If this is the first call to malloc then the heap will require
+		initialisation to setup the list of free blocks. */
+		if( xHeapHasBeenInitialised == pdFALSE )
 8000632c:	00034797          	auipc	a5,0x34
 80006330:	79478793          	addi	a5,a5,1940 # 8003aac0 <xHeapHasBeenInitialised.1813>
 80006334:	0007a783          	lw	a5,0(a5)
 80006338:	00079c63          	bnez	a5,80006350 <pvPortMalloc+0x38>
+		{
+			prvHeapInit();
 8000633c:	2c0000ef          	jal	ra,800065fc <prvHeapInit>
+			xHeapHasBeenInitialised = pdTRUE;
 80006340:	00034797          	auipc	a5,0x34
 80006344:	78078793          	addi	a5,a5,1920 # 8003aac0 <xHeapHasBeenInitialised.1813>
 80006348:	00100713          	li	a4,1
 8000634c:	00e7a023          	sw	a4,0(a5)
+		}
+
+		/* The wanted size is increased so it can contain a BlockLink_t
+		structure in addition to the requested amount of bytes. */
+		if( xWantedSize > 0 )
 80006350:	00c12783          	lw	a5,12(sp)
 80006354:	02078a63          	beqz	a5,80006388 <pvPortMalloc+0x70>
+		{
+			xWantedSize += heapSTRUCT_SIZE;
 80006358:	00800793          	li	a5,8
 8000635c:	00078713          	mv	a4,a5
 80006360:	00c12783          	lw	a5,12(sp)
 80006364:	00e787b3          	add	a5,a5,a4
 80006368:	00f12623          	sw	a5,12(sp)
+
+			/* Ensure that blocks are always aligned to the required number of bytes. */
+			if( ( xWantedSize & portBYTE_ALIGNMENT_MASK ) != 0 )
 8000636c:	00c12783          	lw	a5,12(sp)
 80006370:	0037f793          	andi	a5,a5,3
 80006374:	00078a63          	beqz	a5,80006388 <pvPortMalloc+0x70>
+			{
+				/* Byte alignment required. */
+				xWantedSize += ( portBYTE_ALIGNMENT - ( xWantedSize & portBYTE_ALIGNMENT_MASK ) );
 80006378:	00c12783          	lw	a5,12(sp)
 8000637c:	ffc7f793          	andi	a5,a5,-4
 80006380:	00478793          	addi	a5,a5,4
 80006384:	00f12623          	sw	a5,12(sp)
+			}
+		}
+
+		if( ( xWantedSize > 0 ) && ( xWantedSize < configADJUSTED_HEAP_SIZE ) )
 80006388:	00c12783          	lw	a5,12(sp)
 8000638c:	16078263          	beqz	a5,800064f0 <pvPortMalloc+0x1d8>
 80006390:	00c12703          	lw	a4,12(sp)
 80006394:	000197b7          	lui	a5,0x19
 80006398:	ffb78793          	addi	a5,a5,-5 # 18ffb <_HEAP_SIZE+0x17ffb>
 8000639c:	14e7ea63          	bltu	a5,a4,800064f0 <pvPortMalloc+0x1d8>
+		{
+			/* Blocks are stored in byte order - traverse the list from the start
+			(smallest) block until one of adequate size is found. */
+			pxPreviousBlock = &xStart;
 800063a0:	00034797          	auipc	a5,0x34
 800063a4:	71078793          	addi	a5,a5,1808 # 8003aab0 <xStart>
 800063a8:	02f12423          	sw	a5,40(sp)
+			pxBlock = xStart.pxNextFreeBlock;
 800063ac:	00034797          	auipc	a5,0x34
 800063b0:	70478793          	addi	a5,a5,1796 # 8003aab0 <xStart>
 800063b4:	0007a783          	lw	a5,0(a5)
 800063b8:	02f12623          	sw	a5,44(sp)
+			while( ( pxBlock->xBlockSize < xWantedSize ) && ( pxBlock->pxNextFreeBlock != NULL ) )
 800063bc:	0180006f          	j	800063d4 <pvPortMalloc+0xbc>
+			{
+				pxPreviousBlock = pxBlock;
 800063c0:	02c12783          	lw	a5,44(sp)
 800063c4:	02f12423          	sw	a5,40(sp)
+				pxBlock = pxBlock->pxNextFreeBlock;
 800063c8:	02c12783          	lw	a5,44(sp)
 800063cc:	0007a783          	lw	a5,0(a5)
 800063d0:	02f12623          	sw	a5,44(sp)
+			while( ( pxBlock->xBlockSize < xWantedSize ) && ( pxBlock->pxNextFreeBlock != NULL ) )
 800063d4:	02c12783          	lw	a5,44(sp)
 800063d8:	0047a783          	lw	a5,4(a5)
 800063dc:	00c12703          	lw	a4,12(sp)
@@ -6672,19 +11843,34 @@ Disassembly of section .text:
 800063e4:	02c12783          	lw	a5,44(sp)
 800063e8:	0007a783          	lw	a5,0(a5)
 800063ec:	fc079ae3          	bnez	a5,800063c0 <pvPortMalloc+0xa8>
+			}
+
+			/* If we found the end marker then a block of adequate size was not found. */
+			if( pxBlock != &xEnd )
 800063f0:	02c12703          	lw	a4,44(sp)
 800063f4:	00034797          	auipc	a5,0x34
 800063f8:	6c478793          	addi	a5,a5,1732 # 8003aab8 <xEnd>
 800063fc:	0ef70a63          	beq	a4,a5,800064f0 <pvPortMalloc+0x1d8>
+			{
+				/* Return the memory space - jumping over the BlockLink_t structure
+				at its start. */
+				pvReturn = ( void * ) ( ( ( uint8_t * ) pxPreviousBlock->pxNextFreeBlock ) + heapSTRUCT_SIZE );
 80006400:	02812783          	lw	a5,40(sp)
 80006404:	0007a783          	lw	a5,0(a5)
 80006408:	00800713          	li	a4,8
 8000640c:	00e787b3          	add	a5,a5,a4
 80006410:	02f12223          	sw	a5,36(sp)
+
+				/* This block is being returned for use so must be taken out of the
+				list of free blocks. */
+				pxPreviousBlock->pxNextFreeBlock = pxBlock->pxNextFreeBlock;
 80006414:	02c12783          	lw	a5,44(sp)
 80006418:	0007a703          	lw	a4,0(a5)
 8000641c:	02812783          	lw	a5,40(sp)
 80006420:	00e7a023          	sw	a4,0(a5)
+
+				/* If the block is larger than required it can be split into two. */
+				if( ( pxBlock->xBlockSize - xWantedSize ) > heapMINIMUM_BLOCK_SIZE )
 80006424:	02c12783          	lw	a5,44(sp)
 80006428:	0047a703          	lw	a4,4(a5)
 8000642c:	00c12783          	lw	a5,12(sp)
@@ -6692,19 +11878,32 @@ Disassembly of section .text:
 80006434:	00800713          	li	a4,8
 80006438:	00171713          	slli	a4,a4,0x1
 8000643c:	08f77863          	bleu	a5,a4,800064cc <pvPortMalloc+0x1b4>
+				{
+					/* This block is to be split into two.  Create a new block
+					following the number of bytes requested. The void cast is
+					used to prevent byte alignment warnings from the compiler. */
+					pxNewBlockLink = ( void * ) ( ( ( uint8_t * ) pxBlock ) + xWantedSize );
 80006440:	02c12703          	lw	a4,44(sp)
 80006444:	00c12783          	lw	a5,12(sp)
 80006448:	00f707b3          	add	a5,a4,a5
 8000644c:	00f12e23          	sw	a5,28(sp)
+
+					/* Calculate the sizes of two blocks split from the single
+					block. */
+					pxNewBlockLink->xBlockSize = pxBlock->xBlockSize - xWantedSize;
 80006450:	02c12783          	lw	a5,44(sp)
 80006454:	0047a703          	lw	a4,4(a5)
 80006458:	00c12783          	lw	a5,12(sp)
 8000645c:	40f70733          	sub	a4,a4,a5
 80006460:	01c12783          	lw	a5,28(sp)
 80006464:	00e7a223          	sw	a4,4(a5)
+					pxBlock->xBlockSize = xWantedSize;
 80006468:	02c12783          	lw	a5,44(sp)
 8000646c:	00c12703          	lw	a4,12(sp)
 80006470:	00e7a223          	sw	a4,4(a5)
+
+					/* Insert the new block into the list of free blocks. */
+					prvInsertBlockIntoFreeList( ( pxNewBlockLink ) );
 80006474:	01c12783          	lw	a5,28(sp)
 80006478:	0047a783          	lw	a5,4(a5)
 8000647c:	00f12c23          	sw	a5,24(sp)
@@ -6727,6 +11926,9 @@ Disassembly of section .text:
 800064c0:	02012783          	lw	a5,32(sp)
 800064c4:	01c12703          	lw	a4,28(sp)
 800064c8:	00e7a023          	sw	a4,0(a5)
+				}
+
+				xFreeBytesRemaining -= pxBlock->xBlockSize;
 800064cc:	0001b797          	auipc	a5,0x1b
 800064d0:	a5478793          	addi	a5,a5,-1452 # 80020f20 <xFreeBytesRemaining>
 800064d4:	0007a703          	lw	a4,0(a5)
@@ -6736,32 +11938,72 @@ Disassembly of section .text:
 800064e4:	0001b797          	auipc	a5,0x1b
 800064e8:	a3c78793          	addi	a5,a5,-1476 # 80020f20 <xFreeBytesRemaining>
 800064ec:	00e7a023          	sw	a4,0(a5)
+			}
+		}
+
+		traceMALLOC( pvReturn, xWantedSize );
+	}
+	( void ) xTaskResumeAll();
 800064f0:	8a5fc0ef          	jal	ra,80002d94 <xTaskResumeAll>
+
+	#if( configUSE_MALLOC_FAILED_HOOK == 1 )
+	{
+		if( pvReturn == NULL )
 800064f4:	02412783          	lw	a5,36(sp)
 800064f8:	00079463          	bnez	a5,80006500 <pvPortMalloc+0x1e8>
+		{
+			extern void vApplicationMallocFailedHook( void );
+			vApplicationMallocFailedHook();
 800064fc:	62d000ef          	jal	ra,80007328 <vApplicationMallocFailedHook>
+		}
+	}
+	#endif
+
+	return pvReturn;
 80006500:	02412783          	lw	a5,36(sp)
+}
 80006504:	00078513          	mv	a0,a5
 80006508:	03c12083          	lw	ra,60(sp)
 8000650c:	04010113          	addi	sp,sp,64
 80006510:	00008067          	ret
 
 80006514 <vPortFree>:
+/*-----------------------------------------------------------*/
+
+void vPortFree( void *pv )
+{
 80006514:	fd010113          	addi	sp,sp,-48
 80006518:	02112623          	sw	ra,44(sp)
 8000651c:	00a12623          	sw	a0,12(sp)
+uint8_t *puc = ( uint8_t * ) pv;
 80006520:	00c12783          	lw	a5,12(sp)
 80006524:	00f12c23          	sw	a5,24(sp)
+BlockLink_t *pxLink;
+
+	if( pv != NULL )
 80006528:	00c12783          	lw	a5,12(sp)
 8000652c:	0a078263          	beqz	a5,800065d0 <vPortFree+0xbc>
+	{
+		/* The memory being freed will have an BlockLink_t structure immediately
+		before it. */
+		puc -= heapSTRUCT_SIZE;
 80006530:	00800793          	li	a5,8
 80006534:	40f007b3          	neg	a5,a5
 80006538:	01812703          	lw	a4,24(sp)
 8000653c:	00f707b3          	add	a5,a4,a5
 80006540:	00f12c23          	sw	a5,24(sp)
+
+		/* This unexpected casting is to keep some compilers from issuing
+		byte alignment warnings. */
+		pxLink = ( void * ) puc;
 80006544:	01812783          	lw	a5,24(sp)
 80006548:	00f12a23          	sw	a5,20(sp)
+
+		vTaskSuspendAll();
 8000654c:	825fc0ef          	jal	ra,80002d70 <vTaskSuspendAll>
+		{
+			/* Add this block to the list of free blocks. */
+			prvInsertBlockIntoFreeList( ( ( BlockLink_t * ) pxLink ) );
 80006550:	01412783          	lw	a5,20(sp)
 80006554:	0047a783          	lw	a5,4(a5)
 80006558:	00f12823          	sw	a5,16(sp)
@@ -6784,6 +12026,7 @@ Disassembly of section .text:
 8000659c:	01c12783          	lw	a5,28(sp)
 800065a0:	01412703          	lw	a4,20(sp)
 800065a4:	00e7a023          	sw	a4,0(a5)
+			xFreeBytesRemaining += pxLink->xBlockSize;
 800065a8:	01412783          	lw	a5,20(sp)
 800065ac:	0047a703          	lw	a4,4(a5)
 800065b0:	0001b797          	auipc	a5,0x1b
@@ -6793,90 +12036,152 @@ Disassembly of section .text:
 800065c0:	0001b797          	auipc	a5,0x1b
 800065c4:	96078793          	addi	a5,a5,-1696 # 80020f20 <xFreeBytesRemaining>
 800065c8:	00e7a023          	sw	a4,0(a5)
+			traceFREE( pv, pxLink->xBlockSize );
+		}
+		( void ) xTaskResumeAll();
 800065cc:	fc8fc0ef          	jal	ra,80002d94 <xTaskResumeAll>
+	}
+}
 800065d0:	00000013          	nop
 800065d4:	02c12083          	lw	ra,44(sp)
 800065d8:	03010113          	addi	sp,sp,48
 800065dc:	00008067          	ret
 
 800065e0 <xPortGetFreeHeapSize>:
+/*-----------------------------------------------------------*/
+
+size_t xPortGetFreeHeapSize( void )
+{
+	return xFreeBytesRemaining;
 800065e0:	0001b797          	auipc	a5,0x1b
 800065e4:	94078793          	addi	a5,a5,-1728 # 80020f20 <xFreeBytesRemaining>
 800065e8:	0007a783          	lw	a5,0(a5)
+}
 800065ec:	00078513          	mv	a0,a5
 800065f0:	00008067          	ret
 
 800065f4 <vPortInitialiseBlocks>:
+/*-----------------------------------------------------------*/
+
+void vPortInitialiseBlocks( void )
+{
+	/* This just exists to keep the linker quiet. */
+}
 800065f4:	00000013          	nop
 800065f8:	00008067          	ret
 
 800065fc <prvHeapInit>:
+/*-----------------------------------------------------------*/
+
+static void prvHeapInit( void )
+{
 800065fc:	ff010113          	addi	sp,sp,-16
+BlockLink_t *pxFirstFreeBlock;
+uint8_t *pucAlignedHeap;
+
+	/* Ensure the heap starts on a correctly aligned boundary. */
+	pucAlignedHeap = ( uint8_t * ) ( ( ( portPOINTER_SIZE_TYPE ) &ucHeap[ portBYTE_ALIGNMENT ] ) & ( ~( ( portPOINTER_SIZE_TYPE ) portBYTE_ALIGNMENT_MASK ) ) );
 80006600:	0001b797          	auipc	a5,0x1b
 80006604:	4b478793          	addi	a5,a5,1204 # 80021ab4 <ucHeap+0x4>
 80006608:	ffc7f793          	andi	a5,a5,-4
 8000660c:	00f12623          	sw	a5,12(sp)
+
+	/* xStart is used to hold a pointer to the first item in the list of free
+	blocks.  The void cast is used to prevent compiler warnings. */
+	xStart.pxNextFreeBlock = ( void * ) pucAlignedHeap;
 80006610:	00034797          	auipc	a5,0x34
 80006614:	4a078793          	addi	a5,a5,1184 # 8003aab0 <xStart>
 80006618:	00c12703          	lw	a4,12(sp)
 8000661c:	00e7a023          	sw	a4,0(a5)
+	xStart.xBlockSize = ( size_t ) 0;
 80006620:	00034797          	auipc	a5,0x34
 80006624:	49078793          	addi	a5,a5,1168 # 8003aab0 <xStart>
 80006628:	0007a223          	sw	zero,4(a5)
+
+	/* xEnd is used to mark the end of the list of free blocks. */
+	xEnd.xBlockSize = configADJUSTED_HEAP_SIZE;
 8000662c:	00034797          	auipc	a5,0x34
 80006630:	48c78793          	addi	a5,a5,1164 # 8003aab8 <xEnd>
 80006634:	00019737          	lui	a4,0x19
 80006638:	ffc70713          	addi	a4,a4,-4 # 18ffc <_HEAP_SIZE+0x17ffc>
 8000663c:	00e7a223          	sw	a4,4(a5)
+	xEnd.pxNextFreeBlock = NULL;
 80006640:	00034797          	auipc	a5,0x34
 80006644:	47878793          	addi	a5,a5,1144 # 8003aab8 <xEnd>
 80006648:	0007a023          	sw	zero,0(a5)
+
+	/* To start with there is a single free block that is sized to take up the
+	entire heap space. */
+	pxFirstFreeBlock = ( void * ) pucAlignedHeap;
 8000664c:	00c12783          	lw	a5,12(sp)
 80006650:	00f12423          	sw	a5,8(sp)
+	pxFirstFreeBlock->xBlockSize = configADJUSTED_HEAP_SIZE;
 80006654:	00812783          	lw	a5,8(sp)
 80006658:	00019737          	lui	a4,0x19
 8000665c:	ffc70713          	addi	a4,a4,-4 # 18ffc <_HEAP_SIZE+0x17ffc>
 80006660:	00e7a223          	sw	a4,4(a5)
+	pxFirstFreeBlock->pxNextFreeBlock = &xEnd;
 80006664:	00812783          	lw	a5,8(sp)
 80006668:	00034717          	auipc	a4,0x34
 8000666c:	45070713          	addi	a4,a4,1104 # 8003aab8 <xEnd>
 80006670:	00e7a023          	sw	a4,0(a5)
+}
 80006674:	00000013          	nop
 80006678:	01010113          	addi	sp,sp,16
 8000667c:	00008067          	ret
 
 80006680 <memcpy>:
+#include <string.h>
+#include <stdint.h>
+#include <ctype.h>
+
+void* memcpy(void* dest, const void* src, size_t len)
+{
 80006680:	fe010113          	addi	sp,sp,-32
 80006684:	00a12623          	sw	a0,12(sp)
 80006688:	00b12423          	sw	a1,8(sp)
 8000668c:	00c12223          	sw	a2,4(sp)
+  const char* s = src;
 80006690:	00812783          	lw	a5,8(sp)
 80006694:	00f12e23          	sw	a5,28(sp)
+  char *d = dest;
 80006698:	00c12783          	lw	a5,12(sp)
 8000669c:	00f12c23          	sw	a5,24(sp)
+
+  if ((((uintptr_t)dest | (uintptr_t)src) & (sizeof(uintptr_t)-1)) == 0) {
 800066a0:	00c12703          	lw	a4,12(sp)
 800066a4:	00812783          	lw	a5,8(sp)
 800066a8:	00f767b3          	or	a5,a4,a5
 800066ac:	0037f793          	andi	a5,a5,3
 800066b0:	06079663          	bnez	a5,8000671c <memcpy+0x9c>
+    while ((void*)d < (dest + len - (sizeof(uintptr_t)-1))) {
 800066b4:	02c0006f          	j	800066e0 <memcpy+0x60>
+      *(uintptr_t*)d = *(const uintptr_t*)s;
 800066b8:	01c12783          	lw	a5,28(sp)
 800066bc:	0007a703          	lw	a4,0(a5)
 800066c0:	01812783          	lw	a5,24(sp)
 800066c4:	00e7a023          	sw	a4,0(a5)
+      d += sizeof(uintptr_t);
 800066c8:	01812783          	lw	a5,24(sp)
 800066cc:	00478793          	addi	a5,a5,4
 800066d0:	00f12c23          	sw	a5,24(sp)
+      s += sizeof(uintptr_t);
 800066d4:	01c12783          	lw	a5,28(sp)
 800066d8:	00478793          	addi	a5,a5,4
 800066dc:	00f12e23          	sw	a5,28(sp)
+    while ((void*)d < (dest + len - (sizeof(uintptr_t)-1))) {
 800066e0:	00412783          	lw	a5,4(sp)
 800066e4:	ffd78793          	addi	a5,a5,-3
 800066e8:	00c12703          	lw	a4,12(sp)
 800066ec:	00f707b3          	add	a5,a4,a5
 800066f0:	01812703          	lw	a4,24(sp)
 800066f4:	fcf762e3          	bltu	a4,a5,800066b8 <memcpy+0x38>
+    }
+  }
+
+  while (d < (char*)(dest + len))
 800066f8:	0240006f          	j	8000671c <memcpy+0x9c>
+    *d++ = *s++;
 800066fc:	01c12703          	lw	a4,28(sp)
 80006700:	00170793          	addi	a5,a4,1
 80006704:	00f12e23          	sw	a5,28(sp)
@@ -6885,123 +12190,174 @@ Disassembly of section .text:
 80006710:	00d12c23          	sw	a3,24(sp)
 80006714:	00074703          	lbu	a4,0(a4)
 80006718:	00e78023          	sb	a4,0(a5)
+  while (d < (char*)(dest + len))
 8000671c:	00c12703          	lw	a4,12(sp)
 80006720:	00412783          	lw	a5,4(sp)
 80006724:	00f707b3          	add	a5,a4,a5
 80006728:	01812703          	lw	a4,24(sp)
 8000672c:	fcf768e3          	bltu	a4,a5,800066fc <memcpy+0x7c>
+
+  return dest;
 80006730:	00c12783          	lw	a5,12(sp)
+}
 80006734:	00078513          	mv	a0,a5
 80006738:	02010113          	addi	sp,sp,32
 8000673c:	00008067          	ret
 
 80006740 <memset>:
+
+void* memset(void* dest, int byte, size_t len)
+{
 80006740:	fe010113          	addi	sp,sp,-32
 80006744:	00a12623          	sw	a0,12(sp)
 80006748:	00b12423          	sw	a1,8(sp)
 8000674c:	00c12223          	sw	a2,4(sp)
+  if ((((uintptr_t)dest | len) & (sizeof(uintptr_t)-1)) == 0) {
 80006750:	00c12703          	lw	a4,12(sp)
 80006754:	00412783          	lw	a5,4(sp)
 80006758:	00f767b3          	or	a5,a4,a5
 8000675c:	0037f793          	andi	a5,a5,3
 80006760:	06079863          	bnez	a5,800067d0 <memset+0x90>
+    uintptr_t word = byte & 0xFF;
 80006764:	00812783          	lw	a5,8(sp)
 80006768:	0ff7f793          	andi	a5,a5,255
 8000676c:	00f12a23          	sw	a5,20(sp)
+    word |= word << 8;
 80006770:	01412783          	lw	a5,20(sp)
 80006774:	00879793          	slli	a5,a5,0x8
 80006778:	01412703          	lw	a4,20(sp)
 8000677c:	00f767b3          	or	a5,a4,a5
 80006780:	00f12a23          	sw	a5,20(sp)
+    word |= word << 16;
 80006784:	01412783          	lw	a5,20(sp)
 80006788:	01079793          	slli	a5,a5,0x10
 8000678c:	01412703          	lw	a4,20(sp)
 80006790:	00f767b3          	or	a5,a4,a5
 80006794:	00f12a23          	sw	a5,20(sp)
+    word |= word << 16 << 16;
+
+    uintptr_t *d = dest;
 80006798:	00c12783          	lw	a5,12(sp)
 8000679c:	00f12e23          	sw	a5,28(sp)
+    while (d < (uintptr_t*)(dest + len))
 800067a0:	0180006f          	j	800067b8 <memset+0x78>
+      *d++ = word;
 800067a4:	01c12783          	lw	a5,28(sp)
 800067a8:	00478713          	addi	a4,a5,4
 800067ac:	00e12e23          	sw	a4,28(sp)
 800067b0:	01412703          	lw	a4,20(sp)
 800067b4:	00e7a023          	sw	a4,0(a5)
+    while (d < (uintptr_t*)(dest + len))
 800067b8:	00c12703          	lw	a4,12(sp)
 800067bc:	00412783          	lw	a5,4(sp)
 800067c0:	00f707b3          	add	a5,a4,a5
 800067c4:	01c12703          	lw	a4,28(sp)
 800067c8:	fcf76ee3          	bltu	a4,a5,800067a4 <memset+0x64>
 800067cc:	03c0006f          	j	80006808 <memset+0xc8>
+  } else {
+    char *d = dest;
 800067d0:	00c12783          	lw	a5,12(sp)
 800067d4:	00f12c23          	sw	a5,24(sp)
+    while (d < (char*)(dest + len))
 800067d8:	01c0006f          	j	800067f4 <memset+0xb4>
+      *d++ = byte;
 800067dc:	01812783          	lw	a5,24(sp)
 800067e0:	00178713          	addi	a4,a5,1
 800067e4:	00e12c23          	sw	a4,24(sp)
 800067e8:	00812703          	lw	a4,8(sp)
 800067ec:	0ff77713          	andi	a4,a4,255
 800067f0:	00e78023          	sb	a4,0(a5)
+    while (d < (char*)(dest + len))
 800067f4:	00c12703          	lw	a4,12(sp)
 800067f8:	00412783          	lw	a5,4(sp)
 800067fc:	00f707b3          	add	a5,a4,a5
 80006800:	01812703          	lw	a4,24(sp)
 80006804:	fcf76ce3          	bltu	a4,a5,800067dc <memset+0x9c>
+  }
+  return dest;
 80006808:	00c12783          	lw	a5,12(sp)
+}
 8000680c:	00078513          	mv	a0,a5
 80006810:	02010113          	addi	sp,sp,32
 80006814:	00008067          	ret
 
 80006818 <strlen>:
+
+size_t strlen(const char *s)
+{
 80006818:	fe010113          	addi	sp,sp,-32
 8000681c:	00a12623          	sw	a0,12(sp)
+  const char *p = s;
 80006820:	00c12783          	lw	a5,12(sp)
 80006824:	00f12e23          	sw	a5,28(sp)
+  while (*p)
 80006828:	0100006f          	j	80006838 <strlen+0x20>
+    p++;
 8000682c:	01c12783          	lw	a5,28(sp)
 80006830:	00178793          	addi	a5,a5,1
 80006834:	00f12e23          	sw	a5,28(sp)
+  while (*p)
 80006838:	01c12783          	lw	a5,28(sp)
 8000683c:	0007c783          	lbu	a5,0(a5)
 80006840:	fe0796e3          	bnez	a5,8000682c <strlen+0x14>
+  return p - s;
 80006844:	01c12703          	lw	a4,28(sp)
 80006848:	00c12783          	lw	a5,12(sp)
 8000684c:	40f707b3          	sub	a5,a4,a5
+}
 80006850:	00078513          	mv	a0,a5
 80006854:	02010113          	addi	sp,sp,32
 80006858:	00008067          	ret
 
 8000685c <strcmp>:
+
+int strcmp(const char* s1, const char* s2)
+{
 8000685c:	fe010113          	addi	sp,sp,-32
 80006860:	00a12623          	sw	a0,12(sp)
 80006864:	00b12423          	sw	a1,8(sp)
+  unsigned char c1, c2;
+
+  do {
+    c1 = *s1++;
 80006868:	00c12783          	lw	a5,12(sp)
 8000686c:	00178713          	addi	a4,a5,1
 80006870:	00e12623          	sw	a4,12(sp)
 80006874:	0007c783          	lbu	a5,0(a5)
 80006878:	00f10fa3          	sb	a5,31(sp)
+    c2 = *s2++;
 8000687c:	00812783          	lw	a5,8(sp)
 80006880:	00178713          	addi	a4,a5,1
 80006884:	00e12423          	sw	a4,8(sp)
 80006888:	0007c783          	lbu	a5,0(a5)
 8000688c:	00f10f23          	sb	a5,30(sp)
+  } while (c1 != 0 && c1 == c2);
 80006890:	01f14783          	lbu	a5,31(sp)
 80006894:	00078863          	beqz	a5,800068a4 <strcmp+0x48>
 80006898:	01f14703          	lbu	a4,31(sp)
 8000689c:	01e14783          	lbu	a5,30(sp)
 800068a0:	fcf704e3          	beq	a4,a5,80006868 <strcmp+0xc>
+
+  return c1 - c2;
 800068a4:	01f14703          	lbu	a4,31(sp)
 800068a8:	01e14783          	lbu	a5,30(sp)
 800068ac:	40f707b3          	sub	a5,a4,a5
+}
 800068b0:	00078513          	mv	a0,a5
 800068b4:	02010113          	addi	sp,sp,32
 800068b8:	00008067          	ret
 
 800068bc <strcpy>:
+
+char* strcpy(char* dest, const char* src)
+{
 800068bc:	fe010113          	addi	sp,sp,-32
 800068c0:	00a12623          	sw	a0,12(sp)
 800068c4:	00b12423          	sw	a1,8(sp)
+  char* d = dest;
 800068c8:	00c12783          	lw	a5,12(sp)
 800068cc:	00f12e23          	sw	a5,28(sp)
+  while ((*d++ = *src++))
 800068d0:	00000013          	nop
 800068d4:	00812703          	lw	a4,8(sp)
 800068d8:	00170793          	addi	a5,a4,1
@@ -7013,24 +12369,38 @@ Disassembly of section .text:
 800068f0:	00e78023          	sb	a4,0(a5)
 800068f4:	0007c783          	lbu	a5,0(a5)
 800068f8:	fc079ee3          	bnez	a5,800068d4 <strcpy+0x18>
+    ;
+  return dest;
 800068fc:	00c12783          	lw	a5,12(sp)
+}
 80006900:	00078513          	mv	a0,a5
 80006904:	02010113          	addi	sp,sp,32
 80006908:	00008067          	ret
 
 8000690c <atol>:
+
+long atol(const char* str)
+{
 8000690c:	fe010113          	addi	sp,sp,-32
 80006910:	00a12623          	sw	a0,12(sp)
+  long res = 0;
 80006914:	00012e23          	sw	zero,28(sp)
+  int sign = 0;
 80006918:	00012c23          	sw	zero,24(sp)
+
+  while (*str == ' ')
 8000691c:	0100006f          	j	8000692c <atol+0x20>
+    str++;
 80006920:	00c12783          	lw	a5,12(sp)
 80006924:	00178793          	addi	a5,a5,1
 80006928:	00f12623          	sw	a5,12(sp)
+  while (*str == ' ')
 8000692c:	00c12783          	lw	a5,12(sp)
 80006930:	0007c703          	lbu	a4,0(a5)
 80006934:	02000793          	li	a5,32
 80006938:	fef704e3          	beq	a4,a5,80006920 <atol+0x14>
+
+  if (*str == '-' || *str == '+') {
 8000693c:	00c12783          	lw	a5,12(sp)
 80006940:	0007c703          	lbu	a4,0(a5)
 80006944:	02d00793          	li	a5,45
@@ -7039,22 +12409,29 @@ Disassembly of section .text:
 80006950:	0007c703          	lbu	a4,0(a5)
 80006954:	02b00793          	li	a5,43
 80006958:	06f71263          	bne	a4,a5,800069bc <atol+0xb0>
+    sign = *str == '-';
 8000695c:	00c12783          	lw	a5,12(sp)
 80006960:	0007c783          	lbu	a5,0(a5)
 80006964:	fd378793          	addi	a5,a5,-45
 80006968:	0017b793          	seqz	a5,a5
 8000696c:	0ff7f793          	andi	a5,a5,255
 80006970:	00f12c23          	sw	a5,24(sp)
+    str++;
 80006974:	00c12783          	lw	a5,12(sp)
 80006978:	00178793          	addi	a5,a5,1
 8000697c:	00f12623          	sw	a5,12(sp)
+  }
+
+  while (*str) {
 80006980:	03c0006f          	j	800069bc <atol+0xb0>
+    res *= 10;
 80006984:	01c12703          	lw	a4,28(sp)
 80006988:	00070793          	mv	a5,a4
 8000698c:	00279793          	slli	a5,a5,0x2
 80006990:	00e787b3          	add	a5,a5,a4
 80006994:	00179793          	slli	a5,a5,0x1
 80006998:	00f12e23          	sw	a5,28(sp)
+    res += *str++ - '0';
 8000699c:	00c12783          	lw	a5,12(sp)
 800069a0:	00178713          	addi	a4,a5,1
 800069a4:	00e12623          	sw	a4,12(sp)
@@ -7063,31 +12440,49 @@ Disassembly of section .text:
 800069b0:	01c12703          	lw	a4,28(sp)
 800069b4:	00f707b3          	add	a5,a4,a5
 800069b8:	00f12e23          	sw	a5,28(sp)
+  while (*str) {
 800069bc:	00c12783          	lw	a5,12(sp)
 800069c0:	0007c783          	lbu	a5,0(a5)
 800069c4:	fc0790e3          	bnez	a5,80006984 <atol+0x78>
+  }
+
+  return sign ? -res : res;
 800069c8:	01812783          	lw	a5,24(sp)
 800069cc:	00078863          	beqz	a5,800069dc <atol+0xd0>
 800069d0:	01c12783          	lw	a5,28(sp)
 800069d4:	40f007b3          	neg	a5,a5
 800069d8:	0080006f          	j	800069e0 <atol+0xd4>
 800069dc:	01c12783          	lw	a5,28(sp)
+}
 800069e0:	00078513          	mv	a0,a5
 800069e4:	02010113          	addi	sp,sp,32
 800069e8:	00008067          	ret
 
 800069ec <read>:
+#include <sys/time.h>
+#include "ns16550.h"
+
+#ifndef __linux__
+
+int read(int file, char *ptr, int len) {
 800069ec:	fd010113          	addi	sp,sp,-48
 800069f0:	02112623          	sw	ra,44(sp)
 800069f4:	00a12623          	sw	a0,12(sp)
 800069f8:	00b12423          	sw	a1,8(sp)
 800069fc:	00c12223          	sw	a2,4(sp)
+  int todo;
+  if(len == 0)
 80006a00:	00412783          	lw	a5,4(sp)
 80006a04:	00079663          	bnez	a5,80006a10 <read+0x24>
+    return 0;
 80006a08:	00000793          	li	a5,0
 80006a0c:	0500006f          	j	80006a5c <read+0x70>
+#ifdef CONSOLE_UART
+  todo = 0;
 80006a10:	00012e23          	sw	zero,28(sp)
+  while (ns16550_rxready() && (todo < len)) {
 80006a14:	02c0006f          	j	80006a40 <read+0x54>
+    *ptr++ = ns16550_rxchar();
 80006a18:	6f0000ef          	jal	ra,80007108 <ns16550_rxchar>
 80006a1c:	00050693          	mv	a3,a0
 80006a20:	00812783          	lw	a5,8(sp)
@@ -7095,58 +12490,91 @@ Disassembly of section .text:
 80006a28:	00e12423          	sw	a4,8(sp)
 80006a2c:	0ff6f713          	andi	a4,a3,255
 80006a30:	00e78023          	sb	a4,0(a5)
+    todo++;
 80006a34:	01c12783          	lw	a5,28(sp)
 80006a38:	00178793          	addi	a5,a5,1
 80006a3c:	00f12e23          	sw	a5,28(sp)
+  while (ns16550_rxready() && (todo < len)) {
 80006a40:	6a0000ef          	jal	ra,800070e0 <ns16550_rxready>
 80006a44:	00050793          	mv	a5,a0
 80006a48:	00078863          	beqz	a5,80006a58 <read+0x6c>
 80006a4c:	01c12703          	lw	a4,28(sp)
 80006a50:	00412783          	lw	a5,4(sp)
 80006a54:	fcf742e3          	blt	a4,a5,80006a18 <read+0x2c>
+  }
+#endif
+  return todo;
 80006a58:	01c12783          	lw	a5,28(sp)
+}
 80006a5c:	00078513          	mv	a0,a5
 80006a60:	02c12083          	lw	ra,44(sp)
 80006a64:	03010113          	addi	sp,sp,48
 80006a68:	00008067          	ret
 
 80006a6c <write>:
+
+int write(int file, char *ptr, int len) {
 80006a6c:	fd010113          	addi	sp,sp,-48
 80006a70:	02112623          	sw	ra,44(sp)
 80006a74:	00a12623          	sw	a0,12(sp)
 80006a78:	00b12423          	sw	a1,8(sp)
 80006a7c:	00c12223          	sw	a2,4(sp)
+  int todo;
+
+#ifdef CONSOLE_UART
+  for (todo = 0; todo < len; todo++) {
 80006a80:	00012e23          	sw	zero,28(sp)
 80006a84:	0280006f          	j	80006aac <write+0x40>
+    ns16550_txchar (*ptr++);
 80006a88:	00812783          	lw	a5,8(sp)
 80006a8c:	00178713          	addi	a4,a5,1
 80006a90:	00e12423          	sw	a4,8(sp)
 80006a94:	0007c783          	lbu	a5,0(a5)
 80006a98:	00078513          	mv	a0,a5
 80006a9c:	6a8000ef          	jal	ra,80007144 <ns16550_txchar>
+  for (todo = 0; todo < len; todo++) {
 80006aa0:	01c12783          	lw	a5,28(sp)
 80006aa4:	00178793          	addi	a5,a5,1
 80006aa8:	00f12e23          	sw	a5,28(sp)
 80006aac:	01c12703          	lw	a4,28(sp)
 80006ab0:	00412783          	lw	a5,4(sp)
 80006ab4:	fcf74ae3          	blt	a4,a5,80006a88 <write+0x1c>
+  }
+#endif
+  return len;
 80006ab8:	00412783          	lw	a5,4(sp)
+}
 80006abc:	00078513          	mv	a0,a5
 80006ac0:	02c12083          	lw	ra,44(sp)
 80006ac4:	03010113          	addi	sp,sp,48
 80006ac8:	00008067          	ret
 
 80006acc <gettimeofday>:
+// The following uses rdcycle instead of rdtime (which would make more sense),
+// because rdtime causes an "illegal instruction" trap, which we do not yet
+// handle in bare metal.
+
+int gettimeofday(struct timeval *ptimeval, void *ptimezone)
+{
 80006acc:	fd010113          	addi	sp,sp,-48
 80006ad0:	02112623          	sw	ra,44(sp)
 80006ad4:	00a12623          	sw	a0,12(sp)
 80006ad8:	00b12423          	sw	a1,8(sp)
+    if (ptimeval)
 80006adc:	00c12603          	lw	a2,12(sp)
 80006ae0:	0c060463          	beqz	a2,80006ba8 <gettimeofday+0xdc>
+#if __riscv_xlen == 64
+	asm ("rdcycle %0" : "=r" (tv));
+#else
+	unsigned int tvh;
+	unsigned int tvl;
+	asm ("rdcycle %0;"
 80006ae4:	c00025f3          	rdcycle	a1
 80006ae8:	c8002673          	rdcycleh	a2
 80006aec:	00b12e23          	sw	a1,28(sp)
 80006af0:	00c12c23          	sw	a2,24(sp)
+	    "rdcycleh %1 " : "=r" (tvl), "=r" (tvh));
+	tv = ((long long)tvh) << 32 | tvl;
 80006af4:	01812603          	lw	a2,24(sp)
 80006af8:	00060313          	mv	t1,a2
 80006afc:	00000393          	li	t2,0
@@ -7159,6 +12587,8 @@ Disassembly of section .text:
 80006b18:	00c12823          	sw	a2,16(sp)
 80006b1c:	00e867b3          	or	a5,a6,a4
 80006b20:	00f12a23          	sw	a5,20(sp)
+#endif
+	ptimeval->tv_sec = tv / CLOCK_PERIOD;
 80006b24:	01012783          	lw	a5,16(sp)
 80006b28:	01412803          	lw	a6,20(sp)
 80006b2c:	01c9c637          	lui	a2,0x1c9c
@@ -7172,6 +12602,7 @@ Disassembly of section .text:
 80006b4c:	00078713          	mv	a4,a5
 80006b50:	00c12783          	lw	a5,12(sp)
 80006b54:	00e7a023          	sw	a4,0(a5)
+	ptimeval->tv_usec = tv % CLOCK_PERIOD / (CLOCK_PERIOD / 1000000);
 80006b58:	01012783          	lw	a5,16(sp)
 80006b5c:	01412803          	lw	a6,20(sp)
 80006b60:	01c9c637          	lui	a2,0x1c9c
@@ -7192,196 +12623,313 @@ Disassembly of section .text:
 80006b9c:	00078713          	mv	a4,a5
 80006ba0:	00c12783          	lw	a5,12(sp)
 80006ba4:	00e7a223          	sw	a4,4(a5)
+    }
+
+    return 0;
 80006ba8:	00000793          	li	a5,0
+}
 80006bac:	00078513          	mv	a0,a5
 80006bb0:	02c12083          	lw	ra,44(sp)
 80006bb4:	03010113          	addi	sp,sp,48
 80006bb8:	00008067          	ret
 
 80006bbc <sleep>:
+
+unsigned int sleep(unsigned int seconds)
+{
 80006bbc:	fd010113          	addi	sp,sp,-48
 80006bc0:	02112623          	sw	ra,44(sp)
 80006bc4:	00a12623          	sw	a0,12(sp)
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
 80006bc8:	01810793          	addi	a5,sp,24
 80006bcc:	00000593          	li	a1,0
 80006bd0:	00078513          	mv	a0,a5
 80006bd4:	ef9ff0ef          	jal	ra,80006acc <gettimeofday>
+    seconds += tv.tv_sec;
 80006bd8:	01812783          	lw	a5,24(sp)
 80006bdc:	00078713          	mv	a4,a5
 80006be0:	00c12783          	lw	a5,12(sp)
 80006be4:	00e787b3          	add	a5,a5,a4
 80006be8:	00f12623          	sw	a5,12(sp)
+
+    while (tv.tv_sec < seconds)
 80006bec:	0140006f          	j	80006c00 <sleep+0x44>
+	gettimeofday(&tv, NULL);
 80006bf0:	01810793          	addi	a5,sp,24
 80006bf4:	00000593          	li	a1,0
 80006bf8:	00078513          	mv	a0,a5
 80006bfc:	ed1ff0ef          	jal	ra,80006acc <gettimeofday>
+    while (tv.tv_sec < seconds)
 80006c00:	01812783          	lw	a5,24(sp)
 80006c04:	00078713          	mv	a4,a5
 80006c08:	00c12783          	lw	a5,12(sp)
 80006c0c:	fef762e3          	bltu	a4,a5,80006bf0 <sleep+0x34>
+
+    return 0;
 80006c10:	00000793          	li	a5,0
+}
 80006c14:	00078513          	mv	a0,a5
 80006c18:	02c12083          	lw	ra,44(sp)
 80006c1c:	03010113          	addi	sp,sp,48
 80006c20:	00008067          	ret
 
 80006c24 <_sbrk>:
+
+// JES drafts:
+
+void *
+_sbrk (int nbytes)
+{
 80006c24:	fe010113          	addi	sp,sp,-32
 80006c28:	00112e23          	sw	ra,28(sp)
 80006c2c:	00a12623          	sw	a0,12(sp)
+  errno = ENOMEM;
 80006c30:	269010ef          	jal	ra,80008698 <__errno>
 80006c34:	00050713          	mv	a4,a0
 80006c38:	00c00793          	li	a5,12
 80006c3c:	00f72023          	sw	a5,0(a4)
+  return  (void *) -1;
 80006c40:	fff00793          	li	a5,-1
+}
 80006c44:	00078513          	mv	a0,a5
 80006c48:	01c12083          	lw	ra,28(sp)
 80006c4c:	02010113          	addi	sp,sp,32
 80006c50:	00008067          	ret
 
 80006c54 <_write>:
+  errno = ENOSPC;
+  return -1;
+}
+*/
+
+int _write(int file, char *ptr, int len) {
 80006c54:	fd010113          	addi	sp,sp,-48
 80006c58:	02112623          	sw	ra,44(sp)
 80006c5c:	00a12623          	sw	a0,12(sp)
 80006c60:	00b12423          	sw	a1,8(sp)
 80006c64:	00c12223          	sw	a2,4(sp)
+  int todo;
+
+#ifdef CONSOLE_UART
+  for (todo = 0; todo < len; todo++) {
 80006c68:	00012e23          	sw	zero,28(sp)
 80006c6c:	0280006f          	j	80006c94 <_write+0x40>
+    ns16550_txchar (*ptr++);
 80006c70:	00812783          	lw	a5,8(sp)
 80006c74:	00178713          	addi	a4,a5,1
 80006c78:	00e12423          	sw	a4,8(sp)
 80006c7c:	0007c783          	lbu	a5,0(a5)
 80006c80:	00078513          	mv	a0,a5
 80006c84:	4c0000ef          	jal	ra,80007144 <ns16550_txchar>
+  for (todo = 0; todo < len; todo++) {
 80006c88:	01c12783          	lw	a5,28(sp)
 80006c8c:	00178793          	addi	a5,a5,1
 80006c90:	00f12e23          	sw	a5,28(sp)
 80006c94:	01c12703          	lw	a4,28(sp)
 80006c98:	00412783          	lw	a5,4(sp)
 80006c9c:	fcf74ae3          	blt	a4,a5,80006c70 <_write+0x1c>
+  }
+#endif
+  return len;
 80006ca0:	00412783          	lw	a5,4(sp)
+}
 80006ca4:	00078513          	mv	a0,a5
 80006ca8:	02c12083          	lw	ra,44(sp)
 80006cac:	03010113          	addi	sp,sp,48
 80006cb0:	00008067          	ret
 
 80006cb4 <_close>:
+
+int _close(
+   int fd
+	   )
+{
 80006cb4:	fe010113          	addi	sp,sp,-32
 80006cb8:	00112e23          	sw	ra,28(sp)
 80006cbc:	00a12623          	sw	a0,12(sp)
+  errno = EBADF;
 80006cc0:	1d9010ef          	jal	ra,80008698 <__errno>
 80006cc4:	00050713          	mv	a4,a0
 80006cc8:	00900793          	li	a5,9
 80006ccc:	00f72023          	sw	a5,0(a4)
+  return -1;
 80006cd0:	fff00793          	li	a5,-1
+}
 80006cd4:	00078513          	mv	a0,a5
 80006cd8:	01c12083          	lw	ra,28(sp)
 80006cdc:	02010113          	addi	sp,sp,32
 80006ce0:	00008067          	ret
 
 80006ce4 <_lseek>:
+long _lseek(
+    int fd,
+    long offset,
+    int origin
+)
+{
 80006ce4:	fe010113          	addi	sp,sp,-32
 80006ce8:	00112e23          	sw	ra,28(sp)
 80006cec:	00a12623          	sw	a0,12(sp)
 80006cf0:	00b12423          	sw	a1,8(sp)
 80006cf4:	00c12223          	sw	a2,4(sp)
+  errno = EBADF;
 80006cf8:	1a1010ef          	jal	ra,80008698 <__errno>
 80006cfc:	00050713          	mv	a4,a0
 80006d00:	00900793          	li	a5,9
 80006d04:	00f72023          	sw	a5,0(a4)
+  return -1;
 80006d08:	fff00793          	li	a5,-1
+}
 80006d0c:	00078513          	mv	a0,a5
 80006d10:	01c12083          	lw	ra,28(sp)
 80006d14:	02010113          	addi	sp,sp,32
 80006d18:	00008067          	ret
 
 80006d1c <_read>:
+int _read(
+   int fd,
+   void *buffer,
+   unsigned int count
+)
+{
 80006d1c:	fe010113          	addi	sp,sp,-32
 80006d20:	00112e23          	sw	ra,28(sp)
 80006d24:	00a12623          	sw	a0,12(sp)
 80006d28:	00b12423          	sw	a1,8(sp)
 80006d2c:	00c12223          	sw	a2,4(sp)
+  errno = EBADF;
 80006d30:	169010ef          	jal	ra,80008698 <__errno>
 80006d34:	00050713          	mv	a4,a0
 80006d38:	00900793          	li	a5,9
 80006d3c:	00f72023          	sw	a5,0(a4)
+  return -1;
 80006d40:	fff00793          	li	a5,-1
+}
 80006d44:	00078513          	mv	a0,a5
 80006d48:	01c12083          	lw	ra,28(sp)
 80006d4c:	02010113          	addi	sp,sp,32
 80006d50:	00008067          	ret
 
 80006d54 <_fstat>:
+
+int _fstat(
+   int fd,
+   struct _stat *buffer
+)
+{
 80006d54:	fe010113          	addi	sp,sp,-32
 80006d58:	00112e23          	sw	ra,28(sp)
 80006d5c:	00a12623          	sw	a0,12(sp)
 80006d60:	00b12423          	sw	a1,8(sp)
+  errno = EBADF;
 80006d64:	135010ef          	jal	ra,80008698 <__errno>
 80006d68:	00050713          	mv	a4,a0
 80006d6c:	00900793          	li	a5,9
 80006d70:	00f72023          	sw	a5,0(a4)
+  return -1;
 80006d74:	fff00793          	li	a5,-1
+}
 80006d78:	00078513          	mv	a0,a5
 80006d7c:	01c12083          	lw	ra,28(sp)
 80006d80:	02010113          	addi	sp,sp,32
 80006d84:	00008067          	ret
 
 80006d88 <_isatty>:
+
+int _isatty(
+  int fd
+)
+{
 80006d88:	fe010113          	addi	sp,sp,-32
 80006d8c:	00112e23          	sw	ra,28(sp)
 80006d90:	00a12623          	sw	a0,12(sp)
+  errno = EBADF;
 80006d94:	105010ef          	jal	ra,80008698 <__errno>
 80006d98:	00050713          	mv	a4,a0
 80006d9c:	00900793          	li	a5,9
 80006da0:	00f72023          	sw	a5,0(a4)
+  return 0;
 80006da4:	00000793          	li	a5,0
+}
 80006da8:	00078513          	mv	a0,a5
 80006dac:	01c12083          	lw	ra,28(sp)
 80006db0:	02010113          	addi	sp,sp,32
 80006db4:	00008067          	ret
 
 80006db8 <_kill>:
+
+int _kill(
+  int pid,
+  int sig
+)
+{
 80006db8:	fe010113          	addi	sp,sp,-32
 80006dbc:	00112e23          	sw	ra,28(sp)
 80006dc0:	00a12623          	sw	a0,12(sp)
 80006dc4:	00b12423          	sw	a1,8(sp)
+  errno = EBADF;
 80006dc8:	0d1010ef          	jal	ra,80008698 <__errno>
 80006dcc:	00050713          	mv	a4,a0
 80006dd0:	00900793          	li	a5,9
 80006dd4:	00f72023          	sw	a5,0(a4)
+  return -1;
 80006dd8:	fff00793          	li	a5,-1
+}
 80006ddc:	00078513          	mv	a0,a5
 80006de0:	01c12083          	lw	ra,28(sp)
 80006de4:	02010113          	addi	sp,sp,32
 80006de8:	00008067          	ret
 
 80006dec <_getpid>:
+
+int _getpid(
+  int n
+)
+{
 80006dec:	ff010113          	addi	sp,sp,-16
 80006df0:	00a12623          	sw	a0,12(sp)
+  return 1;
 80006df4:	00100793          	li	a5,1
+}
 80006df8:	00078513          	mv	a0,a5
 80006dfc:	01010113          	addi	sp,sp,16
 80006e00:	00008067          	ret
 
 80006e04 <zeroExtend>:
+
+volatile uint64_t tohost __attribute__((aligned(64)));
+volatile uint64_t fromhost __attribute__((aligned(64)));
+
+uint64_t zeroExtend(long val)
+{
 80006e04:	fe010113          	addi	sp,sp,-32
 80006e08:	00a12623          	sw	a0,12(sp)
+	uint64_t ret = val;
 80006e0c:	00c12783          	lw	a5,12(sp)
 80006e10:	00f12c23          	sw	a5,24(sp)
 80006e14:	41f7d793          	srai	a5,a5,0x1f
 80006e18:	00f12e23          	sw	a5,28(sp)
+	#if __riscv_xlen == 32
+		ret = (0x00000000ffffffff & val);
 80006e1c:	00c12783          	lw	a5,12(sp)
 80006e20:	00f12c23          	sw	a5,24(sp)
 80006e24:	00012e23          	sw	zero,28(sp)
+	#endif
+	return ret;
 80006e28:	01812783          	lw	a5,24(sp)
 80006e2c:	01c12803          	lw	a6,28(sp)
+}
 80006e30:	00078513          	mv	a0,a5
 80006e34:	00080593          	mv	a1,a6
 80006e38:	02010113          	addi	sp,sp,32
 80006e3c:	00008067          	ret
 
 80006e40 <prvSyscallToHost>:
+
+/* Relay syscall to host */
+static uint64_t prvSyscallToHost(long which, long arg0, long arg1, long arg2)
+{
 80006e40:	f6010113          	addi	sp,sp,-160
 80006e44:	08112e23          	sw	ra,156(sp)
 80006e48:	08812c23          	sw	s0,152(sp)
@@ -7394,31 +12942,39 @@ Disassembly of section .text:
 80006e64:	03f78793          	addi	a5,a5,63
 80006e68:	0067d793          	srli	a5,a5,0x6
 80006e6c:	00679413          	slli	s0,a5,0x6
+	volatile uint64_t magic_mem[8] __attribute__((aligned(64)));
+//    volatile uint64_t oldfromhost;
+	magic_mem[0] = zeroExtend(which);
 80006e70:	00c12503          	lw	a0,12(sp)
 80006e74:	f91ff0ef          	jal	ra,80006e04 <zeroExtend>
 80006e78:	00050793          	mv	a5,a0
 80006e7c:	00058813          	mv	a6,a1
 80006e80:	00f42023          	sw	a5,0(s0)
 80006e84:	01042223          	sw	a6,4(s0)
+	magic_mem[1] = zeroExtend(arg0);
 80006e88:	00812503          	lw	a0,8(sp)
 80006e8c:	f79ff0ef          	jal	ra,80006e04 <zeroExtend>
 80006e90:	00050793          	mv	a5,a0
 80006e94:	00058813          	mv	a6,a1
 80006e98:	00f42423          	sw	a5,8(s0)
 80006e9c:	01042623          	sw	a6,12(s0)
+	magic_mem[2] = zeroExtend(arg1);
 80006ea0:	00412503          	lw	a0,4(sp)
 80006ea4:	f61ff0ef          	jal	ra,80006e04 <zeroExtend>
 80006ea8:	00050793          	mv	a5,a0
 80006eac:	00058813          	mv	a6,a1
 80006eb0:	00f42823          	sw	a5,16(s0)
 80006eb4:	01042a23          	sw	a6,20(s0)
+	magic_mem[3] = zeroExtend(arg2);
 80006eb8:	00012503          	lw	a0,0(sp)
 80006ebc:	f49ff0ef          	jal	ra,80006e04 <zeroExtend>
 80006ec0:	00050793          	mv	a5,a0
 80006ec4:	00058813          	mv	a6,a1
 80006ec8:	00f42c23          	sw	a5,24(s0)
 80006ecc:	01042e23          	sw	a6,28(s0)
+	__sync_synchronize();
 80006ed0:	0ff0000f          	fence
+    tohost = zeroExtend(magic_mem);
 80006ed4:	00040793          	mv	a5,s0
 80006ed8:	00078513          	mv	a0,a5
 80006edc:	f29ff0ef          	jal	ra,80006e04 <zeroExtend>
@@ -7428,8 +12984,15 @@ Disassembly of section .text:
 80006eec:	d1870713          	addi	a4,a4,-744 # 8003ac00 <tohost>
 80006ef0:	00f72023          	sw	a5,0(a4)
 80006ef4:	01072223          	sw	a6,4(a4)
+//    do
+//    {
+//        oldfromhost = fromhost;
+//        fromhost = 0;
+//    } while (oldfromhost == 0);
+	return magic_mem[0];
 80006ef8:	00042783          	lw	a5,0(s0)
 80006efc:	00442803          	lw	a6,4(s0)
+}
 80006f00:	00078513          	mv	a0,a5
 80006f04:	00080593          	mv	a1,a6
 80006f08:	09c12083          	lw	ra,156(sp)
@@ -7438,6 +13001,10 @@ Disassembly of section .text:
 80006f14:	00008067          	ret
 
 80006f18 <prvSyscallExit>:
+
+/* Exit systemcall */
+static void prvSyscallExit(long code)
+{
 80006f18:	fc010113          	addi	sp,sp,-64
 80006f1c:	02112e23          	sw	ra,60(sp)
 80006f20:	02812c23          	sw	s0,56(sp)
@@ -7445,10 +13012,12 @@ Disassembly of section .text:
 80006f28:	03212823          	sw	s2,48(sp)
 80006f2c:	03312623          	sw	s3,44(sp)
 80006f30:	00a12623          	sw	a0,12(sp)
+	uint64_t zcode = zeroExtend(code);
 80006f34:	00c12503          	lw	a0,12(sp)
 80006f38:	ecdff0ef          	jal	ra,80006e04 <zeroExtend>
 80006f3c:	00a12c23          	sw	a0,24(sp)
 80006f40:	00b12e23          	sw	a1,28(sp)
+	tohost = ((zcode << 1) | 1);
 80006f44:	01812783          	lw	a5,24(sp)
 80006f48:	01f7d793          	srli	a5,a5,0x1f
 80006f4c:	01c12703          	lw	a4,28(sp)
@@ -7462,48 +13031,85 @@ Disassembly of section .text:
 80006f6c:	c9878793          	addi	a5,a5,-872 # 8003ac00 <tohost>
 80006f70:	0127a023          	sw	s2,0(a5)
 80006f74:	0137a223          	sw	s3,4(a5)
+	for(;;) { }
 80006f78:	0000006f          	j	80006f78 <prvSyscallExit+0x60>
 
 80006f7c <syscall>:
+}
+
+/* Fires a syscall */
+long syscall(long num, long arg0, long arg1, long arg2)
+{
 80006f7c:	ff010113          	addi	sp,sp,-16
 80006f80:	00a12623          	sw	a0,12(sp)
 80006f84:	00b12423          	sw	a1,8(sp)
 80006f88:	00c12223          	sw	a2,4(sp)
 80006f8c:	00d12023          	sw	a3,0(sp)
+	register long a7 asm("a7") = num;
 80006f90:	00c12883          	lw	a7,12(sp)
+	register long a0 asm("a0") = arg0;
 80006f94:	00812503          	lw	a0,8(sp)
+	register long a1 asm("a1") = arg1;
 80006f98:	00412583          	lw	a1,4(sp)
+	register long a2 asm("a2") = arg2;
 80006f9c:	00012603          	lw	a2,0(sp)
+	asm volatile ("scall":"+r"(a0) : "r"(a1), "r"(a2), "r"(a7));
 80006fa0:	00000073          	ecall
+	return a0;
 80006fa4:	00050793          	mv	a5,a0
+}
 80006fa8:	00078513          	mv	a0,a5
 80006fac:	01010113          	addi	sp,sp,16
 80006fb0:	00008067          	ret
 
 80006fb4 <ulSyscallTrap>:
+
+/* Trap handeler */
+unsigned long ulSyscallTrap(long cause, long epc, long regs[32])
+{
 80006fb4:	ff010113          	addi	sp,sp,-16
 80006fb8:	00a12623          	sw	a0,12(sp)
 80006fbc:	00b12423          	sw	a1,8(sp)
 80006fc0:	00c12223          	sw	a2,4(sp)
+		returnValue = prvSyscallToHost(regs[17], regs[10], regs[11], regs[12]);
+	}
+
+	regs[10] = returnValue;
+*/
+  regs[10] = regs[17];
 80006fc4:	00412783          	lw	a5,4(sp)
 80006fc8:	02878793          	addi	a5,a5,40
 80006fcc:	00412703          	lw	a4,4(sp)
 80006fd0:	04472703          	lw	a4,68(a4)
 80006fd4:	00e7a023          	sw	a4,0(a5)
+	return epc + 4;
 80006fd8:	00812783          	lw	a5,8(sp)
 80006fdc:	00478793          	addi	a5,a5,4
+}
 80006fe0:	00078513          	mv	a0,a5
 80006fe4:	01010113          	addi	sp,sp,16
 80006fe8:	00008067          	ret
 
 80006fec <ns16550_init>:
+static struct ns16550_pio * pio = (void*)NS16550_BASE;
+
+#ifdef CONSOLE_UART
+__attribute__ ((constructor))
+static int ns16550_init(void)
+{
 80006fec:	ff010113          	addi	sp,sp,-16
+  uint32_t divisor;
+
+  pio->ier = 0;
 80006ff0:	0001a797          	auipc	a5,0x1a
 80006ff4:	f3478793          	addi	a5,a5,-204 # 80020f24 <pio>
 80006ff8:	0007a783          	lw	a5,0(a5)
 80006ffc:	00078423          	sb	zero,8(a5)
+
+  divisor = NS16550_CLOCK_RATE / (16 * DEFAULT_BAUDRATE);
 80007000:	01a00793          	li	a5,26
 80007004:	00f12623          	sw	a5,12(sp)
+  pio->lcr |= LCR_DLAB;
 80007008:	0001a797          	auipc	a5,0x1a
 8000700c:	f1c78793          	addi	a5,a5,-228 # 80020f24 <pio>
 80007010:	0007a783          	lw	a5,0(a5)
@@ -7515,12 +13121,14 @@ Disassembly of section .text:
 80007028:	f8076713          	ori	a4,a4,-128
 8000702c:	0ff77713          	andi	a4,a4,255
 80007030:	00e78c23          	sb	a4,24(a5)
+  pio->dll = divisor & 0xff;
 80007034:	0001a797          	auipc	a5,0x1a
 80007038:	ef078793          	addi	a5,a5,-272 # 80020f24 <pio>
 8000703c:	0007a783          	lw	a5,0(a5)
 80007040:	00c12703          	lw	a4,12(sp)
 80007044:	0ff77713          	andi	a4,a4,255
 80007048:	00e78023          	sb	a4,0(a5)
+  pio->dlm = (divisor >> 8) & 0xff;
 8000704c:	00c12783          	lw	a5,12(sp)
 80007050:	0087d713          	srli	a4,a5,0x8
 80007054:	0001a797          	auipc	a5,0x1a
@@ -7528,6 +13136,7 @@ Disassembly of section .text:
 8000705c:	0007a783          	lw	a5,0(a5)
 80007060:	0ff77713          	andi	a4,a4,255
 80007064:	00e78423          	sb	a4,8(a5)
+  pio->lcr &= ~LCR_DLAB;
 80007068:	0001a797          	auipc	a5,0x1a
 8000706c:	ebc78793          	addi	a5,a5,-324 # 80020f24 <pio>
 80007070:	0007a783          	lw	a5,0(a5)
@@ -7539,27 +13148,40 @@ Disassembly of section .text:
 80007088:	07f77713          	andi	a4,a4,127
 8000708c:	0ff77713          	andi	a4,a4,255
 80007090:	00e78c23          	sb	a4,24(a5)
+
+  pio->lcr = LCR_WLS8;
 80007094:	0001a797          	auipc	a5,0x1a
 80007098:	e9078793          	addi	a5,a5,-368 # 80020f24 <pio>
 8000709c:	0007a783          	lw	a5,0(a5)
 800070a0:	00300713          	li	a4,3
 800070a4:	00e78c23          	sb	a4,24(a5)
+  pio->fcr = FCR_FE;
 800070a8:	0001a797          	auipc	a5,0x1a
 800070ac:	e7c78793          	addi	a5,a5,-388 # 80020f24 <pio>
 800070b0:	0007a783          	lw	a5,0(a5)
 800070b4:	00100713          	li	a4,1
 800070b8:	00e78823          	sb	a4,16(a5)
+  pio->mcr = MCR_RTS;
 800070bc:	0001a797          	auipc	a5,0x1a
 800070c0:	e6878793          	addi	a5,a5,-408 # 80020f24 <pio>
 800070c4:	0007a783          	lw	a5,0(a5)
 800070c8:	00200713          	li	a4,2
 800070cc:	02e78023          	sb	a4,32(a5)
+
+  return 0;
 800070d0:	00000793          	li	a5,0
+}
 800070d4:	00078513          	mv	a0,a5
 800070d8:	01010113          	addi	sp,sp,16
 800070dc:	00008067          	ret
 
 800070e0 <ns16550_rxready>:
+#endif
+
+
+int ns16550_rxready(void)
+{
+  return ((pio->lsr & LSR_DR) != 0);
 800070e0:	0001a797          	auipc	a5,0x1a
 800070e4:	e4478793          	addi	a5,a5,-444 # 80020f24 <pio>
 800070e8:	0007a783          	lw	a5,0(a5)
@@ -7568,10 +13190,16 @@ Disassembly of section .text:
 800070f4:	0017f793          	andi	a5,a5,1
 800070f8:	00f037b3          	snez	a5,a5
 800070fc:	0ff7f793          	andi	a5,a5,255
+}
 80007100:	00078513          	mv	a0,a5
 80007104:	00008067          	ret
 
 80007108 <ns16550_rxchar>:
+
+
+int ns16550_rxchar(void)
+{
+  while ((pio->lsr & LSR_DR) == 0)
 80007108:	00000013          	nop
 8000710c:	0001a797          	auipc	a5,0x1a
 80007110:	e1878793          	addi	a5,a5,-488 # 80020f24 <pio>
@@ -7580,17 +13208,26 @@ Disassembly of section .text:
 8000711c:	0ff7f793          	andi	a5,a5,255
 80007120:	0017f793          	andi	a5,a5,1
 80007124:	fe0784e3          	beqz	a5,8000710c <ns16550_rxchar+0x4>
+    ;  // nothing
+
+  return pio->rbr;
 80007128:	0001a797          	auipc	a5,0x1a
 8000712c:	dfc78793          	addi	a5,a5,-516 # 80020f24 <pio>
 80007130:	0007a783          	lw	a5,0(a5)
 80007134:	0007c783          	lbu	a5,0(a5)
 80007138:	0ff7f793          	andi	a5,a5,255
+}
 8000713c:	00078513          	mv	a0,a5
 80007140:	00008067          	ret
 
 80007144 <ns16550_txchar>:
+
+
+int ns16550_txchar(int c)
+{
 80007144:	ff010113          	addi	sp,sp,-16
 80007148:	00a12623          	sw	a0,12(sp)
+  while ((pio->lsr & LSR_THRE) == 0)
 8000714c:	00000013          	nop
 80007150:	0001a797          	auipc	a5,0x1a
 80007154:	dd478793          	addi	a5,a5,-556 # 80020f24 <pio>
@@ -7599,18 +13236,29 @@ Disassembly of section .text:
 80007160:	0ff7f793          	andi	a5,a5,255
 80007164:	0207f793          	andi	a5,a5,32
 80007168:	fe0784e3          	beqz	a5,80007150 <ns16550_txchar+0xc>
+    ;  // nothing
+
+  pio->thr = c;
 8000716c:	0001a797          	auipc	a5,0x1a
 80007170:	db878793          	addi	a5,a5,-584 # 80020f24 <pio>
 80007174:	0007a783          	lw	a5,0(a5)
 80007178:	00c12703          	lw	a4,12(sp)
 8000717c:	0ff77713          	andi	a4,a4,255
 80007180:	00e78023          	sb	a4,0(a5)
+
+  return c;
 80007184:	00c12783          	lw	a5,12(sp)
+}
 80007188:	00078513          	mv	a0,a5
 8000718c:	01010113          	addi	sp,sp,16
 80007190:	00008067          	ret
 
 80007194 <ns16550_flush>:
+
+
+void ns16550_flush(void)
+{
+  while ((pio->lsr & LSR_TEMT) == 0)
 80007194:	00000013          	nop
 80007198:	0001a797          	auipc	a5,0x1a
 8000719c:	d8c78793          	addi	a5,a5,-628 # 80020f24 <pio>
@@ -7619,16 +13267,37 @@ Disassembly of section .text:
 800071a8:	0ff7f793          	andi	a5,a5,255
 800071ac:	0407f793          	andi	a5,a5,64
 800071b0:	fe0784e3          	beqz	a5,80007198 <ns16550_flush+0x4>
+    ;  // nothing
+}
 800071b4:	00000013          	nop
 800071b8:	00008067          	ret
 
 800071bc <main>:
+void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName );
+
+/*-----------------------------------------------------------*/
+
+int main( void )
+{
 800071bc:	fe010113          	addi	sp,sp,-32
 800071c0:	00112e23          	sw	ra,28(sp)
+TimerHandle_t xCheckTimer = NULL;
 800071c4:	00012623          	sw	zero,12(sp)
+
+
+  //printf("hello from RTOS\n");
+	/* Create the standard demo tasks, including the interrupt nesting test
+	tasks. */
+	vCreateBlockTimeTasks();
 800071c8:	184000ef          	jal	ra,8000734c <vCreateBlockTimeTasks>
+	vStartCountingSemaphoreTasks();
 800071cc:	211000ef          	jal	ra,80007bdc <vStartCountingSemaphoreTasks>
+	vStartRecursiveMutexTasks();
 800071d0:	66d000ef          	jal	ra,8000803c <vStartRecursiveMutexTasks>
+
+	/* Create the software timer that performs the 'check' functionality,
+	as described at the top of this file. */
+	xCheckTimer = xTimerCreate( "CheckTimer",					/* A text name, purely to help debugging. */
 800071d4:	00000717          	auipc	a4,0x0
 800071d8:	06870713          	addi	a4,a4,104 # 8000723c <prvCheckTimerCallback>
 800071dc:	00000693          	li	a3,0
@@ -7639,8 +13308,16 @@ Disassembly of section .text:
 800071f0:	e7c50513          	addi	a0,a0,-388 # 80020068 <__rodata_start+0x68>
 800071f4:	f05fd0ef          	jal	ra,800050f8 <xTimerCreate>
 800071f8:	00a12623          	sw	a0,12(sp)
+
+	/* If the software timer was created successfully, start it.  It won't
+	actually start running until the scheduler starts.  A block time of
+	zero is used in this call, although any value could be used as the block
+	time will be ignored because the scheduler has not started yet. */
+	if( xCheckTimer != NULL )
 800071fc:	00c12783          	lw	a5,12(sp)
 80007200:	02078263          	beqz	a5,80007224 <main+0x68>
+	{
+		xTimerStart( xCheckTimer, mainDONT_BLOCK );
 80007204:	d61fb0ef          	jal	ra,80002f64 <xTaskGetTickCount>
 80007208:	00050793          	mv	a5,a0
 8000720c:	00000713          	li	a4,0
@@ -7649,58 +13326,111 @@ Disassembly of section .text:
 80007218:	00100593          	li	a1,1
 8000721c:	00c12503          	lw	a0,12(sp)
 80007220:	f8dfd0ef          	jal	ra,800051ac <xTimerGenericCommand>
+	}
+
+
+	/* Start the kernel.  From here on, only tasks and interrupts will run. */
+  //printf("starting scheduler\n");
+	vTaskStartScheduler();
 80007224:	a71fb0ef          	jal	ra,80002c94 <vTaskStartScheduler>
+
+  //printf("just hanging here\n");
+
+	/* Exit FreeRTOS */
+	return 0;
 80007228:	00000793          	li	a5,0
+}
 8000722c:	00078513          	mv	a0,a5
 80007230:	01c12083          	lw	ra,28(sp)
 80007234:	02010113          	addi	sp,sp,32
 80007238:	00008067          	ret
 
 8000723c <prvCheckTimerCallback>:
+/*-----------------------------------------------------------*/
+
+/* See the description at the top of this file. */
+static void prvCheckTimerCallback(__attribute__ ((unused)) TimerHandle_t xTimer )
+{
 8000723c:	fd010113          	addi	sp,sp,-48
 80007240:	02112623          	sw	ra,44(sp)
 80007244:	00a12623          	sw	a0,12(sp)
+static int count = 0;
+unsigned long ulErrorFound = pdFALSE;
 80007248:	00012e23          	sw	zero,28(sp)
+
+	/* Check all the demo and test tasks to ensure that they are all still
+	running, and that none have detected an error. */
+
+	if( xAreBlockTimeTestTasksStillRunning() != pdPASS )
 8000724c:	0ed000ef          	jal	ra,80007b38 <xAreBlockTimeTestTasksStillRunning>
 80007250:	00050713          	mv	a4,a0
 80007254:	00100793          	li	a5,1
 80007258:	00f70e63          	beq	a4,a5,80007274 <prvCheckTimerCallback+0x38>
+	{
+		printf("Error in block time test tasks \r\n");
 8000725c:	00019517          	auipc	a0,0x19
 80007260:	e1850513          	addi	a0,a0,-488 # 80020074 <__rodata_start+0x74>
 80007264:	480010ef          	jal	ra,800086e4 <printf>
+		ulErrorFound |= ( 0x01UL << 1UL );
 80007268:	01c12783          	lw	a5,28(sp)
 8000726c:	0027e793          	ori	a5,a5,2
 80007270:	00f12e23          	sw	a5,28(sp)
+	}
+
+	if( xAreCountingSemaphoreTasksStillRunning() != pdPASS )
 80007274:	521000ef          	jal	ra,80007f94 <xAreCountingSemaphoreTasksStillRunning>
 80007278:	00050713          	mv	a4,a0
 8000727c:	00100793          	li	a5,1
 80007280:	00f70e63          	beq	a4,a5,8000729c <prvCheckTimerCallback+0x60>
+	{
+		printf("Error in counting semaphore tasks \r\n");
 80007284:	00019517          	auipc	a0,0x19
 80007288:	e1450513          	addi	a0,a0,-492 # 80020098 <__rodata_start+0x98>
 8000728c:	458010ef          	jal	ra,800086e4 <printf>
+		ulErrorFound |= ( 0x01UL << 2UL );
 80007290:	01c12783          	lw	a5,28(sp)
 80007294:	0047e793          	ori	a5,a5,4
 80007298:	00f12e23          	sw	a5,28(sp)
+	}
+
+	if( xAreRecursiveMutexTasksStillRunning() != pdPASS )
 8000729c:	2ec010ef          	jal	ra,80008588 <xAreRecursiveMutexTasksStillRunning>
 800072a0:	00050713          	mv	a4,a0
 800072a4:	00100793          	li	a5,1
 800072a8:	00f70e63          	beq	a4,a5,800072c4 <prvCheckTimerCallback+0x88>
+	{
+		printf("Error in recursive mutex tasks \r\n");
 800072ac:	00019517          	auipc	a0,0x19
 800072b0:	e1450513          	addi	a0,a0,-492 # 800200c0 <__rodata_start+0xc0>
 800072b4:	430010ef          	jal	ra,800086e4 <printf>
+		ulErrorFound |= ( 0x01UL << 3UL );
 800072b8:	01c12783          	lw	a5,28(sp)
 800072bc:	0087e793          	ori	a5,a5,8
 800072c0:	00f12e23          	sw	a5,28(sp)
+	}
+
+	if( ulErrorFound != pdFALSE )
 800072c4:	01c12783          	lw	a5,28(sp)
 800072c8:	00078e63          	beqz	a5,800072e4 <prvCheckTimerCallback+0xa8>
+	{
+		__asm volatile("li t6, 0xbeefdead");
 800072cc:	beefefb7          	lui	t6,0xbeefe
 800072d0:	eadf8f93          	addi	t6,t6,-339 # beefdead <__stack+0x3eec12a1>
+		printf("One or more threads has exited! \r\n");
 800072d4:	00019517          	auipc	a0,0x19
 800072d8:	e1050513          	addi	a0,a0,-496 # 800200e4 <__rodata_start+0xe4>
 800072dc:	408010ef          	jal	ra,800086e4 <printf>
+
+    /* Do _not_ stop the scheduler; this would halt the system, but was left for reference on how to do so */
+	/* Stop scheduler */
+//    vTaskEndScheduler();
+
+}
 800072e0:	0380006f          	j	80007318 <prvCheckTimerCallback+0xdc>
+		__asm volatile("li t6, 0xdeadbeef");
 800072e4:	deadcfb7          	lui	t6,0xdeadc
 800072e8:	eeff8f93          	addi	t6,t6,-273 # deadbeef <__stack+0x5ea9f2e3>
+		printf("[%d] All threads still alive! \r\n", count++);
 800072ec:	00033797          	auipc	a5,0x33
 800072f0:	7d878793          	addi	a5,a5,2008 # 8003aac4 <count.2383>
 800072f4:	0007a783          	lw	a5,0(a5)
@@ -7712,29 +13442,62 @@ Disassembly of section .text:
 8000730c:	00019517          	auipc	a0,0x19
 80007310:	dfc50513          	addi	a0,a0,-516 # 80020108 <__rodata_start+0x108>
 80007314:	3d0010ef          	jal	ra,800086e4 <printf>
+}
 80007318:	00000013          	nop
 8000731c:	02c12083          	lw	ra,44(sp)
 80007320:	03010113          	addi	sp,sp,48
 80007324:	00008067          	ret
 
 80007328 <vApplicationMallocFailedHook>:
-80007328:	30047073          	csrci	mstatus,8
+	demo application.  If heap_1.c or heap_2.c are used, then the size of the
+	heap available to pvPortMalloc() is defined by configTOTAL_HEAP_SIZE in
+	FreeRTOSConfig.h, and the xPortGetFreeHeapSize() API function can be used
+	to query the size of free heap space that remains (although it does not
+	provide information on how the remaining heap might be fragmented). */
+	taskDISABLE_INTERRUPTS();
+80007328:	30007073          	csrci	mstatus,0
+	for( ;; );
 8000732c:	0000006f          	j	8000732c <vApplicationMallocFailedHook+0x4>
 
 80007330 <vApplicationIdleHook>:
+	specified, or call vTaskDelay()).  If the application makes use of the
+	vTaskDelete() API function (as this demo application does) then it is also
+	important that vApplicationIdleHook() is permitted to return to its calling
+	function, because it is the responsibility of the idle task to clean up
+	memory allocated by the kernel to any task that has since been deleted. */
+}
 80007330:	00000013          	nop
 80007334:	00008067          	ret
 
 80007338 <vApplicationStackOverflowHook>:
+/*-----------------------------------------------------------*/
+
+void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName )
+{
 80007338:	ff010113          	addi	sp,sp,-16
 8000733c:	00a12623          	sw	a0,12(sp)
 80007340:	00b12423          	sw	a1,8(sp)
-80007344:	30047073          	csrci	mstatus,8
+	( void ) pxTask;
+
+	/* Run time stack overflow checking is performed if
+	configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2.  This hook
+	function is called if a stack overflow is detected. */
+	taskDISABLE_INTERRUPTS();
+80007344:	30007073          	csrci	mstatus,0
+	for( ;; );
 80007348:	0000006f          	j	80007348 <vApplicationStackOverflowHook+0x10>
 
 8000734c <vCreateBlockTimeTasks>:
+static void vSecondaryBlockTimeTestTask( void *pvParameters );
+
+/*-----------------------------------------------------------*/
+
+void vCreateBlockTimeTasks( void )
+{
 8000734c:	ff010113          	addi	sp,sp,-16
 80007350:	00112623          	sw	ra,12(sp)
+	/* Create the queue on which the two tasks block. */
+    xTestQueue = xQueueCreate( bktQUEUE_LENGTH, sizeof( BaseType_t ) );
 80007354:	00000613          	li	a2,0
 80007358:	00400593          	li	a1,4
 8000735c:	00500513          	li	a0,5
@@ -7743,6 +13506,12 @@ Disassembly of section .text:
 80007368:	00033797          	auipc	a5,0x33
 8000736c:	76078793          	addi	a5,a5,1888 # 8003aac8 <xTestQueue>
 80007370:	00e7a023          	sw	a4,0(a5)
+	in use.  The queue registry is provided as a means for kernel aware
+	debuggers to locate queues and has no purpose if a kernel aware debugger
+	is not being used.  The call to vQueueAddToRegistry() will be removed
+	by the pre-processor if configQUEUE_REGISTRY_SIZE is not defined or is
+	defined to be less than 1. */
+	vQueueAddToRegistry( xTestQueue, "Block_Time_Queue" );
 80007374:	00033797          	auipc	a5,0x33
 80007378:	75478793          	addi	a5,a5,1876 # 8003aac8 <xTestQueue>
 8000737c:	0007a783          	lw	a5,0(a5)
@@ -7750,6 +13519,9 @@ Disassembly of section .text:
 80007384:	dac58593          	addi	a1,a1,-596 # 8002012c <__rodata_start+0x12c>
 80007388:	00078513          	mv	a0,a5
 8000738c:	aa1fa0ef          	jal	ra,80001e2c <vQueueAddToRegistry>
+
+	/* Create the two test tasks. */
+	xTaskCreate( vPrimaryBlockTimeTestTask, "BTest1", configMINIMAL_STACK_SIZE, NULL, bktPRIMARY_PRIORITY, NULL );
 80007390:	00000893          	li	a7,0
 80007394:	00000813          	li	a6,0
 80007398:	00000793          	li	a5,0
@@ -7761,6 +13533,7 @@ Disassembly of section .text:
 800073b0:	00000517          	auipc	a0,0x0
 800073b4:	04c50513          	addi	a0,a0,76 # 800073fc <vPrimaryBlockTimeTestTask>
 800073b8:	c05fa0ef          	jal	ra,80001fbc <xTaskGenericCreate>
+	xTaskCreate( vSecondaryBlockTimeTestTask, "BTest2", configMINIMAL_STACK_SIZE, NULL, bktSECONDARY_PRIORITY, &xSecondary );
 800073bc:	00000893          	li	a7,0
 800073c0:	00000813          	li	a6,0
 800073c4:	00033797          	auipc	a5,0x33
@@ -7773,23 +13546,44 @@ Disassembly of section .text:
 800073e0:	00000517          	auipc	a0,0x0
 800073e4:	5b850513          	addi	a0,a0,1464 # 80007998 <vSecondaryBlockTimeTestTask>
 800073e8:	bd5fa0ef          	jal	ra,80001fbc <xTaskGenericCreate>
+}
 800073ec:	00000013          	nop
 800073f0:	00c12083          	lw	ra,12(sp)
 800073f4:	01010113          	addi	sp,sp,16
 800073f8:	00008067          	ret
 
 800073fc <vPrimaryBlockTimeTestTask>:
+/*-----------------------------------------------------------*/
+
+static void vPrimaryBlockTimeTestTask( void *pvParameters )
+{
 800073fc:	fc010113          	addi	sp,sp,-64
 80007400:	02112e23          	sw	ra,60(sp)
 80007404:	00a12623          	sw	a0,12(sp)
+	{
+		/*********************************************************************
+        Test 1
+
+        Simple block time wakeup test on queue receives. */
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 80007408:	02012023          	sw	zero,32(sp)
 8000740c:	0b40006f          	j	800074c0 <vPrimaryBlockTimeTestTask+0xc4>
+		{
+			/* The queue is empty. Attempt to read from the queue using a block
+			time.  When we wake, ensure the delta in time is as expected. */
+			xTimeToBlock = ( TickType_t ) ( bktPRIMARY_BLOCK_TIME << xItem );
 80007410:	02012783          	lw	a5,32(sp)
 80007414:	00a00713          	li	a4,10
 80007418:	00f717b3          	sll	a5,a4,a5
 8000741c:	02f12623          	sw	a5,44(sp)
+
+			xTimeWhenBlocking = xTaskGetTickCount();
 80007420:	b45fb0ef          	jal	ra,80002f64 <xTaskGetTickCount>
 80007424:	02a12423          	sw	a0,40(sp)
+
+			/* We should unblock after xTimeToBlock having not received
+			anything on the queue. */
+			if( xQueueReceive( xTestQueue, &xData, xTimeToBlock ) != errQUEUE_EMPTY )
 80007428:	00033797          	auipc	a5,0x33
 8000742c:	6a078793          	addi	a5,a5,1696 # 8003aac8 <xTestQueue>
 80007430:	0007a783          	lw	a5,0(a5)
@@ -7801,38 +13595,66 @@ Disassembly of section .text:
 80007448:	fe5f90ef          	jal	ra,8000142c <xQueueGenericReceive>
 8000744c:	00050793          	mv	a5,a0
 80007450:	00078a63          	beqz	a5,80007464 <vPrimaryBlockTimeTestTask+0x68>
+			{
+				xErrorOccurred = pdTRUE;
 80007454:	00033797          	auipc	a5,0x33
 80007458:	68478793          	addi	a5,a5,1668 # 8003aad8 <xErrorOccurred>
 8000745c:	00100713          	li	a4,1
 80007460:	00e7a023          	sw	a4,0(a5)
+			}
+
+			/* How long were we blocked for? */
+			xBlockedTime = xTaskGetTickCount() - xTimeWhenBlocking;
 80007464:	b01fb0ef          	jal	ra,80002f64 <xTaskGetTickCount>
 80007468:	00050713          	mv	a4,a0
 8000746c:	02812783          	lw	a5,40(sp)
 80007470:	40f707b3          	sub	a5,a4,a5
 80007474:	02f12223          	sw	a5,36(sp)
+
+			if( xBlockedTime < xTimeToBlock )
 80007478:	02412703          	lw	a4,36(sp)
 8000747c:	02c12783          	lw	a5,44(sp)
 80007480:	00f77a63          	bleu	a5,a4,80007494 <vPrimaryBlockTimeTestTask+0x98>
+			{
+				/* Should not have blocked for less than we requested. */
+				xErrorOccurred = pdTRUE;
 80007484:	00033797          	auipc	a5,0x33
 80007488:	65478793          	addi	a5,a5,1620 # 8003aad8 <xErrorOccurred>
 8000748c:	00100713          	li	a4,1
 80007490:	00e7a023          	sw	a4,0(a5)
+			}
+
+			if( xBlockedTime > ( xTimeToBlock + bktALLOWABLE_MARGIN ) )
 80007494:	02c12783          	lw	a5,44(sp)
 80007498:	00f78793          	addi	a5,a5,15
 8000749c:	02412703          	lw	a4,36(sp)
 800074a0:	00e7fa63          	bleu	a4,a5,800074b4 <vPrimaryBlockTimeTestTask+0xb8>
+			{
+				/* Should not have blocked for longer than we requested,
+				although we would not necessarily run as soon as we were
+				unblocked so a margin is allowed. */
+				xErrorOccurred = pdTRUE;
 800074a4:	00033797          	auipc	a5,0x33
 800074a8:	63478793          	addi	a5,a5,1588 # 8003aad8 <xErrorOccurred>
 800074ac:	00100713          	li	a4,1
 800074b0:	00e7a023          	sw	a4,0(a5)
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 800074b4:	02012783          	lw	a5,32(sp)
 800074b8:	00178793          	addi	a5,a5,1
 800074bc:	02f12023          	sw	a5,32(sp)
 800074c0:	02012703          	lw	a4,32(sp)
 800074c4:	00400793          	li	a5,4
 800074c8:	f4e7d4e3          	ble	a4,a5,80007410 <vPrimaryBlockTimeTestTask+0x14>
+        Test 2
+
+        Simple block time wakeup test on queue sends.
+
+		First fill the queue.  It should be empty so all sends should pass. */
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 800074cc:	02012023          	sw	zero,32(sp)
 800074d0:	0500006f          	j	80007520 <vPrimaryBlockTimeTestTask+0x124>
+		{
+			if( xQueueSend( xTestQueue, &xItem, bktDONT_BLOCK ) != pdPASS )
 800074d4:	00033797          	auipc	a5,0x33
 800074d8:	5f478793          	addi	a5,a5,1524 # 8003aac8 <xTestQueue>
 800074dc:	0007a783          	lw	a5,0(a5)
@@ -7845,24 +13667,43 @@ Disassembly of section .text:
 800074f8:	00050713          	mv	a4,a0
 800074fc:	00100793          	li	a5,1
 80007500:	00f70a63          	beq	a4,a5,80007514 <vPrimaryBlockTimeTestTask+0x118>
+			{
+				xErrorOccurred = pdTRUE;
 80007504:	00033797          	auipc	a5,0x33
 80007508:	5d478793          	addi	a5,a5,1492 # 8003aad8 <xErrorOccurred>
 8000750c:	00100713          	li	a4,1
 80007510:	00e7a023          	sw	a4,0(a5)
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 80007514:	02012783          	lw	a5,32(sp)
 80007518:	00178793          	addi	a5,a5,1
 8000751c:	02f12023          	sw	a5,32(sp)
 80007520:	02012703          	lw	a4,32(sp)
 80007524:	00400793          	li	a5,4
 80007528:	fae7d6e3          	ble	a4,a5,800074d4 <vPrimaryBlockTimeTestTask+0xd8>
+			#if configUSE_PREEMPTION == 0
+				taskYIELD();
+			#endif
+		}
+
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 8000752c:	02012023          	sw	zero,32(sp)
 80007530:	0b40006f          	j	800075e4 <vPrimaryBlockTimeTestTask+0x1e8>
+		{
+			/* The queue is full. Attempt to write to the queue using a block
+			time.  When we wake, ensure the delta in time is as expected. */
+			xTimeToBlock = ( TickType_t ) ( bktPRIMARY_BLOCK_TIME << xItem );
 80007534:	02012783          	lw	a5,32(sp)
 80007538:	00a00713          	li	a4,10
 8000753c:	00f717b3          	sll	a5,a4,a5
 80007540:	02f12623          	sw	a5,44(sp)
+
+			xTimeWhenBlocking = xTaskGetTickCount();
 80007544:	a21fb0ef          	jal	ra,80002f64 <xTaskGetTickCount>
 80007548:	02a12423          	sw	a0,40(sp)
+
+			/* We should unblock after xTimeToBlock having not received
+			anything on the queue. */
+			if( xQueueSend( xTestQueue, &xItem, xTimeToBlock ) != errQUEUE_FULL )
 8000754c:	00033797          	auipc	a5,0x33
 80007550:	57c78793          	addi	a5,a5,1404 # 8003aac8 <xTestQueue>
 80007554:	0007a783          	lw	a5,0(a5)
@@ -7874,59 +13715,103 @@ Disassembly of section .text:
 8000756c:	9f5f90ef          	jal	ra,80000f60 <xQueueGenericSend>
 80007570:	00050793          	mv	a5,a0
 80007574:	00078a63          	beqz	a5,80007588 <vPrimaryBlockTimeTestTask+0x18c>
+			{
+				xErrorOccurred = pdTRUE;
 80007578:	00033797          	auipc	a5,0x33
 8000757c:	56078793          	addi	a5,a5,1376 # 8003aad8 <xErrorOccurred>
 80007580:	00100713          	li	a4,1
 80007584:	00e7a023          	sw	a4,0(a5)
+			}
+
+			/* How long were we blocked for? */
+			xBlockedTime = xTaskGetTickCount() - xTimeWhenBlocking;
 80007588:	9ddfb0ef          	jal	ra,80002f64 <xTaskGetTickCount>
 8000758c:	00050713          	mv	a4,a0
 80007590:	02812783          	lw	a5,40(sp)
 80007594:	40f707b3          	sub	a5,a4,a5
 80007598:	02f12223          	sw	a5,36(sp)
+
+			if( xBlockedTime < xTimeToBlock )
 8000759c:	02412703          	lw	a4,36(sp)
 800075a0:	02c12783          	lw	a5,44(sp)
 800075a4:	00f77a63          	bleu	a5,a4,800075b8 <vPrimaryBlockTimeTestTask+0x1bc>
+			{
+				/* Should not have blocked for less than we requested. */
+				xErrorOccurred = pdTRUE;
 800075a8:	00033797          	auipc	a5,0x33
 800075ac:	53078793          	addi	a5,a5,1328 # 8003aad8 <xErrorOccurred>
 800075b0:	00100713          	li	a4,1
 800075b4:	00e7a023          	sw	a4,0(a5)
+			}
+
+			if( xBlockedTime > ( xTimeToBlock + bktALLOWABLE_MARGIN ) )
 800075b8:	02c12783          	lw	a5,44(sp)
 800075bc:	00f78793          	addi	a5,a5,15
 800075c0:	02412703          	lw	a4,36(sp)
 800075c4:	00e7fa63          	bleu	a4,a5,800075d8 <vPrimaryBlockTimeTestTask+0x1dc>
+			{
+				/* Should not have blocked for longer than we requested,
+				although we would not necessarily run as soon as we were
+				unblocked so a margin is allowed. */
+				xErrorOccurred = pdTRUE;
 800075c8:	00033797          	auipc	a5,0x33
 800075cc:	51078793          	addi	a5,a5,1296 # 8003aad8 <xErrorOccurred>
 800075d0:	00100713          	li	a4,1
 800075d4:	00e7a023          	sw	a4,0(a5)
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 800075d8:	02012783          	lw	a5,32(sp)
 800075dc:	00178793          	addi	a5,a5,1
 800075e0:	02f12023          	sw	a5,32(sp)
 800075e4:	02012703          	lw	a4,32(sp)
 800075e8:	00400793          	li	a5,4
 800075ec:	f4e7d4e3          	ble	a4,a5,80007534 <vPrimaryBlockTimeTestTask+0x138>
+		recognise that its block time has not expired and return to block for
+		the remains of its block time.
+
+		Wake the other task so it blocks attempting to post to the already
+		full queue. */
+		xRunIndicator = 0;
 800075f0:	00033797          	auipc	a5,0x33
 800075f4:	4ec78793          	addi	a5,a5,1260 # 8003aadc <xRunIndicator>
 800075f8:	0007a023          	sw	zero,0(a5)
+		vTaskResume( xSecondary );
 800075fc:	00033797          	auipc	a5,0x33
 80007600:	4d078793          	addi	a5,a5,1232 # 8003aacc <xSecondary>
 80007604:	0007a783          	lw	a5,0(a5)
 80007608:	00078513          	mv	a0,a5
 8000760c:	c5cfb0ef          	jal	ra,80002a68 <vTaskResume>
+
+		/* We need to wait a little to ensure the other task executes. */
+		while( xRunIndicator != bktRUN_INDICATOR )
 80007610:	00c0006f          	j	8000761c <vPrimaryBlockTimeTestTask+0x220>
+		{
+			/* The other task has not yet executed. */
+			vTaskDelay( bktSHORT_WAIT );
 80007614:	01400513          	li	a0,20
 80007618:	e65fa0ef          	jal	ra,8000247c <vTaskDelay>
+		while( xRunIndicator != bktRUN_INDICATOR )
 8000761c:	00033797          	auipc	a5,0x33
 80007620:	4c078793          	addi	a5,a5,1216 # 8003aadc <xRunIndicator>
 80007624:	0007a703          	lw	a4,0(a5)
 80007628:	05500793          	li	a5,85
 8000762c:	fef714e3          	bne	a4,a5,80007614 <vPrimaryBlockTimeTestTask+0x218>
+		}
+		/* Make sure the other task is blocked on the queue. */
+		vTaskDelay( bktSHORT_WAIT );
 80007630:	01400513          	li	a0,20
 80007634:	e49fa0ef          	jal	ra,8000247c <vTaskDelay>
+		xRunIndicator = 0;
 80007638:	00033797          	auipc	a5,0x33
 8000763c:	4a478793          	addi	a5,a5,1188 # 8003aadc <xRunIndicator>
 80007640:	0007a023          	sw	zero,0(a5)
+
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 80007644:	02012023          	sw	zero,32(sp)
 80007648:	1080006f          	j	80007750 <vPrimaryBlockTimeTestTask+0x354>
+		{
+			/* Now when we make space on the queue the other task should wake
+			but not execute as this task has higher priority. */
+			if( xQueueReceive( xTestQueue, &xData, bktDONT_BLOCK ) != pdPASS )
 8000764c:	00033797          	auipc	a5,0x33
 80007650:	47c78793          	addi	a5,a5,1148 # 8003aac8 <xTestQueue>
 80007654:	0007a783          	lw	a5,0(a5)
@@ -7939,10 +13824,18 @@ Disassembly of section .text:
 80007670:	00050713          	mv	a4,a0
 80007674:	00100793          	li	a5,1
 80007678:	00f70a63          	beq	a4,a5,8000768c <vPrimaryBlockTimeTestTask+0x290>
+			{
+				xErrorOccurred = pdTRUE;
 8000767c:	00033797          	auipc	a5,0x33
 80007680:	45c78793          	addi	a5,a5,1116 # 8003aad8 <xErrorOccurred>
 80007684:	00100713          	li	a4,1
 80007688:	00e7a023          	sw	a4,0(a5)
+			}
+
+			/* Now fill the queue again before the other task gets a chance to
+			execute.  If the other task had executed we would find the queue
+			full ourselves, and the other task have set xRunIndicator. */
+			if( xQueueSend( xTestQueue, &xItem, bktDONT_BLOCK ) != pdPASS )
 8000768c:	00033797          	auipc	a5,0x33
 80007690:	43c78793          	addi	a5,a5,1084 # 8003aac8 <xTestQueue>
 80007694:	0007a783          	lw	a5,0(a5)
@@ -7955,61 +13848,106 @@ Disassembly of section .text:
 800076b0:	00050713          	mv	a4,a0
 800076b4:	00100793          	li	a5,1
 800076b8:	00f70a63          	beq	a4,a5,800076cc <vPrimaryBlockTimeTestTask+0x2d0>
+			{
+				xErrorOccurred = pdTRUE;
 800076bc:	00033797          	auipc	a5,0x33
 800076c0:	41c78793          	addi	a5,a5,1052 # 8003aad8 <xErrorOccurred>
 800076c4:	00100713          	li	a4,1
 800076c8:	00e7a023          	sw	a4,0(a5)
+			}
+
+			if( xRunIndicator == bktRUN_INDICATOR )
 800076cc:	00033797          	auipc	a5,0x33
 800076d0:	41078793          	addi	a5,a5,1040 # 8003aadc <xRunIndicator>
 800076d4:	0007a703          	lw	a4,0(a5)
 800076d8:	05500793          	li	a5,85
 800076dc:	00f71a63          	bne	a4,a5,800076f0 <vPrimaryBlockTimeTestTask+0x2f4>
+			{
+				/* The other task should not have executed. */
+				xErrorOccurred = pdTRUE;
 800076e0:	00033797          	auipc	a5,0x33
 800076e4:	3f878793          	addi	a5,a5,1016 # 8003aad8 <xErrorOccurred>
 800076e8:	00100713          	li	a4,1
 800076ec:	00e7a023          	sw	a4,0(a5)
+			}
+
+			/* Raise the priority of the other task so it executes and blocks
+			on the queue again. */
+			vTaskPrioritySet( xSecondary, bktPRIMARY_PRIORITY + 2 );
 800076f0:	00033797          	auipc	a5,0x33
 800076f4:	3dc78793          	addi	a5,a5,988 # 8003aacc <xSecondary>
 800076f8:	0007a783          	lw	a5,0(a5)
 800076fc:	00400593          	li	a1,4
 80007700:	00078513          	mv	a0,a5
 80007704:	fb5fa0ef          	jal	ra,800026b8 <vTaskPrioritySet>
+
+			/* The other task should now have re-blocked without exiting the
+			queue function. */
+			if( xRunIndicator == bktRUN_INDICATOR )
 80007708:	00033797          	auipc	a5,0x33
 8000770c:	3d478793          	addi	a5,a5,980 # 8003aadc <xRunIndicator>
 80007710:	0007a703          	lw	a4,0(a5)
 80007714:	05500793          	li	a5,85
 80007718:	00f71a63          	bne	a4,a5,8000772c <vPrimaryBlockTimeTestTask+0x330>
+			{
+				/* The other task should not have executed outside of the
+				queue function. */
+				xErrorOccurred = pdTRUE;
 8000771c:	00033797          	auipc	a5,0x33
 80007720:	3bc78793          	addi	a5,a5,956 # 8003aad8 <xErrorOccurred>
 80007724:	00100713          	li	a4,1
 80007728:	00e7a023          	sw	a4,0(a5)
+			}
+
+			/* Set the priority back down. */
+			vTaskPrioritySet( xSecondary, bktSECONDARY_PRIORITY );
 8000772c:	00033797          	auipc	a5,0x33
 80007730:	3a078793          	addi	a5,a5,928 # 8003aacc <xSecondary>
 80007734:	0007a783          	lw	a5,0(a5)
 80007738:	00100593          	li	a1,1
 8000773c:	00078513          	mv	a0,a5
 80007740:	f79fa0ef          	jal	ra,800026b8 <vTaskPrioritySet>
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 80007744:	02012783          	lw	a5,32(sp)
 80007748:	00178793          	addi	a5,a5,1
 8000774c:	02f12023          	sw	a5,32(sp)
 80007750:	02012703          	lw	a4,32(sp)
 80007754:	00400793          	li	a5,4
 80007758:	eee7dae3          	ble	a4,a5,8000764c <vPrimaryBlockTimeTestTask+0x250>
+		}
+
+		/* Let the other task timeout.  When it unblockes it will check that it
+		unblocked at the correct time, then suspend itself. */
+		while( xRunIndicator != bktRUN_INDICATOR )
 8000775c:	00c0006f          	j	80007768 <vPrimaryBlockTimeTestTask+0x36c>
+		{
+			vTaskDelay( bktSHORT_WAIT );
 80007760:	01400513          	li	a0,20
 80007764:	d19fa0ef          	jal	ra,8000247c <vTaskDelay>
+		while( xRunIndicator != bktRUN_INDICATOR )
 80007768:	00033797          	auipc	a5,0x33
 8000776c:	37478793          	addi	a5,a5,884 # 8003aadc <xRunIndicator>
 80007770:	0007a703          	lw	a4,0(a5)
 80007774:	05500793          	li	a5,85
 80007778:	fef714e3          	bne	a4,a5,80007760 <vPrimaryBlockTimeTestTask+0x364>
+		}
+		vTaskDelay( bktSHORT_WAIT );
 8000777c:	01400513          	li	a0,20
 80007780:	cfdfa0ef          	jal	ra,8000247c <vTaskDelay>
+		xRunIndicator = 0;
 80007784:	00033797          	auipc	a5,0x33
 80007788:	35878793          	addi	a5,a5,856 # 8003aadc <xRunIndicator>
 8000778c:	0007a023          	sw	zero,0(a5)
+
+		As per test 3 - but with the send and receive the other way around.
+		The other task blocks attempting to read from the queue.
+
+		Empty the queue.  We should find that it is full. */
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 80007790:	02012023          	sw	zero,32(sp)
 80007794:	0500006f          	j	800077e4 <vPrimaryBlockTimeTestTask+0x3e8>
+		{
+			if( xQueueReceive( xTestQueue, &xData, bktDONT_BLOCK ) != pdPASS )
 80007798:	00033797          	auipc	a5,0x33
 8000779c:	33078793          	addi	a5,a5,816 # 8003aac8 <xTestQueue>
 800077a0:	0007a783          	lw	a5,0(a5)
@@ -8022,36 +13960,60 @@ Disassembly of section .text:
 800077bc:	00050713          	mv	a4,a0
 800077c0:	00100793          	li	a5,1
 800077c4:	00f70a63          	beq	a4,a5,800077d8 <vPrimaryBlockTimeTestTask+0x3dc>
+			{
+				xErrorOccurred = pdTRUE;
 800077c8:	00033797          	auipc	a5,0x33
 800077cc:	31078793          	addi	a5,a5,784 # 8003aad8 <xErrorOccurred>
 800077d0:	00100713          	li	a4,1
 800077d4:	00e7a023          	sw	a4,0(a5)
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 800077d8:	02012783          	lw	a5,32(sp)
 800077dc:	00178793          	addi	a5,a5,1
 800077e0:	02f12023          	sw	a5,32(sp)
 800077e4:	02012703          	lw	a4,32(sp)
 800077e8:	00400793          	li	a5,4
 800077ec:	fae7d6e3          	ble	a4,a5,80007798 <vPrimaryBlockTimeTestTask+0x39c>
+			}
+		}
+
+		/* Wake the other task so it blocks attempting to read from  the
+		already	empty queue. */
+		vTaskResume( xSecondary );
 800077f0:	00033797          	auipc	a5,0x33
 800077f4:	2dc78793          	addi	a5,a5,732 # 8003aacc <xSecondary>
 800077f8:	0007a783          	lw	a5,0(a5)
 800077fc:	00078513          	mv	a0,a5
 80007800:	a68fb0ef          	jal	ra,80002a68 <vTaskResume>
+
+		/* We need to wait a little to ensure the other task executes. */
+		while( xRunIndicator != bktRUN_INDICATOR )
 80007804:	00c0006f          	j	80007810 <vPrimaryBlockTimeTestTask+0x414>
+		{
+			vTaskDelay( bktSHORT_WAIT );
 80007808:	01400513          	li	a0,20
 8000780c:	c71fa0ef          	jal	ra,8000247c <vTaskDelay>
+		while( xRunIndicator != bktRUN_INDICATOR )
 80007810:	00033797          	auipc	a5,0x33
 80007814:	2cc78793          	addi	a5,a5,716 # 8003aadc <xRunIndicator>
 80007818:	0007a703          	lw	a4,0(a5)
 8000781c:	05500793          	li	a5,85
 80007820:	fef714e3          	bne	a4,a5,80007808 <vPrimaryBlockTimeTestTask+0x40c>
+		}
+		vTaskDelay( bktSHORT_WAIT );
 80007824:	01400513          	li	a0,20
 80007828:	c55fa0ef          	jal	ra,8000247c <vTaskDelay>
+		xRunIndicator = 0;
 8000782c:	00033797          	auipc	a5,0x33
 80007830:	2b078793          	addi	a5,a5,688 # 8003aadc <xRunIndicator>
 80007834:	0007a023          	sw	zero,0(a5)
+
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 80007838:	02012023          	sw	zero,32(sp)
 8000783c:	1080006f          	j	80007944 <vPrimaryBlockTimeTestTask+0x548>
+		{
+			/* Now when we place an item on the queue the other task should
+			wake but not execute as this task has higher priority. */
+			if( xQueueSend( xTestQueue, &xItem, bktDONT_BLOCK ) != pdPASS )
 80007840:	00033797          	auipc	a5,0x33
 80007844:	28878793          	addi	a5,a5,648 # 8003aac8 <xTestQueue>
 80007848:	0007a783          	lw	a5,0(a5)
@@ -8064,10 +14026,18 @@ Disassembly of section .text:
 80007864:	00050713          	mv	a4,a0
 80007868:	00100793          	li	a5,1
 8000786c:	00f70a63          	beq	a4,a5,80007880 <vPrimaryBlockTimeTestTask+0x484>
+			{
+				xErrorOccurred = pdTRUE;
 80007870:	00033797          	auipc	a5,0x33
 80007874:	26878793          	addi	a5,a5,616 # 8003aad8 <xErrorOccurred>
 80007878:	00100713          	li	a4,1
 8000787c:	00e7a023          	sw	a4,0(a5)
+			}
+
+			/* Now empty the queue again before the other task gets a chance to
+			execute.  If the other task had executed we would find the queue
+			empty ourselves, and the other task would be suspended. */
+			if( xQueueReceive( xTestQueue, &xData, bktDONT_BLOCK ) != pdPASS )
 80007880:	00033797          	auipc	a5,0x33
 80007884:	24878793          	addi	a5,a5,584 # 8003aac8 <xTestQueue>
 80007888:	0007a783          	lw	a5,0(a5)
@@ -8080,56 +14050,92 @@ Disassembly of section .text:
 800078a4:	00050713          	mv	a4,a0
 800078a8:	00100793          	li	a5,1
 800078ac:	00f70a63          	beq	a4,a5,800078c0 <vPrimaryBlockTimeTestTask+0x4c4>
+			{
+				xErrorOccurred = pdTRUE;
 800078b0:	00033797          	auipc	a5,0x33
 800078b4:	22878793          	addi	a5,a5,552 # 8003aad8 <xErrorOccurred>
 800078b8:	00100713          	li	a4,1
 800078bc:	00e7a023          	sw	a4,0(a5)
+			}
+
+			if( xRunIndicator == bktRUN_INDICATOR )
 800078c0:	00033797          	auipc	a5,0x33
 800078c4:	21c78793          	addi	a5,a5,540 # 8003aadc <xRunIndicator>
 800078c8:	0007a703          	lw	a4,0(a5)
 800078cc:	05500793          	li	a5,85
 800078d0:	00f71a63          	bne	a4,a5,800078e4 <vPrimaryBlockTimeTestTask+0x4e8>
+			{
+				/* The other task should not have executed. */
+				xErrorOccurred = pdTRUE;
 800078d4:	00033797          	auipc	a5,0x33
 800078d8:	20478793          	addi	a5,a5,516 # 8003aad8 <xErrorOccurred>
 800078dc:	00100713          	li	a4,1
 800078e0:	00e7a023          	sw	a4,0(a5)
+			}
+
+			/* Raise the priority of the other task so it executes and blocks
+			on the queue again. */
+			vTaskPrioritySet( xSecondary, bktPRIMARY_PRIORITY + 2 );
 800078e4:	00033797          	auipc	a5,0x33
 800078e8:	1e878793          	addi	a5,a5,488 # 8003aacc <xSecondary>
 800078ec:	0007a783          	lw	a5,0(a5)
 800078f0:	00400593          	li	a1,4
 800078f4:	00078513          	mv	a0,a5
 800078f8:	dc1fa0ef          	jal	ra,800026b8 <vTaskPrioritySet>
+
+			/* The other task should now have re-blocked without exiting the
+			queue function. */
+			if( xRunIndicator == bktRUN_INDICATOR )
 800078fc:	00033797          	auipc	a5,0x33
 80007900:	1e078793          	addi	a5,a5,480 # 8003aadc <xRunIndicator>
 80007904:	0007a703          	lw	a4,0(a5)
 80007908:	05500793          	li	a5,85
 8000790c:	00f71a63          	bne	a4,a5,80007920 <vPrimaryBlockTimeTestTask+0x524>
+			{
+				/* The other task should not have executed outside of the
+				queue function. */
+				xErrorOccurred = pdTRUE;
 80007910:	00033797          	auipc	a5,0x33
 80007914:	1c878793          	addi	a5,a5,456 # 8003aad8 <xErrorOccurred>
 80007918:	00100713          	li	a4,1
 8000791c:	00e7a023          	sw	a4,0(a5)
+			}
+			vTaskPrioritySet( xSecondary, bktSECONDARY_PRIORITY );
 80007920:	00033797          	auipc	a5,0x33
 80007924:	1ac78793          	addi	a5,a5,428 # 8003aacc <xSecondary>
 80007928:	0007a783          	lw	a5,0(a5)
 8000792c:	00100593          	li	a1,1
 80007930:	00078513          	mv	a0,a5
 80007934:	d85fa0ef          	jal	ra,800026b8 <vTaskPrioritySet>
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 80007938:	02012783          	lw	a5,32(sp)
 8000793c:	00178793          	addi	a5,a5,1
 80007940:	02f12023          	sw	a5,32(sp)
 80007944:	02012703          	lw	a4,32(sp)
 80007948:	00400793          	li	a5,4
 8000794c:	eee7dae3          	ble	a4,a5,80007840 <vPrimaryBlockTimeTestTask+0x444>
+		}
+
+		/* Let the other task timeout.  When it unblockes it will check that it
+		unblocked at the correct time, then suspend itself. */
+		while( xRunIndicator != bktRUN_INDICATOR )
 80007950:	00c0006f          	j	8000795c <vPrimaryBlockTimeTestTask+0x560>
+		{
+			vTaskDelay( bktSHORT_WAIT );
 80007954:	01400513          	li	a0,20
 80007958:	b25fa0ef          	jal	ra,8000247c <vTaskDelay>
+		while( xRunIndicator != bktRUN_INDICATOR )
 8000795c:	00033797          	auipc	a5,0x33
 80007960:	18078793          	addi	a5,a5,384 # 8003aadc <xRunIndicator>
 80007964:	0007a703          	lw	a4,0(a5)
 80007968:	05500793          	li	a5,85
 8000796c:	fef714e3          	bne	a4,a5,80007954 <vPrimaryBlockTimeTestTask+0x558>
+		}
+		vTaskDelay( bktSHORT_WAIT );
 80007970:	01400513          	li	a0,20
 80007974:	b09fa0ef          	jal	ra,8000247c <vTaskDelay>
+
+		xPrimaryCycles++;
 80007978:	00033797          	auipc	a5,0x33
 8000797c:	15878793          	addi	a5,a5,344 # 8003aad0 <xPrimaryCycles>
 80007980:	0007a783          	lw	a5,0(a5)
@@ -8137,21 +14143,46 @@ Disassembly of section .text:
 80007988:	00033797          	auipc	a5,0x33
 8000798c:	14878793          	addi	a5,a5,328 # 8003aad0 <xPrimaryCycles>
 80007990:	00e7a023          	sw	a4,0(a5)
+		for( xItem = 0; xItem < bktQUEUE_LENGTH; xItem++ )
 80007994:	a75ff06f          	j	80007408 <vPrimaryBlockTimeTestTask+0xc>
 
 80007998 <vSecondaryBlockTimeTestTask>:
+	}
+}
+/*-----------------------------------------------------------*/
+
+static void vSecondaryBlockTimeTestTask( void *pvParameters )
+{
 80007998:	fd010113          	addi	sp,sp,-48
 8000799c:	02112623          	sw	ra,44(sp)
 800079a0:	00a12623          	sw	a0,12(sp)
+	{
+		/*********************************************************************
+        Test 1 and 2
+
+		This task does does not participate in these tests. */
+		vTaskSuspend( NULL );
 800079a4:	00000513          	li	a0,0
 800079a8:	f15fa0ef          	jal	ra,800028bc <vTaskSuspend>
+        Test 3
+
+		The first thing we do is attempt to read from the queue.  It should be
+		full so we block.  Note the time before we block so we can check the
+		wake time is as per that expected. */
+		xTimeWhenBlocking = xTaskGetTickCount();
 800079ac:	db8fb0ef          	jal	ra,80002f64 <xTaskGetTickCount>
 800079b0:	00a12e23          	sw	a0,28(sp)
+
+		/* We should unblock after bktTIME_TO_BLOCK having not sent
+		anything to the queue. */
+		xData = 0;
 800079b4:	00012a23          	sw	zero,20(sp)
+		xRunIndicator = bktRUN_INDICATOR;
 800079b8:	00033797          	auipc	a5,0x33
 800079bc:	12478793          	addi	a5,a5,292 # 8003aadc <xRunIndicator>
 800079c0:	05500713          	li	a4,85
 800079c4:	00e7a023          	sw	a4,0(a5)
+		if( xQueueSend( xTestQueue, &xData, bktTIME_TO_BLOCK ) != errQUEUE_FULL )
 800079c8:	00033797          	auipc	a5,0x33
 800079cc:	10078793          	addi	a5,a5,256 # 8003aac8 <xTestQueue>
 800079d0:	0007a783          	lw	a5,0(a5)
@@ -8163,41 +14194,76 @@ Disassembly of section .text:
 800079e8:	d78f90ef          	jal	ra,80000f60 <xQueueGenericSend>
 800079ec:	00050793          	mv	a5,a0
 800079f0:	00078a63          	beqz	a5,80007a04 <vSecondaryBlockTimeTestTask+0x6c>
+		{
+			xErrorOccurred = pdTRUE;
 800079f4:	00033797          	auipc	a5,0x33
 800079f8:	0e478793          	addi	a5,a5,228 # 8003aad8 <xErrorOccurred>
 800079fc:	00100713          	li	a4,1
 80007a00:	00e7a023          	sw	a4,0(a5)
+		}
+
+		/* How long were we inside the send function? */
+		xBlockedTime = xTaskGetTickCount() - xTimeWhenBlocking;
 80007a04:	d60fb0ef          	jal	ra,80002f64 <xTaskGetTickCount>
 80007a08:	00050713          	mv	a4,a0
 80007a0c:	01c12783          	lw	a5,28(sp)
 80007a10:	40f707b3          	sub	a5,a4,a5
 80007a14:	00f12c23          	sw	a5,24(sp)
+
+		/* We should not have blocked for less time than bktTIME_TO_BLOCK. */
+		if( xBlockedTime < bktTIME_TO_BLOCK )
 80007a18:	01812703          	lw	a4,24(sp)
 80007a1c:	0ae00793          	li	a5,174
 80007a20:	00e7ea63          	bltu	a5,a4,80007a34 <vSecondaryBlockTimeTestTask+0x9c>
+		{
+			xErrorOccurred = pdTRUE;
 80007a24:	00033797          	auipc	a5,0x33
 80007a28:	0b478793          	addi	a5,a5,180 # 8003aad8 <xErrorOccurred>
 80007a2c:	00100713          	li	a4,1
 80007a30:	00e7a023          	sw	a4,0(a5)
+		}
+
+		/* We should of not blocked for much longer than bktALLOWABLE_MARGIN
+		either.  A margin is permitted as we would not necessarily run as
+		soon as we unblocked. */
+		if( xBlockedTime > ( bktTIME_TO_BLOCK + bktALLOWABLE_MARGIN ) )
 80007a34:	01812703          	lw	a4,24(sp)
 80007a38:	0be00793          	li	a5,190
 80007a3c:	00e7fa63          	bleu	a4,a5,80007a50 <vSecondaryBlockTimeTestTask+0xb8>
+		{
+			xErrorOccurred = pdTRUE;
 80007a40:	00033797          	auipc	a5,0x33
 80007a44:	09878793          	addi	a5,a5,152 # 8003aad8 <xErrorOccurred>
 80007a48:	00100713          	li	a4,1
 80007a4c:	00e7a023          	sw	a4,0(a5)
+		}
+
+		/* Suspend ready for test 3. */
+		xRunIndicator = bktRUN_INDICATOR;
 80007a50:	00033797          	auipc	a5,0x33
 80007a54:	08c78793          	addi	a5,a5,140 # 8003aadc <xRunIndicator>
 80007a58:	05500713          	li	a4,85
 80007a5c:	00e7a023          	sw	a4,0(a5)
+		vTaskSuspend( NULL );
 80007a60:	00000513          	li	a0,0
 80007a64:	e59fa0ef          	jal	ra,800028bc <vTaskSuspend>
+
+		/*********************************************************************
+        Test 4
+
+		As per test three, but with the send and receive reversed. */
+		xTimeWhenBlocking = xTaskGetTickCount();
 80007a68:	cfcfb0ef          	jal	ra,80002f64 <xTaskGetTickCount>
 80007a6c:	00a12e23          	sw	a0,28(sp)
+
+		/* We should unblock after bktTIME_TO_BLOCK having not received
+		anything on the queue. */
+		xRunIndicator = bktRUN_INDICATOR;
 80007a70:	00033797          	auipc	a5,0x33
 80007a74:	06c78793          	addi	a5,a5,108 # 8003aadc <xRunIndicator>
 80007a78:	05500713          	li	a4,85
 80007a7c:	00e7a023          	sw	a4,0(a5)
+		if( xQueueReceive( xTestQueue, &xData, bktTIME_TO_BLOCK ) != errQUEUE_EMPTY )
 80007a80:	00033797          	auipc	a5,0x33
 80007a84:	04878793          	addi	a5,a5,72 # 8003aac8 <xTestQueue>
 80007a88:	0007a783          	lw	a5,0(a5)
@@ -8209,33 +14275,56 @@ Disassembly of section .text:
 80007aa0:	98df90ef          	jal	ra,8000142c <xQueueGenericReceive>
 80007aa4:	00050793          	mv	a5,a0
 80007aa8:	00078a63          	beqz	a5,80007abc <vSecondaryBlockTimeTestTask+0x124>
+		{
+			xErrorOccurred = pdTRUE;
 80007aac:	00033797          	auipc	a5,0x33
 80007ab0:	02c78793          	addi	a5,a5,44 # 8003aad8 <xErrorOccurred>
 80007ab4:	00100713          	li	a4,1
 80007ab8:	00e7a023          	sw	a4,0(a5)
+		}
+
+		xBlockedTime = xTaskGetTickCount() - xTimeWhenBlocking;
 80007abc:	ca8fb0ef          	jal	ra,80002f64 <xTaskGetTickCount>
 80007ac0:	00050713          	mv	a4,a0
 80007ac4:	01c12783          	lw	a5,28(sp)
 80007ac8:	40f707b3          	sub	a5,a4,a5
 80007acc:	00f12c23          	sw	a5,24(sp)
+
+		/* We should not have blocked for less time than bktTIME_TO_BLOCK. */
+		if( xBlockedTime < bktTIME_TO_BLOCK )
 80007ad0:	01812703          	lw	a4,24(sp)
 80007ad4:	0ae00793          	li	a5,174
 80007ad8:	00e7ea63          	bltu	a5,a4,80007aec <vSecondaryBlockTimeTestTask+0x154>
+		{
+			xErrorOccurred = pdTRUE;
 80007adc:	00033797          	auipc	a5,0x33
 80007ae0:	ffc78793          	addi	a5,a5,-4 # 8003aad8 <xErrorOccurred>
 80007ae4:	00100713          	li	a4,1
 80007ae8:	00e7a023          	sw	a4,0(a5)
+		}
+
+		/* We should of not blocked for much longer than bktALLOWABLE_MARGIN
+		either.  A margin is permitted as we would not necessarily run as soon
+		as we unblocked. */
+		if( xBlockedTime > ( bktTIME_TO_BLOCK + bktALLOWABLE_MARGIN ) )
 80007aec:	01812703          	lw	a4,24(sp)
 80007af0:	0be00793          	li	a5,190
 80007af4:	00e7fa63          	bleu	a4,a5,80007b08 <vSecondaryBlockTimeTestTask+0x170>
+		{
+			xErrorOccurred = pdTRUE;
 80007af8:	00033797          	auipc	a5,0x33
 80007afc:	fe078793          	addi	a5,a5,-32 # 8003aad8 <xErrorOccurred>
 80007b00:	00100713          	li	a4,1
 80007b04:	00e7a023          	sw	a4,0(a5)
+		}
+
+		xRunIndicator = bktRUN_INDICATOR;
 80007b08:	00033797          	auipc	a5,0x33
 80007b0c:	fd478793          	addi	a5,a5,-44 # 8003aadc <xRunIndicator>
 80007b10:	05500713          	li	a4,85
 80007b14:	00e7a023          	sw	a4,0(a5)
+
+		xSecondaryCycles++;
 80007b18:	00033797          	auipc	a5,0x33
 80007b1c:	fbc78793          	addi	a5,a5,-68 # 8003aad4 <xSecondaryCycles>
 80007b20:	0007a783          	lw	a5,0(a5)
@@ -8243,12 +14332,25 @@ Disassembly of section .text:
 80007b28:	00033797          	auipc	a5,0x33
 80007b2c:	fac78793          	addi	a5,a5,-84 # 8003aad4 <xSecondaryCycles>
 80007b30:	00e7a023          	sw	a4,0(a5)
+		vTaskSuspend( NULL );
 80007b34:	e71ff06f          	j	800079a4 <vSecondaryBlockTimeTestTask+0xc>
 
 80007b38 <xAreBlockTimeTestTasksStillRunning>:
+	}
+}
+/*-----------------------------------------------------------*/
+
+BaseType_t xAreBlockTimeTestTasksStillRunning( void )
+{
 80007b38:	ff010113          	addi	sp,sp,-16
+static BaseType_t xLastPrimaryCycleCount = 0, xLastSecondaryCycleCount = 0;
+BaseType_t xReturn = pdPASS;
 80007b3c:	00100793          	li	a5,1
 80007b40:	00f12623          	sw	a5,12(sp)
+
+	/* Have both tasks performed at least one cycle since this function was
+	last called? */
+	if( xPrimaryCycles == xLastPrimaryCycleCount )
 80007b44:	00033797          	auipc	a5,0x33
 80007b48:	f8c78793          	addi	a5,a5,-116 # 8003aad0 <xPrimaryCycles>
 80007b4c:	0007a703          	lw	a4,0(a5)
@@ -8256,7 +14358,12 @@ Disassembly of section .text:
 80007b54:	f9078793          	addi	a5,a5,-112 # 8003aae0 <xLastPrimaryCycleCount.1388>
 80007b58:	0007a783          	lw	a5,0(a5)
 80007b5c:	00f71463          	bne	a4,a5,80007b64 <xAreBlockTimeTestTasksStillRunning+0x2c>
+	{
+		xReturn = pdFAIL;
 80007b60:	00012623          	sw	zero,12(sp)
+	}
+
+	if( xSecondaryCycles == xLastSecondaryCycleCount )
 80007b64:	00033797          	auipc	a5,0x33
 80007b68:	f7078793          	addi	a5,a5,-144 # 8003aad4 <xSecondaryCycles>
 80007b6c:	0007a703          	lw	a4,0(a5)
@@ -8264,33 +14371,57 @@ Disassembly of section .text:
 80007b74:	f7478793          	addi	a5,a5,-140 # 8003aae4 <xLastSecondaryCycleCount.1389>
 80007b78:	0007a783          	lw	a5,0(a5)
 80007b7c:	00f71463          	bne	a4,a5,80007b84 <xAreBlockTimeTestTasksStillRunning+0x4c>
+	{
+		xReturn = pdFAIL;
 80007b80:	00012623          	sw	zero,12(sp)
+	}
+
+	if( xErrorOccurred == pdTRUE )
 80007b84:	00033797          	auipc	a5,0x33
 80007b88:	f5478793          	addi	a5,a5,-172 # 8003aad8 <xErrorOccurred>
 80007b8c:	0007a703          	lw	a4,0(a5)
 80007b90:	00100793          	li	a5,1
 80007b94:	00f71463          	bne	a4,a5,80007b9c <xAreBlockTimeTestTasksStillRunning+0x64>
+	{
+		xReturn = pdFAIL;
 80007b98:	00012623          	sw	zero,12(sp)
+	}
+
+	xLastSecondaryCycleCount = xSecondaryCycles;
 80007b9c:	00033797          	auipc	a5,0x33
 80007ba0:	f3878793          	addi	a5,a5,-200 # 8003aad4 <xSecondaryCycles>
 80007ba4:	0007a703          	lw	a4,0(a5)
 80007ba8:	00033797          	auipc	a5,0x33
 80007bac:	f3c78793          	addi	a5,a5,-196 # 8003aae4 <xLastSecondaryCycleCount.1389>
 80007bb0:	00e7a023          	sw	a4,0(a5)
+	xLastPrimaryCycleCount = xPrimaryCycles;
 80007bb4:	00033797          	auipc	a5,0x33
 80007bb8:	f1c78793          	addi	a5,a5,-228 # 8003aad0 <xPrimaryCycles>
 80007bbc:	0007a703          	lw	a4,0(a5)
 80007bc0:	00033797          	auipc	a5,0x33
 80007bc4:	f2078793          	addi	a5,a5,-224 # 8003aae0 <xLastPrimaryCycleCount.1388>
 80007bc8:	00e7a023          	sw	a4,0(a5)
+
+	return xReturn;
 80007bcc:	00c12783          	lw	a5,12(sp)
+}
 80007bd0:	00078513          	mv	a0,a5
 80007bd4:	01010113          	addi	sp,sp,16
 80007bd8:	00008067          	ret
 
 80007bdc <vStartCountingSemaphoreTasks>:
+static volatile xCountSemStruct xParameters[ countNUM_TEST_TASKS ];
+
+/*-----------------------------------------------------------*/
+
+void vStartCountingSemaphoreTasks( void )
+{
 80007bdc:	ff010113          	addi	sp,sp,-16
 80007be0:	00112623          	sw	ra,12(sp)
+	/* Create the semaphores that we are going to use for the test/demo.  The
+	first should be created such that it starts at its maximum count value,
+	the second should be created such that it starts with a count value of zero. */
+	xParameters[ 0 ].xSemaphore = xSemaphoreCreateCounting( countMAX_COUNT_VALUE, countMAX_COUNT_VALUE );
 80007be4:	0c800593          	li	a1,200
 80007be8:	0c800513          	li	a0,200
 80007bec:	af4f90ef          	jal	ra,80000ee0 <xQueueCreateCountingSemaphore>
@@ -8298,13 +14429,17 @@ Disassembly of section .text:
 80007bf4:	00033797          	auipc	a5,0x33
 80007bf8:	ef878793          	addi	a5,a5,-264 # 8003aaec <xParameters>
 80007bfc:	00e7a023          	sw	a4,0(a5)
+	xParameters[ 0 ].uxExpectedStartCount = countSTART_AT_MAX_COUNT;
 80007c00:	00033797          	auipc	a5,0x33
 80007c04:	eec78793          	addi	a5,a5,-276 # 8003aaec <xParameters>
 80007c08:	0aa00713          	li	a4,170
 80007c0c:	00e7a223          	sw	a4,4(a5)
+	xParameters[ 0 ].uxLoopCounter = 0;
 80007c10:	00033797          	auipc	a5,0x33
 80007c14:	edc78793          	addi	a5,a5,-292 # 8003aaec <xParameters>
 80007c18:	0007a423          	sw	zero,8(a5)
+
+	xParameters[ 1 ].xSemaphore = xSemaphoreCreateCounting( countMAX_COUNT_VALUE, 0 );
 80007c1c:	00000593          	li	a1,0
 80007c20:	0c800513          	li	a0,200
 80007c24:	abcf90ef          	jal	ra,80000ee0 <xQueueCreateCountingSemaphore>
@@ -8312,12 +14447,20 @@ Disassembly of section .text:
 80007c2c:	00033797          	auipc	a5,0x33
 80007c30:	ec078793          	addi	a5,a5,-320 # 8003aaec <xParameters>
 80007c34:	00e7a623          	sw	a4,12(a5)
+	xParameters[ 1 ].uxExpectedStartCount = 0;
 80007c38:	00033797          	auipc	a5,0x33
 80007c3c:	eb478793          	addi	a5,a5,-332 # 8003aaec <xParameters>
 80007c40:	0007a823          	sw	zero,16(a5)
+	xParameters[ 1 ].uxLoopCounter = 0;
 80007c44:	00033797          	auipc	a5,0x33
 80007c48:	ea878793          	addi	a5,a5,-344 # 8003aaec <xParameters>
 80007c4c:	0007aa23          	sw	zero,20(a5)
+	in use.  The registry is provided as a means for kernel aware 
+	debuggers to locate semaphores and has no purpose if a kernel aware debugger
+	is not being used.  The call to vQueueAddToRegistry() will be removed
+	by the pre-processor if configQUEUE_REGISTRY_SIZE is not defined or is 
+	defined to be less than 1. */
+	vQueueAddToRegistry( ( QueueHandle_t ) xParameters[ 0 ].xSemaphore, "Counting_Sem_1" );
 80007c50:	00033797          	auipc	a5,0x33
 80007c54:	e9c78793          	addi	a5,a5,-356 # 8003aaec <xParameters>
 80007c58:	0007a783          	lw	a5,0(a5)
@@ -8325,6 +14468,7 @@ Disassembly of section .text:
 80007c60:	4f458593          	addi	a1,a1,1268 # 80020150 <__rodata_start+0x150>
 80007c64:	00078513          	mv	a0,a5
 80007c68:	9c4fa0ef          	jal	ra,80001e2c <vQueueAddToRegistry>
+	vQueueAddToRegistry( ( QueueHandle_t ) xParameters[ 1 ].xSemaphore, "Counting_Sem_2" );
 80007c6c:	00033797          	auipc	a5,0x33
 80007c70:	e8078793          	addi	a5,a5,-384 # 8003aaec <xParameters>
 80007c74:	00c7a783          	lw	a5,12(a5)
@@ -8332,6 +14476,10 @@ Disassembly of section .text:
 80007c7c:	4e858593          	addi	a1,a1,1256 # 80020160 <__rodata_start+0x160>
 80007c80:	00078513          	mv	a0,a5
 80007c84:	9a8fa0ef          	jal	ra,80001e2c <vQueueAddToRegistry>
+
+
+	/* Were the semaphores created? */
+	if( ( xParameters[ 0 ].xSemaphore != NULL ) || ( xParameters[ 1 ].xSemaphore != NULL ) )
 80007c88:	00033797          	auipc	a5,0x33
 80007c8c:	e6478793          	addi	a5,a5,-412 # 8003aaec <xParameters>
 80007c90:	0007a783          	lw	a5,0(a5)
@@ -8340,6 +14488,9 @@ Disassembly of section .text:
 80007c9c:	e5478793          	addi	a5,a5,-428 # 8003aaec <xParameters>
 80007ca0:	00c7a783          	lw	a5,12(a5)
 80007ca4:	06078263          	beqz	a5,80007d08 <vStartCountingSemaphoreTasks+0x12c>
+	{
+		/* Create the demo tasks, passing in the semaphore to use as the parameter. */
+		xTaskCreate( prvCountingSemaphoreTask, "CNT1", configMINIMAL_STACK_SIZE, ( void * ) &( xParameters[ 0 ] ), tskIDLE_PRIORITY, NULL );
 80007ca8:	00000893          	li	a7,0
 80007cac:	00000813          	li	a6,0
 80007cb0:	00000793          	li	a5,0
@@ -8352,6 +14503,7 @@ Disassembly of section .text:
 80007ccc:	00000517          	auipc	a0,0x0
 80007cd0:	21450513          	addi	a0,a0,532 # 80007ee0 <prvCountingSemaphoreTask>
 80007cd4:	ae8fa0ef          	jal	ra,80001fbc <xTaskGenericCreate>
+		xTaskCreate( prvCountingSemaphoreTask, "CNT2", configMINIMAL_STACK_SIZE, ( void * ) &( xParameters[ 1 ] ), tskIDLE_PRIORITY, NULL );		
 80007cd8:	00000893          	li	a7,0
 80007cdc:	00000813          	li	a6,0
 80007ce0:	00000793          	li	a5,0
@@ -8364,16 +14516,27 @@ Disassembly of section .text:
 80007cfc:	00000517          	auipc	a0,0x0
 80007d00:	1e450513          	addi	a0,a0,484 # 80007ee0 <prvCountingSemaphoreTask>
 80007d04:	ab8fa0ef          	jal	ra,80001fbc <xTaskGenericCreate>
+	}
+}
 80007d08:	00000013          	nop
 80007d0c:	00c12083          	lw	ra,12(sp)
 80007d10:	01010113          	addi	sp,sp,16
 80007d14:	00008067          	ret
 
 80007d18 <prvDecrementSemaphoreCount>:
+/*-----------------------------------------------------------*/
+
+static void prvDecrementSemaphoreCount( SemaphoreHandle_t xSemaphore, UBaseType_t *puxLoopCounter )
+{
 80007d18:	fd010113          	addi	sp,sp,-48
 80007d1c:	02112623          	sw	ra,44(sp)
 80007d20:	00a12623          	sw	a0,12(sp)
 80007d24:	00b12423          	sw	a1,8(sp)
+UBaseType_t ux;
+
+	/* If the semaphore count is at its maximum then we should not be able to
+	'give' the semaphore. */
+	if( xSemaphoreGive( xSemaphore ) == pdPASS )
 80007d28:	00000693          	li	a3,0
 80007d2c:	00000613          	li	a2,0
 80007d30:	00000593          	li	a1,0
@@ -8382,12 +14545,20 @@ Disassembly of section .text:
 80007d3c:	00050713          	mv	a4,a0
 80007d40:	00100793          	li	a5,1
 80007d44:	00f71a63          	bne	a4,a5,80007d58 <prvDecrementSemaphoreCount+0x40>
+	{
+		xErrorDetected = pdTRUE;
 80007d48:	00033797          	auipc	a5,0x33
 80007d4c:	da078793          	addi	a5,a5,-608 # 8003aae8 <xErrorDetected>
 80007d50:	00100713          	li	a4,1
 80007d54:	00e7a023          	sw	a4,0(a5)
+	}
+
+	/* We should be able to 'take' the semaphore countMAX_COUNT_VALUE times. */
+	for( ux = 0; ux < countMAX_COUNT_VALUE; ux++ )
 80007d58:	00012e23          	sw	zero,28(sp)
 80007d5c:	0540006f          	j	80007db0 <prvDecrementSemaphoreCount+0x98>
+	{
+		if( xSemaphoreTake( xSemaphore, countDONT_BLOCK ) != pdPASS )
 80007d60:	00000693          	li	a3,0
 80007d64:	00000613          	li	a2,0
 80007d68:	00000593          	li	a1,0
@@ -8396,21 +14567,34 @@ Disassembly of section .text:
 80007d74:	00050713          	mv	a4,a0
 80007d78:	00100793          	li	a5,1
 80007d7c:	00f70a63          	beq	a4,a5,80007d90 <prvDecrementSemaphoreCount+0x78>
+		{
+			/* We expected to be able to take the semaphore. */
+			xErrorDetected = pdTRUE;
 80007d80:	00033797          	auipc	a5,0x33
 80007d84:	d6878793          	addi	a5,a5,-664 # 8003aae8 <xErrorDetected>
 80007d88:	00100713          	li	a4,1
 80007d8c:	00e7a023          	sw	a4,0(a5)
+		}
+
+		( *puxLoopCounter )++;
 80007d90:	00812783          	lw	a5,8(sp)
 80007d94:	0007a783          	lw	a5,0(a5)
 80007d98:	00178713          	addi	a4,a5,1
 80007d9c:	00812783          	lw	a5,8(sp)
 80007da0:	00e7a023          	sw	a4,0(a5)
+	for( ux = 0; ux < countMAX_COUNT_VALUE; ux++ )
 80007da4:	01c12783          	lw	a5,28(sp)
 80007da8:	00178793          	addi	a5,a5,1
 80007dac:	00f12e23          	sw	a5,28(sp)
 80007db0:	01c12703          	lw	a4,28(sp)
 80007db4:	0c700793          	li	a5,199
 80007db8:	fae7f4e3          	bleu	a4,a5,80007d60 <prvDecrementSemaphoreCount+0x48>
+		taskYIELD();
+	#endif
+
+	/* If the semaphore count is zero then we should not be able to	'take' 
+	the semaphore. */
+	if( xSemaphoreTake( xSemaphore, countDONT_BLOCK ) == pdPASS )
 80007dbc:	00000693          	li	a3,0
 80007dc0:	00000613          	li	a2,0
 80007dc4:	00000593          	li	a1,0
@@ -8419,20 +14603,33 @@ Disassembly of section .text:
 80007dd0:	00050713          	mv	a4,a0
 80007dd4:	00100793          	li	a5,1
 80007dd8:	00f71a63          	bne	a4,a5,80007dec <prvDecrementSemaphoreCount+0xd4>
+	{
+		xErrorDetected = pdTRUE;
 80007ddc:	00033797          	auipc	a5,0x33
 80007de0:	d0c78793          	addi	a5,a5,-756 # 8003aae8 <xErrorDetected>
 80007de4:	00100713          	li	a4,1
 80007de8:	00e7a023          	sw	a4,0(a5)
+	}
+}
 80007dec:	00000013          	nop
 80007df0:	02c12083          	lw	ra,44(sp)
 80007df4:	03010113          	addi	sp,sp,48
 80007df8:	00008067          	ret
 
 80007dfc <prvIncrementSemaphoreCount>:
+/*-----------------------------------------------------------*/
+
+static void prvIncrementSemaphoreCount( SemaphoreHandle_t xSemaphore, UBaseType_t *puxLoopCounter )
+{
 80007dfc:	fd010113          	addi	sp,sp,-48
 80007e00:	02112623          	sw	ra,44(sp)
 80007e04:	00a12623          	sw	a0,12(sp)
 80007e08:	00b12423          	sw	a1,8(sp)
+UBaseType_t ux;
+
+	/* If the semaphore count is zero then we should not be able to	'take' 
+	the semaphore. */
+	if( xSemaphoreTake( xSemaphore, countDONT_BLOCK ) == pdPASS )
 80007e0c:	00000693          	li	a3,0
 80007e10:	00000613          	li	a2,0
 80007e14:	00000593          	li	a1,0
@@ -8441,12 +14638,20 @@ Disassembly of section .text:
 80007e20:	00050713          	mv	a4,a0
 80007e24:	00100793          	li	a5,1
 80007e28:	00f71a63          	bne	a4,a5,80007e3c <prvIncrementSemaphoreCount+0x40>
+	{
+		xErrorDetected = pdTRUE;
 80007e2c:	00033797          	auipc	a5,0x33
 80007e30:	cbc78793          	addi	a5,a5,-836 # 8003aae8 <xErrorDetected>
 80007e34:	00100713          	li	a4,1
 80007e38:	00e7a023          	sw	a4,0(a5)
+	}
+
+	/* We should be able to 'give' the semaphore countMAX_COUNT_VALUE times. */
+	for( ux = 0; ux < countMAX_COUNT_VALUE; ux++ )
 80007e3c:	00012e23          	sw	zero,28(sp)
 80007e40:	0540006f          	j	80007e94 <prvIncrementSemaphoreCount+0x98>
+	{
+		if( xSemaphoreGive( xSemaphore ) != pdPASS )
 80007e44:	00000693          	li	a3,0
 80007e48:	00000613          	li	a2,0
 80007e4c:	00000593          	li	a1,0
@@ -8455,21 +14660,34 @@ Disassembly of section .text:
 80007e58:	00050713          	mv	a4,a0
 80007e5c:	00100793          	li	a5,1
 80007e60:	00f70a63          	beq	a4,a5,80007e74 <prvIncrementSemaphoreCount+0x78>
+		{
+			/* We expected to be able to take the semaphore. */
+			xErrorDetected = pdTRUE;
 80007e64:	00033797          	auipc	a5,0x33
 80007e68:	c8478793          	addi	a5,a5,-892 # 8003aae8 <xErrorDetected>
 80007e6c:	00100713          	li	a4,1
 80007e70:	00e7a023          	sw	a4,0(a5)
+		}
+
+		( *puxLoopCounter )++;
 80007e74:	00812783          	lw	a5,8(sp)
 80007e78:	0007a783          	lw	a5,0(a5)
 80007e7c:	00178713          	addi	a4,a5,1
 80007e80:	00812783          	lw	a5,8(sp)
 80007e84:	00e7a023          	sw	a4,0(a5)
+	for( ux = 0; ux < countMAX_COUNT_VALUE; ux++ )
 80007e88:	01c12783          	lw	a5,28(sp)
 80007e8c:	00178793          	addi	a5,a5,1
 80007e90:	00f12e23          	sw	a5,28(sp)
 80007e94:	01c12703          	lw	a4,28(sp)
 80007e98:	0c700793          	li	a5,199
 80007e9c:	fae7f4e3          	bleu	a4,a5,80007e44 <prvIncrementSemaphoreCount+0x48>
+		taskYIELD();
+	#endif
+
+	/* If the semaphore count is at its maximum then we should not be able to
+	'give' the semaphore. */
+	if( xSemaphoreGive( xSemaphore ) == pdPASS )
 80007ea0:	00000693          	li	a3,0
 80007ea4:	00000613          	li	a2,0
 80007ea8:	00000593          	li	a1,0
@@ -8478,25 +14696,45 @@ Disassembly of section .text:
 80007eb4:	00050713          	mv	a4,a0
 80007eb8:	00100793          	li	a5,1
 80007ebc:	00f71a63          	bne	a4,a5,80007ed0 <prvIncrementSemaphoreCount+0xd4>
+	{
+		xErrorDetected = pdTRUE;
 80007ec0:	00033797          	auipc	a5,0x33
 80007ec4:	c2878793          	addi	a5,a5,-984 # 8003aae8 <xErrorDetected>
 80007ec8:	00100713          	li	a4,1
 80007ecc:	00e7a023          	sw	a4,0(a5)
+	}
+}
 80007ed0:	00000013          	nop
 80007ed4:	02c12083          	lw	ra,44(sp)
 80007ed8:	03010113          	addi	sp,sp,48
 80007edc:	00008067          	ret
 
 80007ee0 <prvCountingSemaphoreTask>:
+/*-----------------------------------------------------------*/
+
+static void prvCountingSemaphoreTask( void *pvParameters )
+{
 80007ee0:	fd010113          	addi	sp,sp,-48
 80007ee4:	02112623          	sw	ra,44(sp)
 80007ee8:	00a12623          	sw	a0,12(sp)
+		/* Queue a message for printing to say the task has started. */
+		vPrintDisplayMessage( &pcTaskStartMsg );
+	#endif
+
+	/* The semaphore to be used was passed as the parameter. */
+	pxParameter = ( xCountSemStruct * ) pvParameters;
 80007eec:	00c12783          	lw	a5,12(sp)
 80007ef0:	00f12e23          	sw	a5,28(sp)
+
+	/* Did we expect to find the semaphore already at its max count value, or
+	at zero? */
+	if( pxParameter->uxExpectedStartCount == countSTART_AT_MAX_COUNT )
 80007ef4:	01c12783          	lw	a5,28(sp)
 80007ef8:	0047a703          	lw	a4,4(a5)
 80007efc:	0aa00793          	li	a5,170
 80007f00:	02f71063          	bne	a4,a5,80007f20 <prvCountingSemaphoreTask+0x40>
+	{
+		prvDecrementSemaphoreCount( pxParameter->xSemaphore, &( pxParameter->uxLoopCounter ) );
 80007f04:	01c12783          	lw	a5,28(sp)
 80007f08:	0007a703          	lw	a4,0(a5)
 80007f0c:	01c12783          	lw	a5,28(sp)
@@ -8504,6 +14742,11 @@ Disassembly of section .text:
 80007f14:	00078593          	mv	a1,a5
 80007f18:	00070513          	mv	a0,a4
 80007f1c:	dfdff0ef          	jal	ra,80007d18 <prvDecrementSemaphoreCount>
+	}
+
+	/* Now we expect the semaphore count to be 0, so this time there is an
+	error if we can take the semaphore. */
+	if( xSemaphoreTake( pxParameter->xSemaphore, 0 ) == pdPASS )
 80007f20:	01c12783          	lw	a5,28(sp)
 80007f24:	0007a783          	lw	a5,0(a5)
 80007f28:	00000693          	li	a3,0
@@ -8514,10 +14757,17 @@ Disassembly of section .text:
 80007f3c:	00050713          	mv	a4,a0
 80007f40:	00100793          	li	a5,1
 80007f44:	00f71a63          	bne	a4,a5,80007f58 <prvCountingSemaphoreTask+0x78>
+	{
+		xErrorDetected = pdTRUE;
 80007f48:	00033797          	auipc	a5,0x33
 80007f4c:	ba078793          	addi	a5,a5,-1120 # 8003aae8 <xErrorDetected>
 80007f50:	00100713          	li	a4,1
 80007f54:	00e7a023          	sw	a4,0(a5)
+	}
+
+	for( ;; )
+	{
+		prvIncrementSemaphoreCount( pxParameter->xSemaphore, &( pxParameter->uxLoopCounter ) );
 80007f58:	01c12783          	lw	a5,28(sp)
 80007f5c:	0007a703          	lw	a4,0(a5)
 80007f60:	01c12783          	lw	a5,28(sp)
@@ -8525,6 +14775,7 @@ Disassembly of section .text:
 80007f68:	00078593          	mv	a1,a5
 80007f6c:	00070513          	mv	a0,a4
 80007f70:	e8dff0ef          	jal	ra,80007dfc <prvIncrementSemaphoreCount>
+		prvDecrementSemaphoreCount( pxParameter->xSemaphore, &( pxParameter->uxLoopCounter ) );
 80007f74:	01c12783          	lw	a5,28(sp)
 80007f78:	0007a703          	lw	a4,0(a5)
 80007f7c:	01c12783          	lw	a5,28(sp)
@@ -8532,17 +14783,36 @@ Disassembly of section .text:
 80007f84:	00078593          	mv	a1,a5
 80007f88:	00070513          	mv	a0,a4
 80007f8c:	d8dff0ef          	jal	ra,80007d18 <prvDecrementSemaphoreCount>
+		prvIncrementSemaphoreCount( pxParameter->xSemaphore, &( pxParameter->uxLoopCounter ) );
 80007f90:	fc9ff06f          	j	80007f58 <prvCountingSemaphoreTask+0x78>
 
 80007f94 <xAreCountingSemaphoreTasksStillRunning>:
+	}
+}
+/*-----------------------------------------------------------*/
+
+BaseType_t xAreCountingSemaphoreTasksStillRunning( void )
+{
 80007f94:	ff010113          	addi	sp,sp,-16
+static UBaseType_t uxLastCount0 = 0, uxLastCount1 = 0;
+BaseType_t xReturn = pdPASS;
 80007f98:	00100793          	li	a5,1
 80007f9c:	00f12623          	sw	a5,12(sp)
+
+	/* Return fail if any 'give' or 'take' did not result in the expected
+	behaviour. */
+	if( xErrorDetected != pdFALSE )
 80007fa0:	00033797          	auipc	a5,0x33
 80007fa4:	b4878793          	addi	a5,a5,-1208 # 8003aae8 <xErrorDetected>
 80007fa8:	0007a783          	lw	a5,0(a5)
 80007fac:	00078463          	beqz	a5,80007fb4 <xAreCountingSemaphoreTasksStillRunning+0x20>
+	{
+		xReturn = pdFAIL;
 80007fb0:	00012623          	sw	zero,12(sp)
+	}
+
+	/* Return fail if either task is not still incrementing its loop counter. */
+	if( uxLastCount0 == xParameters[ 0 ].uxLoopCounter )
 80007fb4:	00033797          	auipc	a5,0x33
 80007fb8:	b3878793          	addi	a5,a5,-1224 # 8003aaec <xParameters>
 80007fbc:	0087a703          	lw	a4,8(a5)
@@ -8550,14 +14820,23 @@ Disassembly of section .text:
 80007fc4:	b4478793          	addi	a5,a5,-1212 # 8003ab04 <uxLastCount0.1369>
 80007fc8:	0007a783          	lw	a5,0(a5)
 80007fcc:	00f71663          	bne	a4,a5,80007fd8 <xAreCountingSemaphoreTasksStillRunning+0x44>
+	{
+		xReturn = pdFAIL;
 80007fd0:	00012623          	sw	zero,12(sp)
 80007fd4:	01c0006f          	j	80007ff0 <xAreCountingSemaphoreTasksStillRunning+0x5c>
+	}
+	else
+	{
+		uxLastCount0 = xParameters[ 0 ].uxLoopCounter;
 80007fd8:	00033797          	auipc	a5,0x33
 80007fdc:	b1478793          	addi	a5,a5,-1260 # 8003aaec <xParameters>
 80007fe0:	0087a703          	lw	a4,8(a5)
 80007fe4:	00033797          	auipc	a5,0x33
 80007fe8:	b2078793          	addi	a5,a5,-1248 # 8003ab04 <uxLastCount0.1369>
 80007fec:	00e7a023          	sw	a4,0(a5)
+	}
+
+	if( uxLastCount1 == xParameters[ 1 ].uxLoopCounter )
 80007ff0:	00033797          	auipc	a5,0x33
 80007ff4:	afc78793          	addi	a5,a5,-1284 # 8003aaec <xParameters>
 80007ff8:	0147a703          	lw	a4,20(a5)
@@ -8565,28 +14844,53 @@ Disassembly of section .text:
 80008000:	b0c78793          	addi	a5,a5,-1268 # 8003ab08 <uxLastCount1.1370>
 80008004:	0007a783          	lw	a5,0(a5)
 80008008:	00f71663          	bne	a4,a5,80008014 <xAreCountingSemaphoreTasksStillRunning+0x80>
+	{
+		xReturn = pdFAIL;
 8000800c:	00012623          	sw	zero,12(sp)
 80008010:	01c0006f          	j	8000802c <xAreCountingSemaphoreTasksStillRunning+0x98>
+	}
+	else
+	{
+		uxLastCount1 = xParameters[ 1 ].uxLoopCounter;
 80008014:	00033797          	auipc	a5,0x33
 80008018:	ad878793          	addi	a5,a5,-1320 # 8003aaec <xParameters>
 8000801c:	0147a703          	lw	a4,20(a5)
 80008020:	00033797          	auipc	a5,0x33
 80008024:	ae878793          	addi	a5,a5,-1304 # 8003ab08 <uxLastCount1.1370>
 80008028:	00e7a023          	sw	a4,0(a5)
+	}
+
+	return xReturn;
 8000802c:	00c12783          	lw	a5,12(sp)
+}
 80008030:	00078513          	mv	a0,a5
 80008034:	01010113          	addi	sp,sp,16
 80008038:	00008067          	ret
 
 8000803c <vStartRecursiveMutexTasks>:
+static TaskHandle_t xControllingTaskHandle, xBlockingTaskHandle;
+
+/*-----------------------------------------------------------*/
+
+void vStartRecursiveMutexTasks( void )
+{
 8000803c:	ff010113          	addi	sp,sp,-16
 80008040:	00112623          	sw	ra,12(sp)
+	/* Just creates the mutex and the three tasks. */
+
+	xMutex = xSemaphoreCreateRecursiveMutex();
 80008044:	00400513          	li	a0,4
 80008048:	c85f80ef          	jal	ra,80000ccc <xQueueCreateMutex>
 8000804c:	00050713          	mv	a4,a0
 80008050:	00033797          	auipc	a5,0x33
 80008054:	abc78793          	addi	a5,a5,-1348 # 8003ab0c <xMutex>
 80008058:	00e7a023          	sw	a4,0(a5)
+	in use.  The registry is provided as a means for kernel aware
+	debuggers to locate mutex and has no purpose if a kernel aware debugger
+	is not being used.  The call to vQueueAddToRegistry() will be removed
+	by the pre-processor if configQUEUE_REGISTRY_SIZE is not defined or is
+	defined to be less than 1. */
+	vQueueAddToRegistry( ( QueueHandle_t ) xMutex, "Recursive_Mutex" );
 8000805c:	00033797          	auipc	a5,0x33
 80008060:	ab078793          	addi	a5,a5,-1360 # 8003ab0c <xMutex>
 80008064:	0007a783          	lw	a5,0(a5)
@@ -8594,10 +14898,15 @@ Disassembly of section .text:
 8000806c:	11858593          	addi	a1,a1,280 # 80020180 <__rodata_start+0x180>
 80008070:	00078513          	mv	a0,a5
 80008074:	db9f90ef          	jal	ra,80001e2c <vQueueAddToRegistry>
+
+
+	if( xMutex != NULL )
 80008078:	00033797          	auipc	a5,0x33
 8000807c:	a9478793          	addi	a5,a5,-1388 # 8003ab0c <xMutex>
 80008080:	0007a783          	lw	a5,0(a5)
 80008084:	08078863          	beqz	a5,80008114 <vStartRecursiveMutexTasks+0xd8>
+	{
+		xTaskCreate( prvRecursiveMutexControllingTask, "Rec1", configMINIMAL_STACK_SIZE, NULL, recmuCONTROLLING_TASK_PRIORITY, &xControllingTaskHandle );
 80008088:	00000893          	li	a7,0
 8000808c:	00000813          	li	a6,0
 80008090:	00033797          	auipc	a5,0x33
@@ -8610,6 +14919,7 @@ Disassembly of section .text:
 800080ac:	00000517          	auipc	a0,0x0
 800080b0:	07850513          	addi	a0,a0,120 # 80008124 <prvRecursiveMutexControllingTask>
 800080b4:	f09f90ef          	jal	ra,80001fbc <xTaskGenericCreate>
+        xTaskCreate( prvRecursiveMutexBlockingTask, "Rec2", configMINIMAL_STACK_SIZE, NULL, recmuBLOCKING_TASK_PRIORITY, &xBlockingTaskHandle );
 800080b8:	00000893          	li	a7,0
 800080bc:	00000813          	li	a6,0
 800080c0:	00033797          	auipc	a5,0x33
@@ -8622,6 +14932,7 @@ Disassembly of section .text:
 800080dc:	00000517          	auipc	a0,0x0
 800080e0:	1ac50513          	addi	a0,a0,428 # 80008288 <prvRecursiveMutexBlockingTask>
 800080e4:	ed9f90ef          	jal	ra,80001fbc <xTaskGenericCreate>
+        xTaskCreate( prvRecursiveMutexPollingTask, "Rec3", configMINIMAL_STACK_SIZE, NULL, recmuPOLLING_TASK_PRIORITY, NULL );
 800080e8:	00000893          	li	a7,0
 800080ec:	00000813          	li	a6,0
 800080f0:	00000793          	li	a5,0
@@ -8633,15 +14944,27 @@ Disassembly of section .text:
 80008108:	00000517          	auipc	a0,0x0
 8000810c:	29050513          	addi	a0,a0,656 # 80008398 <prvRecursiveMutexPollingTask>
 80008110:	eadf90ef          	jal	ra,80001fbc <xTaskGenericCreate>
+	}
+}
 80008114:	00000013          	nop
 80008118:	00c12083          	lw	ra,12(sp)
 8000811c:	01010113          	addi	sp,sp,16
 80008120:	00008067          	ret
 
 80008124 <prvRecursiveMutexControllingTask>:
+/*-----------------------------------------------------------*/
+
+static void prvRecursiveMutexControllingTask( void *pvParameters )
+{
 80008124:	fd010113          	addi	sp,sp,-48
 80008128:	02112623          	sw	ra,44(sp)
 8000812c:	00a12623          	sw	a0,12(sp)
+	{
+		/* Should not be able to 'give' the mutex, as we have not yet 'taken'
+		it.   The first time through, the mutex will not have been used yet,
+		subsequent times through, at this point the mutex will be held by the
+		polling task. */
+		if( xSemaphoreGiveRecursive( xMutex ) == pdPASS )
 80008130:	00033797          	auipc	a5,0x33
 80008134:	9dc78793          	addi	a5,a5,-1572 # 8003ab0c <xMutex>
 80008138:	0007a783          	lw	a5,0(a5)
@@ -8650,12 +14973,23 @@ Disassembly of section .text:
 80008144:	00050713          	mv	a4,a0
 80008148:	00100793          	li	a5,1
 8000814c:	00f71a63          	bne	a4,a5,80008160 <prvRecursiveMutexControllingTask+0x3c>
+		{
+			xErrorOccurred = pdTRUE;
 80008150:	00033797          	auipc	a5,0x33
 80008154:	9c078793          	addi	a5,a5,-1600 # 8003ab10 <xErrorOccurred>
 80008158:	00100713          	li	a4,1
 8000815c:	00e7a023          	sw	a4,0(a5)
+		}
+
+		for( ux = 0; ux < recmuMAX_COUNT; ux++ )
 80008160:	00012e23          	sw	zero,28(sp)
 80008164:	04c0006f          	j	800081b0 <prvRecursiveMutexControllingTask+0x8c>
+			at this point and this Take will cause the polling task to inherit
+			the priority of this task.  In this case the block time must be
+			long enough to ensure the polling task will execute again before the
+			block time expires.  If the block time does expire then the error
+			flag will be set here. */
+			if( xSemaphoreTakeRecursive( xMutex, recmuEIGHT_TICK_DELAY ) != pdPASS )
 80008168:	00033797          	auipc	a5,0x33
 8000816c:	9a478793          	addi	a5,a5,-1628 # 8003ab0c <xMutex>
 80008170:	0007a783          	lw	a5,0(a5)
@@ -8665,22 +14999,45 @@ Disassembly of section .text:
 80008180:	00050713          	mv	a4,a0
 80008184:	00100793          	li	a5,1
 80008188:	00f70a63          	beq	a4,a5,8000819c <prvRecursiveMutexControllingTask+0x78>
+			{
+				xErrorOccurred = pdTRUE;
 8000818c:	00033797          	auipc	a5,0x33
 80008190:	98478793          	addi	a5,a5,-1660 # 8003ab10 <xErrorOccurred>
 80008194:	00100713          	li	a4,1
 80008198:	00e7a023          	sw	a4,0(a5)
+
+			/* Ensure the other task attempting to access the mutex (and the
+			other demo tasks) are able to execute to ensure they either block
+			(where a block time is specified) or return an error (where no
+			block time is specified) as the mutex is held by this task. */
+			vTaskDelay( recmuSHORT_DELAY );
 8000819c:	01400513          	li	a0,20
 800081a0:	adcfa0ef          	jal	ra,8000247c <vTaskDelay>
+		for( ux = 0; ux < recmuMAX_COUNT; ux++ )
 800081a4:	01c12783          	lw	a5,28(sp)
 800081a8:	00178793          	addi	a5,a5,1
 800081ac:	00f12e23          	sw	a5,28(sp)
 800081b0:	01c12703          	lw	a4,28(sp)
 800081b4:	00900793          	li	a5,9
 800081b8:	fae7f8e3          	bleu	a4,a5,80008168 <prvRecursiveMutexControllingTask+0x44>
+		}
+
+		/* For each time we took the mutex, give it back. */
+		for( ux = 0; ux < recmuMAX_COUNT; ux++ )
 800081bc:	00012e23          	sw	zero,28(sp)
 800081c0:	0480006f          	j	80008208 <prvRecursiveMutexControllingTask+0xe4>
+		{
+			/* Ensure the other task attempting to access the mutex (and the
+			other demo tasks) are able to execute. */
+			vTaskDelay( recmuSHORT_DELAY );
 800081c4:	01400513          	li	a0,20
 800081c8:	ab4fa0ef          	jal	ra,8000247c <vTaskDelay>
+			/* We should now be able to give the mutex as many times as we
+			took it.  When the mutex is available again the Blocking task
+			should be unblocked but not run because it has a lower priority
+			than this task.  The polling task should also not run at this point
+			as it too has a lower priority than this task. */
+			if( xSemaphoreGiveRecursive( xMutex ) != pdPASS )
 800081cc:	00033797          	auipc	a5,0x33
 800081d0:	94078793          	addi	a5,a5,-1728 # 8003ab0c <xMutex>
 800081d4:	0007a783          	lw	a5,0(a5)
@@ -8689,16 +15046,25 @@ Disassembly of section .text:
 800081e0:	00050713          	mv	a4,a0
 800081e4:	00100793          	li	a5,1
 800081e8:	00f70a63          	beq	a4,a5,800081fc <prvRecursiveMutexControllingTask+0xd8>
+			{
+				xErrorOccurred = pdTRUE;
 800081ec:	00033797          	auipc	a5,0x33
 800081f0:	92478793          	addi	a5,a5,-1756 # 8003ab10 <xErrorOccurred>
 800081f4:	00100713          	li	a4,1
 800081f8:	00e7a023          	sw	a4,0(a5)
+		for( ux = 0; ux < recmuMAX_COUNT; ux++ )
 800081fc:	01c12783          	lw	a5,28(sp)
 80008200:	00178793          	addi	a5,a5,1
 80008204:	00f12e23          	sw	a5,28(sp)
 80008208:	01c12703          	lw	a4,28(sp)
 8000820c:	00900793          	li	a5,9
 80008210:	fae7fae3          	bleu	a4,a5,800081c4 <prvRecursiveMutexControllingTask+0xa0>
+			#endif
+		}
+
+		/* Having given it back the same number of times as it was taken, we
+		should no longer be the mutex owner, so the next give should fail. */
+		if( xSemaphoreGiveRecursive( xMutex ) == pdPASS )
 80008214:	00033797          	auipc	a5,0x33
 80008218:	8f878793          	addi	a5,a5,-1800 # 8003ab0c <xMutex>
 8000821c:	0007a783          	lw	a5,0(a5)
@@ -8707,10 +15073,17 @@ Disassembly of section .text:
 80008228:	00050713          	mv	a4,a0
 8000822c:	00100793          	li	a5,1
 80008230:	00f71a63          	bne	a4,a5,80008244 <prvRecursiveMutexControllingTask+0x120>
+		{
+			xErrorOccurred = pdTRUE;
 80008234:	00033797          	auipc	a5,0x33
 80008238:	8dc78793          	addi	a5,a5,-1828 # 8003ab10 <xErrorOccurred>
 8000823c:	00100713          	li	a4,1
 80008240:	00e7a023          	sw	a4,0(a5)
+		}
+
+		/* Keep count of the number of cycles this task has performed so a
+		stall can be detected. */
+		uxControllingCycles++;
 80008244:	00033797          	auipc	a5,0x33
 80008248:	8d878793          	addi	a5,a5,-1832 # 8003ab1c <uxControllingCycles>
 8000824c:	0007a783          	lw	a5,0(a5)
@@ -8718,21 +15091,39 @@ Disassembly of section .text:
 80008254:	00033797          	auipc	a5,0x33
 80008258:	8c878793          	addi	a5,a5,-1848 # 8003ab1c <uxControllingCycles>
 8000825c:	00e7a023          	sw	a4,0(a5)
+
+		/* Suspend ourselves so the blocking task can execute. */
+		xControllingIsSuspended = pdTRUE;
 80008260:	00033797          	auipc	a5,0x33
 80008264:	8b478793          	addi	a5,a5,-1868 # 8003ab14 <xControllingIsSuspended>
 80008268:	00100713          	li	a4,1
 8000826c:	00e7a023          	sw	a4,0(a5)
+		vTaskSuspend( NULL );
 80008270:	00000513          	li	a0,0
 80008274:	e48fa0ef          	jal	ra,800028bc <vTaskSuspend>
+		xControllingIsSuspended = pdFALSE;
 80008278:	00033797          	auipc	a5,0x33
 8000827c:	89c78793          	addi	a5,a5,-1892 # 8003ab14 <xControllingIsSuspended>
 80008280:	0007a023          	sw	zero,0(a5)
+		if( xSemaphoreGiveRecursive( xMutex ) == pdPASS )
 80008284:	eadff06f          	j	80008130 <prvRecursiveMutexControllingTask+0xc>
 
 80008288 <prvRecursiveMutexBlockingTask>:
+	}
+}
+/*-----------------------------------------------------------*/
+
+static void prvRecursiveMutexBlockingTask( void *pvParameters )
+{
 80008288:	fe010113          	addi	sp,sp,-32
 8000828c:	00112e23          	sw	ra,28(sp)
 80008290:	00a12623          	sw	a0,12(sp)
+		this call should block until the controlling task has given up the
+		mutex, and not actually execute	past this call until the controlling
+		task is suspended.  portMAX_DELAY - 1 is used instead of portMAX_DELAY
+		to ensure the task's state is reported as Blocked and not Suspended in
+		a later call to configASSERT() (within the polling task). */
+		if( xSemaphoreTakeRecursive( xMutex, ( portMAX_DELAY - 1 ) ) == pdPASS )
 80008294:	00033797          	auipc	a5,0x33
 80008298:	87878793          	addi	a5,a5,-1928 # 8003ab0c <xMutex>
 8000829c:	0007a783          	lw	a5,0(a5)
@@ -8742,16 +15133,28 @@ Disassembly of section .text:
 800082ac:	00050713          	mv	a4,a0
 800082b0:	00100793          	li	a5,1
 800082b4:	08f71263          	bne	a4,a5,80008338 <prvRecursiveMutexBlockingTask+0xb0>
+		{
+			if( xControllingIsSuspended != pdTRUE )
 800082b8:	00033797          	auipc	a5,0x33
 800082bc:	85c78793          	addi	a5,a5,-1956 # 8003ab14 <xControllingIsSuspended>
 800082c0:	0007a703          	lw	a4,0(a5)
 800082c4:	00100793          	li	a5,1
 800082c8:	00f70c63          	beq	a4,a5,800082e0 <prvRecursiveMutexBlockingTask+0x58>
+			{
+				/* Did not expect to execute until the controlling task was
+				suspended. */
+				xErrorOccurred = pdTRUE;
 800082cc:	00033797          	auipc	a5,0x33
 800082d0:	84478793          	addi	a5,a5,-1980 # 8003ab10 <xErrorOccurred>
 800082d4:	00100713          	li	a4,1
 800082d8:	00e7a023          	sw	a4,0(a5)
 800082dc:	06c0006f          	j	80008348 <prvRecursiveMutexBlockingTask+0xc0>
+			}
+			else
+			{
+				/* Give the mutex back before suspending ourselves to allow
+				the polling task to obtain the mutex. */
+				if( xSemaphoreGiveRecursive( xMutex ) != pdPASS )
 800082e0:	00033797          	auipc	a5,0x33
 800082e4:	82c78793          	addi	a5,a5,-2004 # 8003ab0c <xMutex>
 800082e8:	0007a783          	lw	a5,0(a5)
@@ -8760,24 +15163,41 @@ Disassembly of section .text:
 800082f4:	00050713          	mv	a4,a0
 800082f8:	00100793          	li	a5,1
 800082fc:	00f70a63          	beq	a4,a5,80008310 <prvRecursiveMutexBlockingTask+0x88>
+				{
+					xErrorOccurred = pdTRUE;
 80008300:	00033797          	auipc	a5,0x33
 80008304:	81078793          	addi	a5,a5,-2032 # 8003ab10 <xErrorOccurred>
 80008308:	00100713          	li	a4,1
 8000830c:	00e7a023          	sw	a4,0(a5)
+				}
+
+				xBlockingIsSuspended = pdTRUE;
 80008310:	00033797          	auipc	a5,0x33
 80008314:	80878793          	addi	a5,a5,-2040 # 8003ab18 <xBlockingIsSuspended>
 80008318:	00100713          	li	a4,1
 8000831c:	00e7a023          	sw	a4,0(a5)
+				vTaskSuspend( NULL );
 80008320:	00000513          	li	a0,0
 80008324:	d98fa0ef          	jal	ra,800028bc <vTaskSuspend>
+				xBlockingIsSuspended = pdFALSE;
 80008328:	00032797          	auipc	a5,0x32
 8000832c:	7f078793          	addi	a5,a5,2032 # 8003ab18 <xBlockingIsSuspended>
 80008330:	0007a023          	sw	zero,0(a5)
 80008334:	0140006f          	j	80008348 <prvRecursiveMutexBlockingTask+0xc0>
+		}
+		else
+		{
+			/* We should not leave the xSemaphoreTakeRecursive() function
+			until the mutex was obtained. */
+			xErrorOccurred = pdTRUE;
 80008338:	00032797          	auipc	a5,0x32
 8000833c:	7d878793          	addi	a5,a5,2008 # 8003ab10 <xErrorOccurred>
 80008340:	00100713          	li	a4,1
 80008344:	00e7a023          	sw	a4,0(a5)
+		}
+
+		/* The controlling and blocking tasks should be in lock step. */
+		if( uxControllingCycles != ( uxBlockingCycles + 1 ) )
 80008348:	00032797          	auipc	a5,0x32
 8000834c:	7d878793          	addi	a5,a5,2008 # 8003ab20 <uxBlockingCycles>
 80008350:	0007a783          	lw	a5,0(a5)
@@ -8786,10 +15206,17 @@ Disassembly of section .text:
 8000835c:	7c478793          	addi	a5,a5,1988 # 8003ab1c <uxControllingCycles>
 80008360:	0007a783          	lw	a5,0(a5)
 80008364:	00f70a63          	beq	a4,a5,80008378 <prvRecursiveMutexBlockingTask+0xf0>
+		{
+			xErrorOccurred = pdTRUE;
 80008368:	00032797          	auipc	a5,0x32
 8000836c:	7a878793          	addi	a5,a5,1960 # 8003ab10 <xErrorOccurred>
 80008370:	00100713          	li	a4,1
 80008374:	00e7a023          	sw	a4,0(a5)
+		}
+
+		/* Keep count of the number of cycles this task has performed so a
+		stall can be detected. */
+		uxBlockingCycles++;
 80008378:	00032797          	auipc	a5,0x32
 8000837c:	7a878793          	addi	a5,a5,1960 # 8003ab20 <uxBlockingCycles>
 80008380:	0007a783          	lw	a5,0(a5)
@@ -8797,12 +15224,25 @@ Disassembly of section .text:
 80008388:	00032797          	auipc	a5,0x32
 8000838c:	79878793          	addi	a5,a5,1944 # 8003ab20 <uxBlockingCycles>
 80008390:	00e7a023          	sw	a4,0(a5)
+		if( xSemaphoreTakeRecursive( xMutex, ( portMAX_DELAY - 1 ) ) == pdPASS )
 80008394:	f01ff06f          	j	80008294 <prvRecursiveMutexBlockingTask+0xc>
 
 80008398 <prvRecursiveMutexPollingTask>:
+	}
+}
+/*-----------------------------------------------------------*/
+
+static void prvRecursiveMutexPollingTask( void *pvParameters )
+{
 80008398:	fe010113          	addi	sp,sp,-32
 8000839c:	00112e23          	sw	ra,28(sp)
 800083a0:	00a12623          	sw	a0,12(sp)
+	for( ;; )
+	{
+		/* Keep attempting to obtain the mutex.  We should only obtain it when
+		the blocking task has suspended itself, which in turn should only
+		happen when the controlling task is also suspended. */
+		if( xSemaphoreTakeRecursive( xMutex, recmuNO_DELAY ) == pdPASS )
 800083a4:	00032797          	auipc	a5,0x32
 800083a8:	76878793          	addi	a5,a5,1896 # 8003ab0c <xMutex>
 800083ac:	0007a783          	lw	a5,0(a5)
@@ -8812,6 +15252,10 @@ Disassembly of section .text:
 800083bc:	00050713          	mv	a4,a0
 800083c0:	00100793          	li	a5,1
 800083c4:	fef710e3          	bne	a4,a5,800083a4 <prvRecursiveMutexPollingTask+0xc>
+		{
+			#if( INCLUDE_eTaskGetState == 1 )
+			{
+				configASSERT( eTaskGetState( xControllingTaskHandle ) == eSuspended );
 800083c8:	00032797          	auipc	a5,0x32
 800083cc:	76078793          	addi	a5,a5,1888 # 8003ab28 <xControllingTaskHandle>
 800083d0:	0007a783          	lw	a5,0(a5)
@@ -8820,8 +15264,9 @@ Disassembly of section .text:
 800083dc:	00050713          	mv	a4,a0
 800083e0:	00300793          	li	a5,3
 800083e4:	00f70663          	beq	a4,a5,800083f0 <prvRecursiveMutexPollingTask+0x58>
-800083e8:	30047073          	csrci	mstatus,8
+800083e8:	30007073          	csrci	mstatus,0
 800083ec:	0000006f          	j	800083ec <prvRecursiveMutexPollingTask+0x54>
+				configASSERT( eTaskGetState( xBlockingTaskHandle ) == eSuspended );
 800083f0:	00032797          	auipc	a5,0x32
 800083f4:	73c78793          	addi	a5,a5,1852 # 8003ab2c <xBlockingTaskHandle>
 800083f8:	0007a783          	lw	a5,0(a5)
@@ -8830,8 +15275,13 @@ Disassembly of section .text:
 80008404:	00050713          	mv	a4,a0
 80008408:	00300793          	li	a5,3
 8000840c:	00f70663          	beq	a4,a5,80008418 <prvRecursiveMutexPollingTask+0x80>
-80008410:	30047073          	csrci	mstatus,8
+80008410:	30007073          	csrci	mstatus,0
 80008414:	0000006f          	j	80008414 <prvRecursiveMutexPollingTask+0x7c>
+			}
+			#endif /* INCLUDE_eTaskGetState */
+
+			/* Is the blocking task suspended? */
+			if( ( xBlockingIsSuspended != pdTRUE ) || ( xControllingIsSuspended != pdTRUE ) )
 80008418:	00032797          	auipc	a5,0x32
 8000841c:	70078793          	addi	a5,a5,1792 # 8003ab18 <xBlockingIsSuspended>
 80008420:	0007a703          	lw	a4,0(a5)
@@ -8842,11 +15292,19 @@ Disassembly of section .text:
 80008434:	0007a703          	lw	a4,0(a5)
 80008438:	00100793          	li	a5,1
 8000843c:	00f70c63          	beq	a4,a5,80008454 <prvRecursiveMutexPollingTask+0xbc>
+			{
+				xErrorOccurred = pdTRUE;
 80008440:	00032797          	auipc	a5,0x32
 80008444:	6d078793          	addi	a5,a5,1744 # 8003ab10 <xErrorOccurred>
 80008448:	00100713          	li	a4,1
 8000844c:	00e7a023          	sw	a4,0(a5)
 80008450:	1340006f          	j	80008584 <prvRecursiveMutexPollingTask+0x1ec>
+			}
+			else
+			{
+				/* Keep count of the number of cycles this task has performed
+				so a stall can be detected. */
+				uxPollingCycles++;
 80008454:	00032797          	auipc	a5,0x32
 80008458:	6d078793          	addi	a5,a5,1744 # 8003ab24 <uxPollingCycles>
 8000845c:	0007a783          	lw	a5,0(a5)
@@ -8854,16 +15312,33 @@ Disassembly of section .text:
 80008464:	00032797          	auipc	a5,0x32
 80008468:	6c078793          	addi	a5,a5,1728 # 8003ab24 <uxPollingCycles>
 8000846c:	00e7a023          	sw	a4,0(a5)
+				will then inherit the higher priority.  The Blocking task will
+				block indefinitely when it attempts to obtain the mutex, the
+				Controlling task will only block for a fixed period and an
+				error will be latched if the polling task has not returned the
+				mutex by the time this fixed period has expired. */
+				vTaskResume( xBlockingTaskHandle );
 80008470:	00032797          	auipc	a5,0x32
 80008474:	6bc78793          	addi	a5,a5,1724 # 8003ab2c <xBlockingTaskHandle>
 80008478:	0007a783          	lw	a5,0(a5)
 8000847c:	00078513          	mv	a0,a5
 80008480:	de8fa0ef          	jal	ra,80002a68 <vTaskResume>
+				#if( configUSE_PREEMPTION == 0 )
+					taskYIELD();
+				#endif
+
+				vTaskResume( xControllingTaskHandle );
 80008484:	00032797          	auipc	a5,0x32
 80008488:	6a478793          	addi	a5,a5,1700 # 8003ab28 <xControllingTaskHandle>
 8000848c:	0007a783          	lw	a5,0(a5)
 80008490:	00078513          	mv	a0,a5
 80008494:	dd4fa0ef          	jal	ra,80002a68 <vTaskResume>
+					taskYIELD();
+				#endif
+
+				/* The other two tasks should now have executed and no longer
+				be suspended. */
+				if( ( xBlockingIsSuspended == pdTRUE ) || ( xControllingIsSuspended == pdTRUE ) )
 80008498:	00032797          	auipc	a5,0x32
 8000849c:	68078793          	addi	a5,a5,1664 # 8003ab18 <xBlockingIsSuspended>
 800084a0:	0007a703          	lw	a4,0(a5)
@@ -8874,17 +15349,31 @@ Disassembly of section .text:
 800084b4:	0007a703          	lw	a4,0(a5)
 800084b8:	00100793          	li	a5,1
 800084bc:	00f71a63          	bne	a4,a5,800084d0 <prvRecursiveMutexPollingTask+0x138>
+				{
+					xErrorOccurred = pdTRUE;
 800084c0:	00032797          	auipc	a5,0x32
 800084c4:	65078793          	addi	a5,a5,1616 # 8003ab10 <xErrorOccurred>
 800084c8:	00100713          	li	a4,1
 800084cc:	00e7a023          	sw	a4,0(a5)
+				}
+
+				#if( INCLUDE_uxTaskPriorityGet == 1 )
+				{
+					/* Check priority inherited. */
+					configASSERT( uxTaskPriorityGet( NULL ) == recmuCONTROLLING_TASK_PRIORITY );
 800084d0:	00000513          	li	a0,0
 800084d4:	92cfa0ef          	jal	ra,80002600 <uxTaskPriorityGet>
 800084d8:	00050713          	mv	a4,a0
 800084dc:	00200793          	li	a5,2
 800084e0:	00f70663          	beq	a4,a5,800084ec <prvRecursiveMutexPollingTask+0x154>
-800084e4:	30047073          	csrci	mstatus,8
+800084e4:	30007073          	csrci	mstatus,0
 800084e8:	0000006f          	j	800084e8 <prvRecursiveMutexPollingTask+0x150>
+				}
+				#endif /* INCLUDE_uxTaskPriorityGet */
+
+				#if( INCLUDE_eTaskGetState == 1 )
+				{
+					configASSERT( eTaskGetState( xControllingTaskHandle ) == eBlocked );
 800084ec:	00032797          	auipc	a5,0x32
 800084f0:	63c78793          	addi	a5,a5,1596 # 8003ab28 <xControllingTaskHandle>
 800084f4:	0007a783          	lw	a5,0(a5)
@@ -8893,8 +15382,9 @@ Disassembly of section .text:
 80008500:	00050713          	mv	a4,a0
 80008504:	00200793          	li	a5,2
 80008508:	00f70663          	beq	a4,a5,80008514 <prvRecursiveMutexPollingTask+0x17c>
-8000850c:	30047073          	csrci	mstatus,8
+8000850c:	30007073          	csrci	mstatus,0
 80008510:	0000006f          	j	80008510 <prvRecursiveMutexPollingTask+0x178>
+					configASSERT( eTaskGetState( xBlockingTaskHandle ) == eBlocked );
 80008514:	00032797          	auipc	a5,0x32
 80008518:	61878793          	addi	a5,a5,1560 # 8003ab2c <xBlockingTaskHandle>
 8000851c:	0007a783          	lw	a5,0(a5)
@@ -8903,8 +15393,13 @@ Disassembly of section .text:
 80008528:	00050713          	mv	a4,a0
 8000852c:	00200793          	li	a5,2
 80008530:	00f70663          	beq	a4,a5,8000853c <prvRecursiveMutexPollingTask+0x1a4>
-80008534:	30047073          	csrci	mstatus,8
+80008534:	30007073          	csrci	mstatus,0
 80008538:	0000006f          	j	80008538 <prvRecursiveMutexPollingTask+0x1a0>
+				}
+				#endif /* INCLUDE_eTaskGetState */
+
+				/* Release the mutex, disinheriting the higher priority again. */
+				if( xSemaphoreGiveRecursive( xMutex ) != pdPASS )
 8000853c:	00032797          	auipc	a5,0x32
 80008540:	5d078793          	addi	a5,a5,1488 # 8003ab0c <xMutex>
 80008544:	0007a783          	lw	a5,0(a5)
@@ -8913,20 +15408,40 @@ Disassembly of section .text:
 80008550:	00050713          	mv	a4,a0
 80008554:	00100793          	li	a5,1
 80008558:	00f70a63          	beq	a4,a5,8000856c <prvRecursiveMutexPollingTask+0x1d4>
+				{
+					xErrorOccurred = pdTRUE;
 8000855c:	00032797          	auipc	a5,0x32
 80008560:	5b478793          	addi	a5,a5,1460 # 8003ab10 <xErrorOccurred>
 80008564:	00100713          	li	a4,1
 80008568:	00e7a023          	sw	a4,0(a5)
+				}
+
+				#if( INCLUDE_uxTaskPriorityGet == 1 )
+				{
+					/* Check priority disinherited. */
+					configASSERT( uxTaskPriorityGet( NULL ) == recmuPOLLING_TASK_PRIORITY );
 8000856c:	00000513          	li	a0,0
 80008570:	890fa0ef          	jal	ra,80002600 <uxTaskPriorityGet>
 80008574:	00050793          	mv	a5,a0
 80008578:	e20786e3          	beqz	a5,800083a4 <prvRecursiveMutexPollingTask+0xc>
-8000857c:	30047073          	csrci	mstatus,8
+8000857c:	30007073          	csrci	mstatus,0
 80008580:	0000006f          	j	80008580 <prvRecursiveMutexPollingTask+0x1e8>
+		if( xSemaphoreTakeRecursive( xMutex, recmuNO_DELAY ) == pdPASS )
 80008584:	e21ff06f          	j	800083a4 <prvRecursiveMutexPollingTask+0xc>
 
 80008588 <xAreRecursiveMutexTasksStillRunning>:
+}
+/*-----------------------------------------------------------*/
+
+/* This is called to check that all the created tasks are still running. */
+BaseType_t xAreRecursiveMutexTasksStillRunning( void )
+{
 80008588:	ff010113          	addi	sp,sp,-16
+BaseType_t xReturn;
+static UBaseType_t uxLastControllingCycles = 0, uxLastBlockingCycles = 0, uxLastPollingCycles = 0;
+
+	/* Is the controlling task still cycling? */
+	if( uxLastControllingCycles == uxControllingCycles )
 8000858c:	00032797          	auipc	a5,0x32
 80008590:	5a478793          	addi	a5,a5,1444 # 8003ab30 <uxLastControllingCycles.1374>
 80008594:	0007a703          	lw	a4,0(a5)
@@ -8934,17 +15449,27 @@ Disassembly of section .text:
 8000859c:	58478793          	addi	a5,a5,1412 # 8003ab1c <uxControllingCycles>
 800085a0:	0007a783          	lw	a5,0(a5)
 800085a4:	00f71c63          	bne	a4,a5,800085bc <xAreRecursiveMutexTasksStillRunning+0x34>
+	{
+		xErrorOccurred = pdTRUE;
 800085a8:	00032797          	auipc	a5,0x32
 800085ac:	56878793          	addi	a5,a5,1384 # 8003ab10 <xErrorOccurred>
 800085b0:	00100713          	li	a4,1
 800085b4:	00e7a023          	sw	a4,0(a5)
 800085b8:	01c0006f          	j	800085d4 <xAreRecursiveMutexTasksStillRunning+0x4c>
+	}
+	else
+	{
+		uxLastControllingCycles = uxControllingCycles;
 800085bc:	00032797          	auipc	a5,0x32
 800085c0:	56078793          	addi	a5,a5,1376 # 8003ab1c <uxControllingCycles>
 800085c4:	0007a703          	lw	a4,0(a5)
 800085c8:	00032797          	auipc	a5,0x32
 800085cc:	56878793          	addi	a5,a5,1384 # 8003ab30 <uxLastControllingCycles.1374>
 800085d0:	00e7a023          	sw	a4,0(a5)
+	}
+
+	/* Is the blocking task still cycling? */
+	if( uxLastBlockingCycles == uxBlockingCycles )
 800085d4:	00032797          	auipc	a5,0x32
 800085d8:	56078793          	addi	a5,a5,1376 # 8003ab34 <uxLastBlockingCycles.1375>
 800085dc:	0007a703          	lw	a4,0(a5)
@@ -8952,17 +15477,27 @@ Disassembly of section .text:
 800085e4:	54078793          	addi	a5,a5,1344 # 8003ab20 <uxBlockingCycles>
 800085e8:	0007a783          	lw	a5,0(a5)
 800085ec:	00f71c63          	bne	a4,a5,80008604 <xAreRecursiveMutexTasksStillRunning+0x7c>
+	{
+		xErrorOccurred = pdTRUE;
 800085f0:	00032797          	auipc	a5,0x32
 800085f4:	52078793          	addi	a5,a5,1312 # 8003ab10 <xErrorOccurred>
 800085f8:	00100713          	li	a4,1
 800085fc:	00e7a023          	sw	a4,0(a5)
 80008600:	01c0006f          	j	8000861c <xAreRecursiveMutexTasksStillRunning+0x94>
+	}
+	else
+	{
+		uxLastBlockingCycles = uxBlockingCycles;
 80008604:	00032797          	auipc	a5,0x32
 80008608:	51c78793          	addi	a5,a5,1308 # 8003ab20 <uxBlockingCycles>
 8000860c:	0007a703          	lw	a4,0(a5)
 80008610:	00032797          	auipc	a5,0x32
 80008614:	52478793          	addi	a5,a5,1316 # 8003ab34 <uxLastBlockingCycles.1375>
 80008618:	00e7a023          	sw	a4,0(a5)
+	}
+
+	/* Is the polling task still cycling? */
+	if( uxLastPollingCycles == uxPollingCycles )
 8000861c:	00032797          	auipc	a5,0x32
 80008620:	51c78793          	addi	a5,a5,1308 # 8003ab38 <uxLastPollingCycles.1376>
 80008624:	0007a703          	lw	a4,0(a5)
@@ -8970,27 +15505,46 @@ Disassembly of section .text:
 8000862c:	4fc78793          	addi	a5,a5,1276 # 8003ab24 <uxPollingCycles>
 80008630:	0007a783          	lw	a5,0(a5)
 80008634:	00f71c63          	bne	a4,a5,8000864c <xAreRecursiveMutexTasksStillRunning+0xc4>
+	{
+		xErrorOccurred = pdTRUE;
 80008638:	00032797          	auipc	a5,0x32
 8000863c:	4d878793          	addi	a5,a5,1240 # 8003ab10 <xErrorOccurred>
 80008640:	00100713          	li	a4,1
 80008644:	00e7a023          	sw	a4,0(a5)
 80008648:	01c0006f          	j	80008664 <xAreRecursiveMutexTasksStillRunning+0xdc>
+	}
+	else
+	{
+		uxLastPollingCycles = uxPollingCycles;
 8000864c:	00032797          	auipc	a5,0x32
 80008650:	4d878793          	addi	a5,a5,1240 # 8003ab24 <uxPollingCycles>
 80008654:	0007a703          	lw	a4,0(a5)
 80008658:	00032797          	auipc	a5,0x32
 8000865c:	4e078793          	addi	a5,a5,1248 # 8003ab38 <uxLastPollingCycles.1376>
 80008660:	00e7a023          	sw	a4,0(a5)
+	}
+
+	if( xErrorOccurred == pdTRUE )
 80008664:	00032797          	auipc	a5,0x32
 80008668:	4ac78793          	addi	a5,a5,1196 # 8003ab10 <xErrorOccurred>
 8000866c:	0007a703          	lw	a4,0(a5)
 80008670:	00100793          	li	a5,1
 80008674:	00f71663          	bne	a4,a5,80008680 <xAreRecursiveMutexTasksStillRunning+0xf8>
+	{
+		xReturn = pdFAIL;
 80008678:	00012623          	sw	zero,12(sp)
 8000867c:	00c0006f          	j	80008688 <xAreRecursiveMutexTasksStillRunning+0x100>
+	}
+	else
+	{
+		xReturn = pdPASS;
 80008680:	00100793          	li	a5,1
 80008684:	00f12623          	sw	a5,12(sp)
+	}
+
+	return xReturn;
 80008688:	00c12783          	lw	a5,12(sp)
+}
 8000868c:	00078513          	mv	a0,a5
 80008690:	01010113          	addi	sp,sp,16
 80008694:	00008067          	ret

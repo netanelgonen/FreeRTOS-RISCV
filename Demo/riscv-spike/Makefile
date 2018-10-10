@@ -97,12 +97,17 @@ INCLUDES = \
 	-I../Common/include \
 	-I$(FREERTOS_SOURCE_DIR)/portable/GCC/RISCV
 
+ARCH 		= -march=rv32im
+ABI 		= -mabi=ilp32
+
+ASFLAGS            += -g $(ARCH) $(ABI)  -Wa,-Ilegacy
+
 CFLAGS = \
 	$(WARNINGS) $(INCLUDES) \
 	-fomit-frame-pointer -fno-strict-aliasing -fno-builtin \
 	-D__gracefulExit -mcmodel=medany #-fPIC
 
-CFLAGS             += -specs=arch/bare.specs -O0 -g
+CFLAGS             += -specs=arch/bare.specs -O0 -g -D__riscv_xlen=32 $(ARCH) $(ABI) -mcmodel=medany
 CFLAGS             += -DCONSOLE_UART
 
 GCCVER 	= $(shell $(GCC) --version | grep gcc | cut -d" " -f9)
@@ -121,7 +126,7 @@ OBJS = $(CRT0_OBJ) $(PORT_ASM_OBJ) $(PORT_OBJ) $(RTOS_OBJ) $(DEMO_OBJ) $(APP_OBJ
 LDFLAGS	 = -T arch/link.ld -nostartfiles -static -nostdlib
 LIBS	 = -L$(CCPATH)/lib/gcc/$(TARGET)/$(GCCVER) \
 		   -L$(CCPATH)/$(TARGET)/lib \
-		   -lc -lgcc
+		   -lc -lgcc -lm
 
 %.o: %.c
 	@echo "    CC $<"
