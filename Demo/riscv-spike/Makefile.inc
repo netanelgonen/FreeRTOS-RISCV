@@ -5,6 +5,19 @@ RISCV_LIB  ?= elf
 RISCV ?=
 CCPATH =
 
+ifeq ($(XLEN), 32)
+#CROSS_COMPILE 	= riscv32-unknown-elf-
+ARCH 		= -march=rv32im
+ABI 		= -mabi=ilp32
+endif
+
+ifeq ($(RISCV_XLEN), 64)
+#CROSS_COMPILE 	= riscv64-unknown-elf-
+ARCH 		= -march=rv64imafd
+#ABI 		= -mabi=lp64d
+endif
+
+
 TARGET=$(CCPATH)riscv${RISCV_XLEN}-unknown-${RISCV_LIB}
 #-----------------------------------------------------------
 GCC		= $(TARGET)-gcc

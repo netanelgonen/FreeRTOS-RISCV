@@ -97,9 +97,6 @@ INCLUDES = \
 	-I../Common/include \
 	-I$(FREERTOS_SOURCE_DIR)/portable/GCC/RISCV
 
-ARCH 		= -march=rv32im
-ABI 		= -mabi=ilp32
-
 ASFLAGS            += -g $(ARCH) $(ABI)  -Wa,-Ilegacy
 
 CFLAGS = \
@@ -107,7 +104,7 @@ CFLAGS = \
 	-fomit-frame-pointer -fno-strict-aliasing -fno-builtin \
 	-D__gracefulExit -mcmodel=medany #-fPIC
 
-CFLAGS             += -specs=arch/bare.specs -O0 -g -D__riscv_xlen=32 $(ARCH) $(ABI) -mcmodel=medany
+CFLAGS             += -specs=arch/bare.specs -O0 -g $(ARCH) $(ABI) -mcmodel=medany
 CFLAGS             += -DCONSOLE_UART
 
 GCCVER 	= $(shell $(GCC) --version | grep gcc | cut -d" " -f9)
