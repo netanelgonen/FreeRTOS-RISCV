@@ -102,7 +102,7 @@ CFLAGS = \
 	-fomit-frame-pointer -fno-strict-aliasing -fno-builtin \
 	-D__gracefulExit -mcmodel=medany #-fPIC
 
-CFLAGS             += -specs=arch/bare.specs
+CFLAGS             += -specs=arch/bare.specs -O0 -g
 CFLAGS             += -DCONSOLE_UART
 
 GCCVER 	= $(shell $(GCC) --version | grep gcc | cut -d" " -f9)
