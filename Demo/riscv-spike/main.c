@@ -154,9 +154,9 @@ portENABLE_INTERRUPTS();
   //printf("hello from RTOS\n");
 	/* Create the standard demo tasks, including the interrupt nesting test
 	tasks. */
-	vCreateBlockTimeTasks();
-	vStartCountingSemaphoreTasks();
-	vStartRecursiveMutexTasks();
+	//vCreateBlockTimeTasks();
+	//vStartCountingSemaphoreTasks();
+	//vStartRecursiveMutexTasks();
 
 	/* Create the software timer that performs the 'check' functionality,
 	as described at the top of this file. */
@@ -194,9 +194,10 @@ static void prvCheckTimerCallback(__attribute__ ((unused)) TimerHandle_t xTimer 
 static int count = 0;
 unsigned long ulErrorFound = pdFALSE;
 
+printf("[%d] Timer callback! \r\n", count++);
 	/* Check all the demo and test tasks to ensure that they are all still
 	running, and that none have detected an error. */
-
+/*
 	if( xAreBlockTimeTestTasksStillRunning() != pdPASS )
 	{
 		printf("Error in block time test tasks \r\n");
@@ -223,7 +224,7 @@ unsigned long ulErrorFound = pdFALSE;
 		__asm volatile("li t6, 0xdeadbeef");
 		printf("[%d] All threads still alive! \r\n", count++);
 	}
-
+*/
     /* Do _not_ stop the scheduler; this would halt the system, but was left for reference on how to do so */
 	/* Stop scheduler */
 //    vTaskEndScheduler();
