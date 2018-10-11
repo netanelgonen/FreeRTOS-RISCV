@@ -138,11 +138,18 @@ void vApplicationIdleHook( void );
 void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName );
 
 /*-----------------------------------------------------------*/
+volatile int wait = 1;
+
 
 int main( void )
 {
 TimerHandle_t xCheckTimer = NULL;
 
+portDISABLE_INTERRUPTS();
+while(wait) {
+  ;
+}
+portENABLE_INTERRUPTS();
 
   //printf("hello from RTOS\n");
 	/* Create the standard demo tasks, including the interrupt nesting test
