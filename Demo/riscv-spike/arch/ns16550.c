@@ -48,7 +48,7 @@ static struct ns16550_pio * pio = (void*)NS16550_BASE;
 
 #ifdef CONSOLE_UART
 __attribute__ ((constructor))
-static int ns16550_init(void)
+int ns16550_init(void)
 {
   uint32_t divisor;
 

@@ -5,7 +5,7 @@ RISCV_LIB  ?= elf
 RISCV ?=
 CCPATH =
 
-ifeq ($(XLEN), 32)
+ifeq ($(RISCV_XLEN), 32)
 #CROSS_COMPILE 	= riscv32-unknown-elf-
 ARCH 		= -march=rv32im
 ABI 		= -mabi=ilp32

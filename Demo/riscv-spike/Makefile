@@ -95,17 +95,16 @@ INCLUDES = \
 	-I../Common/include \
 	-I$(FREERTOS_SOURCE_DIR)/portable/GCC/RISCV
 
-ASFLAGS            += -g $(ARCH) $(ABI)  -Wa,-Ilegacy
+ASFLAGS  += -g $(ARCH) $(ABI)  -Wa,-Ilegacy
 
 CFLAGS = \
 	$(WARNINGS) $(INCLUDES) \
-	-fomit-frame-pointer -fno-strict-aliasing -fno-builtin \
-	-D__gracefulExit -mcmodel=medany #-fPIC
+#	-fomit-frame-pointer -fno-strict-aliasing -fno-builtin
 
-CFLAGS             += -specs=arch/bare.specs -O0 -g $(ARCH) $(ABI) -mcmodel=medany
-CFLAGS             += -DCONSOLE_UART
+CFLAGS += -specs=arch/bare.specs -O0 -g3 $(ARCH) $(ABI) -mcmodel=medany
+CFLAGS += -DCONSOLE_UART
 
-GCCVER 	= $(shell $(GCC) --version | grep gcc | cut -d" " -f9)
+ARFLAGS=crsv
 
 #
 # Define all object files.
@@ -118,10 +117,15 @@ PORT_ASM_OBJ = $(PORT_ASM:.S=.o)
 CRT0_OBJ = $(CRT0:.S=.o)
 OBJS = $(CRT0_OBJ) $(PORT_ASM_OBJ) $(PORT_OBJ) $(RTOS_OBJ) $(DEMO_OBJ) $(APP_OBJ)
 
-LDFLAGS	 = -T arch/link.ld -nostartfiles -static -nostdlib
-LIBS	 = -L$(CCPATH)/lib/gcc/$(TARGET)/$(GCCVER) \
-		   -L$(CCPATH)/$(TARGET)/lib \
-		   -lc -lgcc -lm
+LDFLAGS	 = -specs=arch/bare.specs -T arch/link.ld -nostartfiles  #-static -nostdlib 
+#LDFLAGS	           += -Wl,-e,_reset
+LIBS	 =  -lc -lgcc
+
+$(info ASFLAGS=$(ASFLAGS))
+$(info LDLIBS=$(LDLIBS))
+$(info CFLAGS=$(CFLAGS))
+$(info LDFLAGS=$(LDFLAGS))
+$(info ARFLAGS=$(ARFLAGS))
 
 %.o: %.c
 	@echo "    CC $<"

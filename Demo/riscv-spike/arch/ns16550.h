@@ -96,6 +96,6 @@ int ns16550_rxready(void);
 int ns16550_rxchar(void);
 int ns16550_txchar(int c);
 void ns16550_flush(void);
-
+int ns16550_init(void);
 
 #endif
