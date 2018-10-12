@@ -105,7 +105,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "riscv_counters.h"
-
+#include "ns16550.h"
 
 /* The period after which the check timer will expire provided no errors have
 been reported by any of the standard demo tasks.  ms are converted to the
@@ -138,18 +138,20 @@ void vApplicationIdleHook( void );
 void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName );
 
 /*-----------------------------------------------------------*/
-volatile int wait = 1;
+//volatile int wait = 1;
 
 
 int main( void )
 {
 TimerHandle_t xCheckTimer = NULL;
 
-portDISABLE_INTERRUPTS();
-while(wait) {
-  ;
-}
-portENABLE_INTERRUPTS();
+
+	ns16550_init();
+//portDISABLE_INTERRUPTS();
+//while(wait) {
+//  ;
+//}
+//portENABLE_INTERRUPTS();
 
   //printf("hello from RTOS\n");
 	/* Create the standard demo tasks, including the interrupt nesting test
