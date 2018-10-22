@@ -90,6 +90,7 @@ boot:
 	.align 6
 	.section .text,"ax",@progbits
 	.globl _mstart
+
 /* Startup code */
 _mstart:
     la t0, trap_entry
@@ -161,12 +162,12 @@ interrupt:
 	slli    t0,t0,1
 	srli    t0,t0,1
 	addi    t0,t0,-3
-	beq		t0,x0,softwareInterrupt
+	beq	t0,x0,softwareInterrupt
 	LOAD	t0, 0x0(sp)
 	addi	sp, sp, REGBYTES
 
 	/* Interupt is timer interrupt */
-	j		TIMER_CMP_INT
+	j	TIMER_CMP_INT
 	mret
 
 softwareInterrupt:
@@ -225,9 +226,7 @@ trap_entry:
 
 
 	mv a2, sp
-  /* FIXME */
-	// jal ulSyscallTrap
-
+	jal ulSyscallTrap
 	csrw mepc, a0
 
 	LOAD x1, 1*REGBYTES(sp)
@@ -263,6 +262,7 @@ trap_entry:
 	LOAD x31, 31*REGBYTES(sp)
 
 	addi sp, sp, REGBYTES*32
+
 	mret
 
 /* Fills memory blocks */

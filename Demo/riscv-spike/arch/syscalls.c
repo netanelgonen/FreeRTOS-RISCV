@@ -20,6 +20,7 @@ int _read(int fd,void *buffer,unsigned int count);
 int _isatty(int fd);
 int _kill(int pid,int sig);
 int _getpid(int n);
+unsigned long ulSyscallTrap(long cause, long epc, long regs[32] __attribute__((unused)));
 
 void* _sbrk (int nbytes)
 {
@@ -95,3 +96,15 @@ int _getpid(int n)
 }
 #endif /* #ifndef __linux__ */
 
+
+/* Syscall handeler */
+// does currently nothing - keep this to handle system calls in the future
+unsigned long ulSyscallTrap(long cause, long epc, long regs[32] __attribute__((unused)))
+{
+	(void)cause;
+	(void)epc;
+
+	// infinite loop, just so we know we caused a syscall
+	for(;;) { } // TODO: replace with a proper handler
+	return epc + 4;
+}

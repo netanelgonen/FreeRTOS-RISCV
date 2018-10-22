@@ -132,11 +132,13 @@ static void prvTaskExitError( void );
  * which is likely for the very first interrupt. When that happens, compare timer + 
  * tickrate may already be behind current timer and prevent correctly programming
  * the 2nd interrupt
+ * 
+ * TODO: we should disable timer irq justa fter entering this handler, 
+ * and re-enable the irq right before leaving this handler
  */
 static void prvSetNextTimerInterrupt(void)
 {
-    if (mtime && timecmp) 
-        *timecmp = *mtime + (configTICK_CLOCK_HZ / configTICK_RATE_HZ);
+		*timecmp = *mtime + (configTICK_CLOCK_HZ / configTICK_RATE_HZ);
 }
 /*-----------------------------------------------------------*/
 
