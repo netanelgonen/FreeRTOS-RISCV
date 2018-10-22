@@ -12,22 +12,78 @@ Bug fixes: [Julio Gago](https://github.com/julio-gago-metempsy)
 
 Update to priv spec 1.10: [sherrbc1](https://github.com/sherrbc1)
 
-## Build
 
-You can edit `main()` in [main.c](Demo/riscv-spike/main.c) to add your FreeRTOS task definitions and set up the scheduler.
-
-To build FreeRTOS,
+## Install
+You need a modified spike simulator with UART patch. There is no easy way to install it, we suggest using a modified version of riscv-tools:
 
 ```bash
-cd Demo/riscv-spike
-export RISCV=/opt/riscv # your riscv tools path here
-make
+git clone --recursive -b uart_patch https://github.com/GasloiInc/riscv-tools.git
+cd riscv-tools
 ```
+
+Set up your `$RISCV` variable to some sensible location, for example:
+```bash
+export RISCV=~/Documents/riscv
+```
+
+Now build the spike simulator:
+```bash
+./build-spike-only.sh
+```
+
+If you need the other tools as well, run instead:
+```bash
+./build-rv32ima.sh
+```
+
+## Build
+Go to `Demo/riscv-spike` and hit `make clean; make`. 
 
 ## Run
+
 ```bash
-spike riscv-spike.elf
+./run_spike.sh # will run rtos in the spike simulator
 ```
+
+Note that spike uses tty for a simulated UART peripheral. In order to see any simulation output, you have to start `socat`:
+```bash
+./run_socat.sh # will display UART output
+```
+
+You should see:
+```bash
+$ ./run_socat.sh 
+[0] Timer callback! 
+[1] Timer callback! 
+[2] Timer callback! 
+[3] Timer callback! 
+...
+```
+
+## Debug
+
+If you want to debug spike, use `-H` flag that stops execution until a debugger is connected. Note that is stops the execution only until you connect `openocd`, so by the time you connect `gdb` it will be already running.
+
+```bash
+./run_spike.sh -H # add the -H flag
+```
+
+Start openocd:
+```bash
+./run_openocd.sh
+```
+
+And then start gdb:
+```bash
+riscv32-unknown-elf-gdb riscv-spike.elf
+```
+
+And connect to the target with:
+```bash
+(gdb) target remote localhost:3333
+```
+
+Happy debugging!
 
 ## Tested environments
 
