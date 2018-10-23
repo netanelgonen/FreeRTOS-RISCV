@@ -136,8 +136,59 @@ void vApplicationIdleHook( void );
 void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName );
 
 /*-----------------------------------------------------------*/
-//volatile int wait = 1;
+// user task handle
+static TaskHandle_t xControllingTaskHandle;
+static void prvUserTask( void *pvParameters )
+{
+	const TickType_t xDelay = 1 / portTICK_PERIOD_MS;
+	char* rodata_start = (char*)0x80020000;
+	char* p = rodata_start;
+	char* pattern = "SECRET_KEY";
+	(void) pvParameters;
+	while(1) {
+		//printf("Waiting for user input\n");
+		while (ns16550_rxready()) {
+			int c = ns16550_rxchar();
+			if (c=='a') {
+				printf("MALICIOUS TASK: Looking for secret string in rodata section\n");
+				uint8_t idx = 0;
+				uint8_t occurences = 0;
+				while (1) {
+					if (*p == pattern[idx]) {
+						printf("MALICIOUS TASK: Got %c at memory %p\n", *p, p);
+						p++;
+						idx++;
+					} else {
+						idx = 0;
+						p++;
+					}
 
+					if (idx == 10) {
+						//printf("Pattern matched, occurences %u\n", occurences);
+						if (occurences == 1) {
+							printf("MALICIOUS TASK: Found location of the secret key, now will clear it\n");
+							p++; // ':'
+							p++; // ' ' 
+							for (uint8_t i=0; i<4; i++) {
+								*p = '0';
+								p++;
+							}
+							printf("MALICIOUS TASK: Done!\n");
+							break;
+						} else {
+							printf("MALICIOUS TASK: Found our search pattern in memory, continuing to search.\n");
+							occurences++;
+							idx = 0;
+						}
+					}
+				}
+			}
+		}
+		vTaskDelay( xDelay );
+	}
+}
+/*-----------------------------------------------------------*/
+// main entry point
 
 int main( void )
 {
@@ -145,12 +196,10 @@ TimerHandle_t xCheckTimer = NULL;
 
 	ns16550_init();
 
-	//printf("hello from RTOS\n");
-	/* Create the standard demo tasks, including the interrupt nesting test
-	tasks. */
-	//vCreateBlockTimeTasks();
-	//vStartCountingSemaphoreTasks();
-	//vStartRecursiveMutexTasks();
+	/* Add the first task */
+	xTaskCreate( prvUserTask, "User1", configMINIMAL_STACK_SIZE, NULL, 0, &xControllingTaskHandle );
+
+
 
 	/* Create the software timer that performs the 'check' functionality,
 	as described at the top of this file. */
@@ -178,48 +227,13 @@ TimerHandle_t xCheckTimer = NULL;
 	return 0;
 }
 /*-----------------------------------------------------------*/
-
 /* See the description at the top of this file. */
 static void prvCheckTimerCallback(__attribute__ ((unused)) TimerHandle_t xTimer )
 {
 static int count = 0;
-unsigned long ulErrorFound = pdFALSE;
+static char* secret_key = "SECRET_KEY: 1234\n";
 
-printf("[%d] Timer callback! \r\n", count++);
-	/* Check all the demo and test tasks to ensure that they are all still
-	running, and that none have detected an error. */
-/*
-	if( xAreBlockTimeTestTasksStillRunning() != pdPASS )
-	{
-		printf("Error in block time test tasks \r\n");
-		ulErrorFound |= ( 0x01UL << 1UL );
-	}
-
-	if( xAreCountingSemaphoreTasksStillRunning() != pdPASS )
-	{
-		printf("Error in counting semaphore tasks \r\n");
-		ulErrorFound |= ( 0x01UL << 2UL );
-	}
-
-	if( xAreRecursiveMutexTasksStillRunning() != pdPASS )
-	{
-		printf("Error in recursive mutex tasks \r\n");
-		ulErrorFound |= ( 0x01UL << 3UL );
-	}
-
-	if( ulErrorFound != pdFALSE )
-	{
-		__asm volatile("li t6, 0xbeefdead");
-		printf("One or more threads has exited! \r\n");
-	}else{
-		__asm volatile("li t6, 0xdeadbeef");
-		printf("[%d] All threads still alive! \r\n", count++);
-	}
-*/
-    /* Do _not_ stop the scheduler; this would halt the system, but was left for reference on how to do so */
-	/* Stop scheduler */
-//    vTaskEndScheduler();
-
+printf("TIMER TASK: [%d] Calling using secret key: %s \r\n", count++, secret_key);
 }
 /*-----------------------------------------------------------*/
 
