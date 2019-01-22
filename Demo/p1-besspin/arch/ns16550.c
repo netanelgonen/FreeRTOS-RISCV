@@ -58,22 +58,28 @@ __attribute__ ((constructor))
 int ns16550_init(void)
 {
   uint32_t divisor;
+  divisor = NS16550_CLOCK_RATE / (16 * DEFAULT_BAUDRATE);
 
+  /* Disable all interrupts */
   pio->ier = 0;
 
-  divisor = NS16550_CLOCK_RATE / (16 * DEFAULT_BAUDRATE);
-  /* Allow access to the Divisor Latch Registers (bit 7 of LCR) */
+  /* DLAB=1, Set Divisor Latch MSB and LSB registers */
   pio->lcr |= LCR_DLAB;
-
   pio->dll = divisor & 0xff;
   pio->dlm = (divisor >> 8) & 0xff;
+
+  /* DLAB=0 Allow access to RBR, THR, IER, IIR registers*/
   pio->lcr &= ~LCR_DLAB;
 
-  /* */
+  /* 8 bits/char, 1 stop bit */
   //pio->lcr = LCR_WLS8;
-  /* Set # of stop bits to 2, and # of data bits to 8 */
+  /* 8 bits/char, 2 stop bits */
   pio->lcr = 7;
+
+  /* Enable FIFOs */
   pio->fcr = FCR_FE;
+
+  /* Drive RTSN (request to send) low */
   pio->mcr = MCR_RTS;
 
   return 0;
@@ -106,7 +112,7 @@ int ns16550_txchar(int c)
   return c;
 }
 
-
+/* Wait for transmitter shift register/FIFO to empty */
 void ns16550_flush(void)
 {
   while ((pio->lsr & LSR_TEMT) == 0)

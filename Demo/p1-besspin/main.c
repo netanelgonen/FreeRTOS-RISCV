@@ -194,6 +194,8 @@ int main( void )
 {
 TimerHandle_t xCheckTimer = NULL;
 
+	char uart_rx;
+
 	ns16550_init();
 
 	/* Add the first task */
@@ -201,6 +203,15 @@ TimerHandle_t xCheckTimer = NULL;
 
 	/* Test sending character 'b' to UART */
 	ns16550_txchar( 'b' );
+
+	/* Test receiving character from UART */
+	uart_rx = ns16550_rxchar();
+
+	ns16550_txchar( uart_rx );
+
+	//ns16550_txchar( 'c' );
+
+	
 
 	/* Create the software timer that performs the 'check' functionality,
 	as described at the top of this file. */
