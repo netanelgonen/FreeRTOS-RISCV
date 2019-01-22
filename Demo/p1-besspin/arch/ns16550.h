@@ -3,8 +3,8 @@
 #define __NS16550_H__
 
 
-#define NS16550_BASE (0xC0000000ULL)
-#define NS16550_CLOCK_RATE  (4000000ULL) // 4MHz
+#define NS16550_BASE (0x62300000ULL)
+#define NS16550_CLOCK_RATE  (25000000ULL) // 4MHz
 
 enum __attribute__ ((__packed__)) ier_t
 {

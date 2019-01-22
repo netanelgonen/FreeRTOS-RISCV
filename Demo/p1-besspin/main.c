@@ -197,9 +197,10 @@ TimerHandle_t xCheckTimer = NULL;
 	ns16550_init();
 
 	/* Add the first task */
-	xTaskCreate( prvUserTask, "User1", configMINIMAL_STACK_SIZE, NULL, 0, &xControllingTaskHandle );
+	//xTaskCreate( prvUserTask, "User1", configMINIMAL_STACK_SIZE, NULL, 0, &xControllingTaskHandle );
 
-
+	/* Test sending character 'b' to UART */
+	ns16550_txchar( 'b' );
 
 	/* Create the software timer that performs the 'check' functionality,
 	as described at the top of this file. */

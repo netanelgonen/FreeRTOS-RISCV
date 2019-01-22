@@ -5,42 +5,49 @@
 
 #define DEFAULT_BAUDRATE  (9600)
 
-
-struct __attribute__ ((aligned (8))) ns16550_pio
+/* Struct for 16550 register space */
+struct __attribute__ ((aligned (4))) ns16550_pio
 {
-  // 0x000
-  union __attribute__ ((aligned (8))) {
+  /* 0x000 */
+  union __attribute__ ((aligned (4))) {
+    /* Receive buffer when read */
     const volatile uint8_t rbr;
+    /* Transmit holding register when written */
     volatile uint8_t thr;
+    /* Divisor latch (LSB) register when bit 7 of LCR is set */
     volatile uint8_t dll;
   };
 
-  // 0x008
-  union __attribute__ ((aligned (8))) {
+  /* 0x004 */
+  union __attribute__ ((aligned (4))) {
+    /* Divisor latch (MSB) register when bit 7 of LCR is set */
     volatile uint8_t dlm;
+    /* Interrupt enable register */
     volatile enum ier_t ier;
   };
 
-  // 0x010
-  union __attribute__ ((aligned (8))) {
+  /* 0x008 */
+  union __attribute__ ((aligned (4))) {
+    /* Interrupt identification register */
     const volatile enum iir_t iir;
+    /* FIFO control register when bit 7 of LCR is set */
     volatile enum fcr_t fcr;
   };
 
-  // 0x018
-  volatile enum lcr_t lcr __attribute__ ((aligned (8)));
+  /* 0x00c -- Line control register (LCR) */
+  volatile enum lcr_t lcr __attribute__ ((aligned (4)));
 
-  // 0x020
-  volatile enum mcr_t mcr __attribute__ ((aligned (8)));
+  /* 0x010 -- Modem control register */
+  volatile enum mcr_t mcr __attribute__ ((aligned (4)));
 
-  // 0x028
-  volatile enum lsr_t lsr __attribute__ ((aligned (8)));
+  /* 0x014 -- Line status register (LSR) */
+  volatile enum lsr_t lsr __attribute__ ((aligned (4)));
 
-  // 0x030
-  volatile uint8_t msr __attribute__ ((aligned (8)));
+  /* 0x018 -- Modem status register */
+  volatile uint8_t msr __attribute__ ((aligned (4)));
 
-  // 0x038
-  volatile uint8_t scr __attribute__ ((aligned (8)));
+  /* 0x01c -- Scratch register */
+  volatile uint8_t scr __attribute__ ((aligned (4)));
 };
 
 
@@ -55,12 +62,17 @@ int ns16550_init(void)
   pio->ier = 0;
 
   divisor = NS16550_CLOCK_RATE / (16 * DEFAULT_BAUDRATE);
+  /* Allow access to the Divisor Latch Registers (bit 7 of LCR) */
   pio->lcr |= LCR_DLAB;
+
   pio->dll = divisor & 0xff;
   pio->dlm = (divisor >> 8) & 0xff;
   pio->lcr &= ~LCR_DLAB;
 
-  pio->lcr = LCR_WLS8;
+  /* */
+  //pio->lcr = LCR_WLS8;
+  /* Set # of stop bits to 2, and # of data bits to 8 */
+  pio->lcr = 7;
   pio->fcr = FCR_FE;
   pio->mcr = MCR_RTS;
 
