@@ -144,6 +144,33 @@ int main( void )
 {
 TimerHandle_t xCheckTimer = NULL;
 
+	int i;
+	char uart_rx;
+	char uart_rx_str[7];
+
+	/* Initalize UART */
+	ns16550_init();
+
+	/* UART loopback tests */
+	/* Tests to be used with TestGfe.test_uart_driver
+	    in test_gfe_unittest.py */
+
+	/* UART test with tx/rx_char */
+	/* Loop 3 times to receive 3 characters */
+	for( i=0; i<3; i++ ) {
+		uart_rx = ns16550_rxchar();
+		ns16550_txchar( uart_rx );
+	}	
+
+	/* UART loopback test with strings */
+	/* Loop 6 times to receive 'Hello!' */
+	for(i=0; i<6; i++) {
+		uart_rx_str[i] = ns16550_rxchar();
+	}
+	/* Add end of string character */
+	uart_rx_str[6] = '\0';
+
+	printf( uart_rx_str );	
 	
 	/* Add the first task */
 	//xTaskCreate( prvUserTask, "User1", configMINIMAL_STACK_SIZE, NULL, 0, &xControllingTaskHandle );
@@ -178,10 +205,10 @@ TimerHandle_t xCheckTimer = NULL;
 /* See the description at the top of this file. */
 static void prvCheckTimerCallback(__attribute__ ((unused)) TimerHandle_t xTimer )
 {
-	static int count = 0;
-	static char* secret_key = "SECRET_KEY: 1234\n";
+static int count = 0;
+static char* secret_key = "SECRET_KEY: 1234\n";
 
-	printf("TIMER TASK: [%d] Calling using secret key: %s \r\n", count++, secret_key);
+printf("TIMER TASK: [%d] Calling using secret key: %s \r\n", count++, secret_key);
 }
 /*-----------------------------------------------------------*/
 

@@ -32,13 +32,7 @@ void* _sbrk (int nbytes)
 
 int _write(int file, char *ptr, int len) 
 {
-  int todo;
   (void)file;
-// //#ifdef CONSOLE_UART
-//   for (todo = 0; todo < len; todo++) {
-//     ns16550_txchar (*ptr++);
-//   }
-// //#endif
   int i;
   for( i=0; i<len; i++) {
     if (ptr[i] == '\n') {
