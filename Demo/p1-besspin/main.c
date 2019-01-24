@@ -101,7 +101,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "riscv_counters.h"
-#include "ns16550.h"
+#include "uart_16550.h"
 
 /* The period after which the check timer will expire provided no errors have
 been reported by any of the standard demo tasks.  ms are converted to the

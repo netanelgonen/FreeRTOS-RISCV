@@ -101,7 +101,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "riscv_counters.h"
-#include "ns16550.h"
+#include "uart_16550.h"
 
 /* The period after which the check timer will expire provided no errors have
 been reported by any of the standard demo tasks.  ms are converted to the
@@ -149,7 +149,7 @@ TimerHandle_t xCheckTimer = NULL;
 	char uart_rx_str[7];
 
 	/* Initalize UART */
-	ns16550_init();
+	uart_init();
 
 	/* UART loopback tests */
 	/* Tests to be used with TestGfe.test_uart_driver
@@ -158,14 +158,14 @@ TimerHandle_t xCheckTimer = NULL;
 	/* UART test with tx/rx_char */
 	/* Loop 3 times to receive 3 characters */
 	for( i=0; i<3; i++ ) {
-		uart_rx = ns16550_rxchar();
-		ns16550_txchar( uart_rx );
+		uart_rx = uart_rxchar();
+		uart_txchar( uart_rx );
 	}	
 
 	/* UART loopback test with strings */
 	/* Loop 6 times to receive 'Hello!' */
 	for(i=0; i<6; i++) {
-		uart_rx_str[i] = ns16550_rxchar();
+		uart_rx_str[i] = uart_rxchar();
 	}
 	/* Add end of string character */
 	uart_rx_str[6] = '\0';

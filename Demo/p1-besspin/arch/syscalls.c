@@ -2,7 +2,7 @@
 #include <sys/stat.h>
 #include <sys/times.h>
 #include <sys/time.h>
-#include "ns16550.h"
+#include "uart_16550.h"
 
 // to communicate with the debugger
 volatile uint64_t tohost __attribute__((aligned(64)));
@@ -36,9 +36,9 @@ int _write(int file, char *ptr, int len)
   int i;
   for( i=0; i<len; i++) {
     if (ptr[i] == '\n') {
-      ns16550_txchar('\r');
+      uart_txchar('\r');
     }
-    ns16550_txchar(ptr[i]);
+    uart_txchar(ptr[i]);
   }
 
   return len;
