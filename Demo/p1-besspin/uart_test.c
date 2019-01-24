@@ -133,47 +133,21 @@ void vApplicationIdleHook( void );
  */
 void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName );
 
-/*-----------------------------------------------------------*/
-// user task handle
-static TaskHandle_t xControllingTaskHandle;
+/*
+ * UART test task to be used with TestGfe.test_uart_driver
+ * in test_gfe_unittest.py 
+ */
+void vTestUART( void *pvParameters );
 
 /*-----------------------------------------------------------*/
-// main entry point
+/* main entry point */
 
 int main( void )
 {
-TimerHandle_t xCheckTimer = NULL;
-
-	int i;
-	char uart_rx;
-	char uart_rx_str[7];
-
-	/* Initalize UART */
-	uart_init();
-
-	/* UART loopback tests */
-	/* Tests to be used with TestGfe.test_uart_driver
-	    in test_gfe_unittest.py */
-
-	/* UART test with tx/rx_char */
-	/* Loop 3 times to receive 3 characters */
-	for( i=0; i<3; i++ ) {
-		uart_rx = uart_rxchar();
-		uart_txchar( uart_rx );
-	}	
-
-	/* UART loopback test with strings */
-	/* Loop 6 times to receive 'Hello!' */
-	for(i=0; i<6; i++) {
-		uart_rx_str[i] = uart_rxchar();
-	}
-	/* Add end of string character */
-	uart_rx_str[6] = '\0';
-
-	printf( uart_rx_str );	
+TimerHandle_t xCheckTimer = NULL;	
 	
-	/* Add the first task */
-	//xTaskCreate( prvUserTask, "User1", configMINIMAL_STACK_SIZE, NULL, 0, &xControllingTaskHandle );
+	/* Create UART test */
+	xTaskCreate( vTestUART, "UART Test", 1000, NULL, 0, NULL );
 
 
 	/* Create the software timer that performs the 'check' functionality,
@@ -211,7 +185,39 @@ static char* secret_key = "SECRET_KEY: 1234\n";
 printf("TIMER TASK: [%d] Calling using secret key: %s \r\n", count++, secret_key);
 }
 /*-----------------------------------------------------------*/
+void vTestUART( void *pvParameters )
+{
+	/* vTestUART() tests the 16550 UART on the VCU118. It is to be run
+	with TestGfe.test_uart_driver in test_gfe_unittest.py.
+	It performs two loopbacks, the first with individual chars and the
+	second with a string */
+	int i;
+	char uart_rx;
+	char uart_rx_str[7];
 
+	/* Initalize UART */
+	uart_init();
+
+	/* UART loopback tests */
+
+	/* UART test with tx/rx_char */
+	/* Loop 3 times to receive 3 characters */
+	for( i=0; i<3; i++ ) {
+		uart_rx = uart_rxchar();
+		uart_txchar( uart_rx );
+	}	
+
+	/* UART loopback test with strings */
+	/* Loop 6 times to receive 'Hello!' */
+	for(i=0; i<6; i++) {
+		uart_rx_str[i] = uart_rxchar();
+	}
+	/* Add end of string character */
+	uart_rx_str[6] = '\0';
+
+	printf( uart_rx_str );
+}
+/*-----------------------------------------------------------*/
 void vApplicationMallocFailedHook( void )
 {
 	/* vApplicationMallocFailedHook() will only be called if

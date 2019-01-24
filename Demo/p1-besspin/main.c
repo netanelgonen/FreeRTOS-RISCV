@@ -134,21 +134,15 @@ void vApplicationIdleHook( void );
 void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName );
 
 /*-----------------------------------------------------------*/
-// user task handle
-static TaskHandle_t xControllingTaskHandle;
-
-/*-----------------------------------------------------------*/
-// main entry point
+/* main entry point */
 
 int main( void )
 {
 TimerHandle_t xCheckTimer = NULL;
 
+	/* Initialize 16550 UART */
+	uart_init();
 	
-	/* Add the first task */
-	//xTaskCreate( prvUserTask, "User1", configMINIMAL_STACK_SIZE, NULL, 0, &xControllingTaskHandle );
-
-
 	/* Create the software timer that performs the 'check' functionality,
 	as described at the top of this file. */
 	xCheckTimer = xTimerCreate( "CheckTimer",					/* A text name, purely to help debugging. */

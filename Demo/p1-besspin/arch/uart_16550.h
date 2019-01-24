@@ -3,7 +3,7 @@
 #define __UART_16550_H__
 
 #define UART_BASE (0x62300000ULL)
-#define UART_CLOCK_RATE  (25000000ULL) // 4MHz
+#define UART_CLOCK_RATE  (25000000ULL) // 25MHz
 
 enum __attribute__ ((__packed__)) ier_t
 {
