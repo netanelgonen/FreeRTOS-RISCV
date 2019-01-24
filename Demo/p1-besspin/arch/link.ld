@@ -79,8 +79,8 @@ _HEAP_SIZE = DEFINED(_HEAP_SIZE) ? _HEAP_SIZE : 0x1000;
  * Define memory layout
  ****************************************************************************/
 MEMORY {
-	imem : ORIGIN = 0x80000000, LENGTH = 0x00020000
-	dmem : ORIGIN = 0x80020000, LENGTH = 0x00020000
+	imem : ORIGIN = 0x80000000, LENGTH = 0x00030000
+	dmem : ORIGIN = 0x80030000, LENGTH = 0x00020000
 }
 
 /* Specify the default entry point to the program */

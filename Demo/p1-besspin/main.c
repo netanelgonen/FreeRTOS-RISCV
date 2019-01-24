@@ -194,24 +194,39 @@ int main( void )
 {
 TimerHandle_t xCheckTimer = NULL;
 
+	int i;
 	char uart_rx;
+	char uart_rx_str[7];
 
+	/* Initalize UART */
 	ns16550_init();
 
+	/* UART loopback test with tx/rx_char */
+	for( i=0; i<3; i++ ) {
+		uart_rx = ns16550_rxchar();
+		ns16550_txchar( uart_rx );
+	}	
+
+	/* UART loopback test with strings */
+
+	// i = 0;
+	// while( ns16550_rxready() != 0) {
+	// 	uart_rx_str[i] = ns16550_rxchar();
+	// 	i++;
+	// }
+
+	/* add comment about 6 */
+	for(i=0; i<6; i++) {
+		uart_rx_str[i] = ns16550_rxchar();
+	}
+	/* Add end of string character */
+	uart_rx_str[6] = '\0';
+
+	printf( uart_rx_str );	
+	
 	/* Add the first task */
 	//xTaskCreate( prvUserTask, "User1", configMINIMAL_STACK_SIZE, NULL, 0, &xControllingTaskHandle );
 
-	/* Test sending character 'b' to UART */
-	ns16550_txchar( 'b' );
-
-	/* Test receiving character from UART */
-	uart_rx = ns16550_rxchar();
-
-	ns16550_txchar( uart_rx );
-
-	//ns16550_txchar( 'c' );
-
-	
 
 	/* Create the software timer that performs the 'check' functionality,
 	as described at the top of this file. */

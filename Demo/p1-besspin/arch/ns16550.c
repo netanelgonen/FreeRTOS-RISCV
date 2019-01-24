@@ -79,6 +79,10 @@ int ns16550_init(void)
   /* Enable FIFOs */
   pio->fcr = FCR_FE;
 
+  // /* Reset FIFOs */
+  // pio->fcr |= 6;
+  // pio->fcr &= ~6;
+
   /* Drive RTSN (request to send) low */
   pio->mcr = MCR_RTS;
 
@@ -117,4 +121,7 @@ void ns16550_flush(void)
 {
   while ((pio->lsr & LSR_TEMT) == 0)
     ;  // nothing
+
+  while ((pio->lsr & LSR_THRE) == 0)
+    ; // nothing
 }
