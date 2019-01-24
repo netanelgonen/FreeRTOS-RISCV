@@ -71,19 +71,8 @@
 */
 
 /*
- * main() creates a set of standard demo task and a timer.
- * It then starts the scheduler.  The web documentation provides
- * more details of the standard demo application tasks, which provide no
- * particular functionality, but do provide a good example of how to use the
- * FreeRTOS API.
- *
- * In addition to the standard demo tasks, the following tasks and timer are
- * defined and/or created within this file:
- *
- * "Check" software timer - The check timer period is initially set to three
- * seconds.  Its callback function checks that all the standard demo tasks, and
- * the register check tasks, are not only still executing, but are executing
- * without reporting any errors.
+ * main() creates a task to run UART tests.
+ * It then starts the scheduler.
  */
 
 /* Kernel includes. */
@@ -103,20 +92,10 @@
 #include "riscv_counters.h"
 #include "uart_16550.h"
 
-/* The period after which the check timer will expire provided no errors have
-been reported by any of the standard demo tasks.  ms are converted to the
-equivalent in ticks using the portTICK_PERIOD_MS constant. */
-#define mainCHECK_TIMER_PERIOD_MS			( 3000UL / portTICK_PERIOD_MS )
-
 /* A block time of zero simply means "don't block". */
 #define mainDONT_BLOCK						( 0UL )
 
 /*-----------------------------------------------------------*/
-
-/*
- * The check timer callback function, as described at the top of this file.
- */
-static void prvCheckTimerCallback( TimerHandle_t xTimer );
 
 /*
  * FreeRTOS hook for when malloc fails, enable in FreeRTOSConfig.
@@ -143,46 +122,15 @@ void vTestUART( void *pvParameters );
 /* main entry point */
 
 int main( void )
-{
-TimerHandle_t xCheckTimer = NULL;	
-	
+{	
 	/* Create UART test */
 	xTaskCreate( vTestUART, "UART Test", 1000, NULL, 0, NULL );
-
-
-	/* Create the software timer that performs the 'check' functionality,
-	as described at the top of this file. */
-	xCheckTimer = xTimerCreate( "CheckTimer",					/* A text name, purely to help debugging. */
-								( mainCHECK_TIMER_PERIOD_MS ),	/* The timer period, in this case 3000ms (3s). */
-								pdTRUE,							/* This is an auto-reload timer, so xAutoReload is set to pdTRUE. */
-								( void * ) 0,					/* The ID is not used, so can be set to anything. */
-								prvCheckTimerCallback			/* The callback function that inspects the status of all the other tasks. */
-							  );
-
-	/* If the software timer was created successfully, start it.  It won't
-	actually start running until the scheduler starts.  A block time of
-	zero is used in this call, although any value could be used as the block
-	time will be ignored because the scheduler has not started yet. */
-	if( xCheckTimer != NULL )
-	{
-		xTimerStart( xCheckTimer, mainDONT_BLOCK );
-	}
-
 
 	/* Start the kernel.  From here on, only tasks and interrupts will run. */
 	vTaskStartScheduler();
 
 	/* Exit FreeRTOS */
 	return 0;
-}
-/*-----------------------------------------------------------*/
-/* See the description at the top of this file. */
-static void prvCheckTimerCallback(__attribute__ ((unused)) TimerHandle_t xTimer )
-{
-static int count = 0;
-static char* secret_key = "SECRET_KEY: 1234\n";
-
-printf("TIMER TASK: [%d] Calling using secret key: %s \r\n", count++, secret_key);
 }
 /*-----------------------------------------------------------*/
 void vTestUART( void *pvParameters )
