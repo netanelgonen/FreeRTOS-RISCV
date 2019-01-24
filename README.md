@@ -59,6 +59,11 @@ $ ./run_socat.sh
 [3] Timer callback! 
 ...
 ```
+## UART
+
+If you want to build a version with 16550 UART tests,
+go to `Demo/p1-besspin` and hit `make clean; make MAIN_FILE=test_uart.c`
+This version is made to run on hardware.
 
 ## Debug
 
