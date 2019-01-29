@@ -1,6 +1,9 @@
 # FreeRTOS for RISC-V
 
 This is a port of FreeRTOS to RISC-V
+
+This has been tested on the Chisel P1 on the VCU118.
+
 ## Contributors
 The original port to priv spec 1.7 was contributed by [Technolution](https://interactive.freertos.org/hc/en-us/community/posts/210030246-32-bit-and-64-bit-RISC-V-using-GCC)
 

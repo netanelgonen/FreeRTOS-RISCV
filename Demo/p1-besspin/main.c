@@ -106,7 +106,8 @@
 /* The period after which the check timer will expire provided no errors have
 been reported by any of the standard demo tasks.  ms are converted to the
 equivalent in ticks using the portTICK_PERIOD_MS constant. */
-#define mainCHECK_TIMER_PERIOD_MS			( 3000UL / portTICK_PERIOD_MS )
+// #define mainCHECK_TIMER_PERIOD_MS			( 3000UL / portTICK_PERIOD_MS )
+#define mainCHECK_TIMER_PERIOD_MS           pdMS_TO_TICKS( 3000 )
 
 /* A block time of zero simply means "don't block". */
 #define mainDONT_BLOCK						( 0UL )
@@ -134,15 +135,22 @@ void vApplicationIdleHook( void );
 void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName );
 
 /*-----------------------------------------------------------*/
-/* main entry point */
+/* Main entry point */
 
 int main( void )
 {
 TimerHandle_t xCheckTimer = NULL;
+BaseType_t xTimerStarted;
 
 	/* Initialize 16550 UART */
 	uart_init();
 	
+    /* Create the standard demo tasks, including the interrupt nesting test
+    tasks. */
+    vCreateBlockTimeTasks();
+    vStartCountingSemaphoreTasks();
+    vStartRecursiveMutexTasks();
+
 	/* Create the software timer that performs the 'check' functionality,
 	as described at the top of this file. */
 	xCheckTimer = xTimerCreate( "CheckTimer",					/* A text name, purely to help debugging. */
@@ -156,9 +164,10 @@ TimerHandle_t xCheckTimer = NULL;
 	actually start running until the scheduler starts.  A block time of
 	zero is used in this call, although any value could be used as the block
 	time will be ignored because the scheduler has not started yet. */
-	if( xCheckTimer != NULL )
+
+    if( xCheckTimer != NULL )
 	{
-		xTimerStart( xCheckTimer, mainDONT_BLOCK );
+		xTimerStart( xCheckTimer, 0 );
 	}
 
 
@@ -169,13 +178,48 @@ TimerHandle_t xCheckTimer = NULL;
 	return 0;
 }
 /*-----------------------------------------------------------*/
+
 /* See the description at the top of this file. */
 static void prvCheckTimerCallback(__attribute__ ((unused)) TimerHandle_t xTimer )
+// static void prvCheckTimerCallback( TimerHandle_t xTimer )
 {
-	static int count = 0;
-	static char* secret_key = "SECRET_KEY: 1234\n";
+static int count = 0;
+unsigned long ulErrorFound = pdFALSE;
 
-	printf("TIMER TASK: [%d] Calling using secret key: %s \r\n", count++, secret_key);
+    /* Check all the demo and test tasks to ensure that they are all still
+    running, and that none have detected an error. */
+
+    if( xAreBlockTimeTestTasksStillRunning() != pdPASS )
+    {
+        printf("Error in block time test tasks \r\n");
+        ulErrorFound |= ( 0x01UL << 1UL );
+    }
+
+    if( xAreCountingSemaphoreTasksStillRunning() != pdPASS )
+    {
+        printf("Error in counting semaphore tasks \r\n");
+        ulErrorFound |= ( 0x01UL << 2UL );
+    }
+
+    if( xAreRecursiveMutexTasksStillRunning() != pdPASS )
+    {
+        printf("Error in recursive mutex tasks \r\n");
+        ulErrorFound |= ( 0x01UL << 3UL );
+    }
+
+    if( ulErrorFound != pdFALSE )
+    {
+        __asm volatile("li t6, 0xbeefdead");
+        printf("One or more threads has exited! \r\n");
+    }else{
+        __asm volatile("li t6, 0xdeadbeef");
+        printf("[%d] All threads still alive! \r\n", count++);
+    }
+
+    /* Do _not_ stop the scheduler; this would halt the system, but was left for reference on how to do so */
+    /* Stop scheduler */
+//    vTaskEndScheduler();
+
 }
 /*-----------------------------------------------------------*/
 
