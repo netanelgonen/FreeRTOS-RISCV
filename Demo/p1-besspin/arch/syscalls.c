@@ -4,7 +4,7 @@
 #include <sys/time.h>
 #include "uart_16550.h"
 
-// to communicate with the debugger
+/* To communicate with the debugger */
 volatile uint64_t tohost __attribute__((aligned(64)));
 volatile uint64_t fromhost __attribute__((aligned(64)));
 
@@ -100,14 +100,15 @@ int _getpid(int n)
 #endif /* #ifndef __linux__ */
 
 
-/* Syscall handeler */
-// does currently nothing - keep this to handle system calls in the future
+/* Syscall handler placeholder */
+/* A way to handle syscalls has not been implemented. 
+TA1 teams can add their own handlers if they wish. */
 unsigned long ulSyscallTrap(long cause, long epc, long regs[32] __attribute__((unused)))
 {
 	(void)cause;
 	(void)epc;
 
-	// infinite loop, just so we know we caused a syscall
-	for(;;) { } // TODO: replace with a proper handler
+	/* Infinite loop, just so we know we caused a syscall */
+	for(;;) { }
 	return epc + 4;
 }

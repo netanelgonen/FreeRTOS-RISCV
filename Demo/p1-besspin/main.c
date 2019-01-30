@@ -140,7 +140,6 @@ void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName );
 int main( void )
 {
 TimerHandle_t xCheckTimer = NULL;
-BaseType_t xTimerStarted;
 
 	/* Initialize 16550 UART */
 	uart_init();

@@ -3,8 +3,6 @@
 #include "uart_16550.h"
 
 
-#define DEFAULT_BAUDRATE  (9600)
-
 /* Struct for 16550 register space */
 struct __attribute__ ((aligned (4))) uart_pio
 {
@@ -71,17 +69,11 @@ int uart_init(void)
   /* DLAB=0 Allow access to RBR, THR, IER, IIR registers*/
   pio->lcr &= ~LCR_DLAB;
 
-  /* 8 bits/char, 1 stop bit */
-  //pio->lcr = LCR_WLS8;
   /* 8 bits/char, 2 stop bits */
   pio->lcr = 7;
 
   /* Enable FIFOs */
   pio->fcr = FCR_FE;
-
-  // /* Reset FIFOs */
-  // pio->fcr |= 6;
-  // pio->fcr &= ~6;
 
   /* Drive RTSN (request to send) low */
   pio->mcr = MCR_RTS;
@@ -100,7 +92,7 @@ int uart_rxready(void)
 int uart_rxchar(void)
 {
   while ((pio->lsr & LSR_DR) == 0)
-    ;  // nothing
+    ;  /* Wait */
 
   return pio->rbr;
 }
@@ -109,7 +101,7 @@ int uart_rxchar(void)
 int uart_txchar(int c)
 {
   while ((pio->lsr & LSR_THRE) == 0)
-    ;  // nothing
+    ;  /* Wait */
 
   pio->thr = c;
 
@@ -120,8 +112,8 @@ int uart_txchar(int c)
 void uart_flush(void)
 {
   while ((pio->lsr & LSR_TEMT) == 0)
-    ;  // nothing
+    ;  /* Wait */
 
   while ((pio->lsr & LSR_THRE) == 0)
-    ; // nothing
+    ;  /* Wait */
 }

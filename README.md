@@ -2,8 +2,6 @@
 
 This is a port of FreeRTOS to RISC-V
 
-This has been tested on the Chisel P1 on the VCU118.
-
 ## Contributors
 The original port to priv spec 1.7 was contributed by [Technolution](https://interactive.freertos.org/hc/en-us/community/posts/210030246-32-bit-and-64-bit-RISC-V-using-GCC)
 
@@ -15,86 +13,45 @@ Bug fixes: [Julio Gago](https://github.com/julio-gago-metempsy)
 
 Update to priv spec 1.10: [sherrbc1](https://github.com/sherrbc1)
 
+Update for the SSITH P1 on the Xilinx VCU118: Galois, Inc.
 
-## Install
-You need a modified spike simulator with UART patch. There is no easy way to install it, we suggest using a modified version of riscv-tools:
+## Demo applications
+`main()` in main.c contains demo tasks testing queue functions within tasks, 
+counting semaphores, and recursive mutexes.
 
-```bash
-git clone --recursive -b uart_patch https://github.com/GasloiInc/riscv-tools.git
-cd riscv-tools
-```
+`main()` in test_uart.c contains loopback tests to be run with the UART driver
+unit test.
 
-Set up your `$RISCV` variable to some sensible location, for example:
-```bash
-export RISCV=~/Documents/riscv
-```
-
-Now build the spike simulator:
-```bash
-./build-spike-only.sh
-```
-
-If you need the other tools as well, run instead:
-```bash
-./build-rv32ima.sh
-```
+The UART drivers have been updated for the Xilinx AXI UART 16550.
+The drivers do not handle interrupts.
 
 ## Build
-Go to `Demo/riscv-spike` and hit `make clean; make`. 
+To build FreeRTOS,
+```bash
+cd Demo/p1-besspin
+make
+```
+
+To build a version of FreeRTOS to use with the UART driver unit test,
+```bash
+make MAIN_FILE=test_uart.c
+```
+
+Your `$RISCV` variable should be set to the location of `riscv-tools`.
 
 ## Run
+This can be run in gdb.
 
+Using a serial port communication program such as minicom, you should see:
 ```bash
-./run_spike.sh # will run rtos in the spike simulator
-```
-
-Note that spike uses tty for a simulated UART peripheral. In order to see any simulation output, you have to start `socat`:
-```bash
-./run_socat.sh # will display UART output
-```
-
-You should see:
-```bash
-$ ./run_socat.sh 
-[0] Timer callback! 
-[1] Timer callback! 
-[2] Timer callback! 
-[3] Timer callback! 
+[0] All threads still alive! 
+[1] All threads still alive! 
+[2] All threads still alive!
+[3] All threads still alive!
 ...
 ```
-## UART
-
-If you want to build a version with 16550 UART tests,
-go to `Demo/p1-besspin` and hit `make clean; make MAIN_FILE=test_uart.c`
-This version is made to run on hardware.
-
-## Debug
-
-If you want to debug spike, use `-H` flag that stops execution until a debugger is connected. Note that is stops the execution only until you connect `openocd`, so by the time you connect `gdb` it will be already running.
-
-```bash
-./run_spike.sh -H # add the -H flag
-```
-
-Start openocd:
-```bash
-./run_openocd.sh
-```
-
-And then start gdb:
-```bash
-riscv32-unknown-elf-gdb riscv-spike.elf
-```
-
-And connect to the target with:
-```bash
-(gdb) target remote localhost:3333
-```
-
-Happy debugging!
+This indicates that the demo tasks are running.
 
 ## Tested environments
 
-Tested on a Rocket RISC-V processor with local interrupt controller (Clint) using preemption.
-
-Tested in Spike and Verilator with several builds including single-task, multi-task and typical demo test including queues, semaphores, mutexes and about a dozen concurrent tasks.
+This has been tested on the Chisel P1 on the VCU118.

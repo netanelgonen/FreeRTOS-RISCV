@@ -56,8 +56,7 @@
 
 include ./Makefile.inc
 
-# Root of RISC-V tools installation. Note that we expect to find the spike
-# simulator header files here under $(RISCV)/include/spike .
+# Root of RISC-V tools installation.
 RISCV ?= /opt/riscv
 # Use main.c if no other MAIN_FILE specified
 MAIN_FILE ?= main.c
@@ -89,7 +88,6 @@ DEMO_SRC = \
 
 INCLUDES = \
 	-I. \
-	-I$(RISCV)/include/spike \
 	-I./arch \
 	-I./conf \
 	-I./include \
@@ -153,9 +151,5 @@ clean :
 
 force_true:
 	@true
-
-#-------------------------------------------------------------
-sim: all
-	spike $(PROG).elf
 
 
