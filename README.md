@@ -34,7 +34,7 @@ make
 
 To build a version of FreeRTOS to use with the UART driver unit test,
 ```bash
-make MAIN_FILE=test_uart.c
+make PROG=uart_test
 ```
 
 Your `$RISCV` variable should be set to the location of `riscv-tools`.
