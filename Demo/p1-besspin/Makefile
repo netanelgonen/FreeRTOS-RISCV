@@ -102,7 +102,6 @@ CFLAGS = \
 #	-fomit-frame-pointer -fno-strict-aliasing -fno-builtin
 
 CFLAGS += -specs=arch/bare.specs -O0 -g3 $(ARCH) $(ABI) -mcmodel=medany
-CFLAGS += -DCONSOLE_UART
 
 ARFLAGS=crsv
 

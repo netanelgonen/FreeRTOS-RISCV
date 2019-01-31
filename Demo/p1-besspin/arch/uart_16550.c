@@ -51,7 +51,6 @@ struct __attribute__ ((aligned (4))) uart_pio
 
 static struct uart_pio * pio = (void*)UART_BASE;
 
-#ifdef CONSOLE_UART
 __attribute__ ((constructor))
 int uart_init(void)
 {
@@ -80,7 +79,6 @@ int uart_init(void)
 
   return 0;
 }
-#endif
 
 
 int uart_rxready(void)
