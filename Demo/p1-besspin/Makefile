@@ -58,8 +58,7 @@ include ./Makefile.inc
 
 # Root of RISC-V tools installation.
 RISCV ?= /opt/riscv
-# Use main.c if no other MAIN_FILE specified
-MAIN_FILE ?= main.c
+MAIN_FILE = $(PROG).c
 
 FREERTOS_SRC = \
 	$(FREERTOS_SOURCE_DIR)/croutine.c \

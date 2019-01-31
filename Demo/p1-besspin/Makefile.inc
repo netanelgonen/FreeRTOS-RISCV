@@ -26,7 +26,8 @@ OBJDUMP	= $(TARGET)-objdump
 AR		= $(TARGET)-ar
 RANLIB	= $(TARGET)-ranlib
 
-PROG	= riscv-p1-vcu118
+# Use main as source file and target file name if not specified
+PROG	?= main
 CRT0	= arch/boot.S
 
 FREERTOS_SOURCE_DIR	= ../../Source
