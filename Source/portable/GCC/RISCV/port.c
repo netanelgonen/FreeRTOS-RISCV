@@ -98,7 +98,7 @@ BaseType_t xStartContext[31] = {0};
  * emulated SoC of the Spike RISC-V emulator with respect to the
  * Machine Timer Registers mtime and mtimecmp
  */
-#define CLINT_BASE  0x2000000
+#define CLINT_BASE  0x10000000
 volatile uint64_t* mtime =      (uint64_t*)(CLINT_BASE + 0xbff8);
 volatile uint64_t* timecmp =    (uint64_t*)(CLINT_BASE + 0x4000);
 
