@@ -156,7 +156,8 @@ void vTestBarcode( void *pvParameters )
 	uart_rx_str[10] = '\0';
 
 	/* Print barcode via UART0 */
-	printf( uart_rx_str );
+	printf("Received: ");
+    printf( uart_rx_str );
 }
 /*-----------------------------------------------------------*/
 void vApplicationMallocFailedHook( void )

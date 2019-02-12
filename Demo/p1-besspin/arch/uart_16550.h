@@ -6,6 +6,7 @@
 #define UART1_BASE (0x62340000ULL)
 #define UART_CLOCK_RATE  (83000000ULL) // 83MHz
 #define DEFAULT_BAUDRATE  (9600)
+#define UART1_BAUDRATE (115200)
 
 
 enum __attribute__ ((__packed__)) ier_t

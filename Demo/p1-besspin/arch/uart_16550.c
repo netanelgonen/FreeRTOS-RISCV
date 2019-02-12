@@ -120,7 +120,7 @@ void uart0_flush(void)
 int uart1_init(void)
 {
   uint32_t divisor;
-  divisor = UART_CLOCK_RATE / (16 * DEFAULT_BAUDRATE);
+  divisor = UART_CLOCK_RATE / (16 * UART1_BAUDRATE);
 
   /* Disable all interrupts */
   pio1->ier = 0;
