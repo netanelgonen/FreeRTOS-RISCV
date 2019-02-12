@@ -36,9 +36,9 @@ int _write(int file, char *ptr, int len)
   int i;
   for( i=0; i<len; i++) {
     if (ptr[i] == '\n') {
-      uart_txchar('\r');
+      uart0_txchar('\r');
     }
-    uart_txchar(ptr[i]);
+    uart0_txchar(ptr[i]);
   }
 
   return len;
