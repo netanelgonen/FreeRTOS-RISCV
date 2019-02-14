@@ -1,3 +1,6 @@
+# This repository has been archived and may be deleted in the future. Please use https://github.com/GaloisInc/FreeRTOS-mirror/ instead
+
+
 # FreeRTOS for RISC-V
 
 This is a port of FreeRTOS to RISC-V
