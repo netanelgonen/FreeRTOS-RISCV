@@ -83,6 +83,7 @@ PORT_ASM = $(FREERTOS_SOURCE_DIR)/portable/GCC/RISCV/portasm.S
 DEMO_SRC = \
 	arch/syscalls.c \
 	arch/uart_16550.c \
+	arch/gpio.c \
 	$(MAIN_FILE)
 
 INCLUDES = \
