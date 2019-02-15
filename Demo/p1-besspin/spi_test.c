@@ -96,6 +96,7 @@
 #define mainDONT_BLOCK						( 0UL )
 
 #define SPI_BASE (0x62320000ULL)
+#define SPI_SRR (*(unsigned int *) 0x62320040)
 #define SPICR (*(unsigned int *) 0x62320060)
 #define SPISR (*(unsigned int *) 0x62320064)
 #define SPI_DTR (*(unsigned int *) 0x62320068)
@@ -130,7 +131,7 @@ void vTestSPI( void *pvParameters );
 
 int main( void )
 {	
-  uart_init();
+  uart0_init();
 
 	/* Create SPI test */
 	xTaskCreate( vTestSPI, "SPI Test", 1000, NULL, 0, NULL );
@@ -147,51 +148,51 @@ void vTestSPI( void *pvParameters )
 	/* vTestSPI() tests the AXI SPI on the VCU118 in 
   loopback mode */
 
-  char spi_rx;
+  (void) pvParameters;
+
+  char spi_rx0;
+  char spi_rx1;
+  char spi_rx2;
 
 	/***** INIT *****/
-	// Set CPHA=0 and CPOL=0
-  SPICR &= ~(0x18);
+  /* Software reset */
+  SPI_SRR = 0xa;
 
-  // Reset TX FIFO
-  SPICR |= 0x20;
-
-  // Set to Master mode
+  /* Set to Master mode */
   SPICR |= 0x4;
 
-  // Enable loopback mode (LOOP)
+  /* Enable loopback mode (LOOP) */
   SPICR |= 0x1;
 
-  // SPI system enable (SPE)
+	/***** TRANSMIT *****/
+	/* Inhibit master */
+  SPICR |= 0x100;
+
+  /* Write data to data transmit register */
+  SPI_DTR = 'a';
+  SPI_DTR = 'b';
+  SPI_DTR = 'c';
+
+  /* SPI system enable (SPE) */
   SPICR |= 0x2;
 
-	/***** TRANSMIT *****/
-	// Inhibit master
-  SPICR |= 0x100;
+  /* Deinhibit master */
+  SPICR &= ~(0x100);
 
-  // Write data to data transmit register
-  SPI_DTR = 'a';
+  /* Wait until TX is empty */
+  while ( (SPISR & 0x4) == 0 )
+     ; // wait
 
-  // Issue chip select
-  SPI_SSR = 0x0;
-
-  // Deinhibit master
-  SPICR &= 0x011;
-
-  // Deassert chip select
-  SPI_SSR = 0x1;
-
-  // Inhibit master
-  SPICR |= 0x100;
-
-  // While RX empty is true, wait
+  /* While RX empty is true, wait */
   while ( (SPISR & 0x1) != 0 )
      ; // wait
 
-  spi_rx = SPI_DRR;
+  /* Receive and print out */
+  spi_rx0 = (char) SPI_DRR;
+  spi_rx1 = (char) SPI_DRR;
+  spi_rx2 = (char) SPI_DRR;
 
-  // Read
-  printf( "Received: %c \n", spi_rx);
+  printf( "Received: %c %c %c \n", spi_rx0, spi_rx1, spi_rx2);
 
   vTaskDelete( NULL );
 }
