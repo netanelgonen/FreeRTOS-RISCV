@@ -56,9 +56,7 @@
 
 include ./Makefile.inc
 
-# Root of RISC-V tools installation. Note that we expect to find the spike
-# simulator header files here under $(RISCV)/include/spike .
-RISCV ?= /opt/riscv
+BUILD_MINI = y
 
 FREERTOS_SRC = \
 	$(FREERTOS_SOURCE_DIR)/croutine.c \
@@ -73,34 +71,45 @@ FREERTOS_SRC = \
 
 APP_SOURCE_DIR	= ../Common/Minimal
 
-APP_SRC =  \
+APP_SRC-$(BUILD_MINI:y=n) =  \
 	$(APP_SOURCE_DIR)/blocktim.c \
 	$(APP_SOURCE_DIR)/countsem.c \
 	$(APP_SOURCE_DIR)/recmutex.c
-		
+APP_SRC = $(APP_SRC-y)
 
 PORT_SRC = $(FREERTOS_SOURCE_DIR)/portable/GCC/RISCV/port.c
 PORT_ASM = $(FREERTOS_SOURCE_DIR)/portable/GCC/RISCV/portasm.S
 
-DEMO_SRC = \
+DEMO_SRC-y = \
 	arch/syscalls.c \
-	arch/clib.c \
-	main.c
+	arch/clib.c
 
-INCLUDES = \
+DEMO_SRC-$(BUILD_MINI) += main_mini.c
+DEMO_SRC-$(BUILD_MINI:y=n) += main.c
+
+DEMO_SRC = $(DEMO_SRC-y)
+
+
+INCLUDES-y = \
 	-I. \
-	-I$(RISCV)/include/spike \
 	-I./arch \
+	-I./arch/drivers/include \
 	-I./conf \
 	-I./include \
 	-I$(FREERTOS_SOURCE_DIR)/include \
-	-I../Common/include \
 	-I$(FREERTOS_SOURCE_DIR)/portable/GCC/RISCV
+	
+INCLUDES-$(BUILD_MINI:y=n) += -I../Common/include
+INCLUDES = $(INCLUDES-y)
+
+ENABLE_DEBUG = y
+DEBUG-n = -Os -g0
+DEBUG-y = -O0 -g3
 
 CFLAGS = \
-	$(WARNINGS) $(INCLUDES) \
-	-fomit-frame-pointer -fno-strict-aliasing -fno-builtin \
-	-D__gracefulExit -mcmodel=medany #-fPIC
+	$(WARNINGS) $(INCLUDES) $(DEBUG-$(ENABLE_DEBUG))\
+	-fomit-frame-pointer -fno-strict-aliasing -fno-builtin -mcmodel=medany \
+	-fno-asynchronous-unwind-tables -Wl,--build-id=none -D__gracefulExit
 
 GCCVER 	= $(shell $(GCC) --version | grep gcc | cut -d" " -f9)
 
@@ -115,38 +124,41 @@ PORT_ASM_OBJ = $(PORT_ASM:.S=.o)
 CRT0_OBJ = $(CRT0:.S=.o)
 OBJS = $(CRT0_OBJ) $(PORT_ASM_OBJ) $(PORT_OBJ) $(RTOS_OBJ) $(DEMO_OBJ) $(APP_OBJ)
 
-LDFLAGS	 = -T arch/link.ld -nostartfiles -static -nostdlib
-LIBS	 = -L$(CCPATH)/lib/gcc/$(TARGET)/$(GCCVER) \
-		   -L$(CCPATH)/$(TARGET)/lib \
-		   -lc -lgcc
+LDFLAGS	 = -T arch/link.ld -nostartfiles -static -nostdlib -flto -Xlinker -Map=$(PROG).map 
+LIBS     = -lc -lgcc 
 
 %.o: %.c
-	@echo "    CC $<"
-	@$(GCC) -c $(CFLAGS) -o $@ $<
+	$(Q)echo "    CC $<"
+	$(Q)$(GCC) -c $(CFLAGS) -o $@ $<
 
 %.o: %.S
-	@echo "    CC $<"
-	@$(GCC) -c $(CFLAGS) -o $@ $<
+	$(Q)echo "    CC $<"
+	$(Q)$(GCC) -c $(CFLAGS) -o $@ $<
 
-all: $(PROG).elf
+all: $(PROG).elf $(PROG).bin
 
 $(PROG).elf  : $(OBJS) Makefile 
-	@echo Linking....
-	@$(GCC) -o $@ $(LDFLAGS) $(OBJS) $(LIBS)
-	@$(OBJDUMP) -S $(PROG).elf > $(PROG).asm	
-	@echo Completed $@
+	$(Q)echo Linking....
+	$(Q)$(GCC) -o $@ $(LDFLAGS) $(OBJS) $(LIBS)
+	$(Q)$(OBJDUMP) -S $(PROG).elf > $(PROG).asm
+	$(Q)echo Completed $@
+
+$(PROG).bin: $(PROG).elf
+	$(Q)echo "    objcopy $<"
+	$(Q)$(OBJCOPY) -O binary --change-addresses -0x80000000 $(PROG).elf $(PROG).bin
+	$(Q)echo "Finished $@"
 
 clean :
-	@rm -f $(OBJS)
-	@rm -f $(PROG).elf 
-	@rm -f $(PROG).map
-	@rm -f $(PROG).asm
+	$(Q)rm -f $(OBJS)
+	$(Q)rm -f $(PROG).elf 
+	$(Q)rm -f $(PROG).map
+	$(Q)rm -f $(PROG).asm
+	$(Q)rm -f $(PROG).bin
 
 force_true:
-	@true
-
-#-------------------------------------------------------------
-sim: all
-	spike $(PROG).elf
-
+	$(Q)true
+	
+debug-var-%:
+	@echo $* = $($*)
+	
 

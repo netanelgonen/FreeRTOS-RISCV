@@ -93,9 +93,60 @@
 .global vPortEndScheduler
 .global xExitStack
 
+/*
+.pushsection .counters
+counter_portSAVE_CONTEXT:
+	.word 0xdeadbee0
+total_portSAVE_CONTEXT:
+	.word 0xdeadbee1
+counter_portRESTORE_CONTEXT:
+	.word 0xdeadbee2
+total_portRESTORE_CONTEXT:
+	.word 0xdeadbee3
+counter_portSAVE_EPC:
+	.word 0xdeadbee4
+total_portSAVE_EPC:
+	.word 0xdeadbee5
+counter_portSAVE_RA:
+	.word 0xdeadbee6
+total_portSAVE_RA:
+	.word 0xdeadbee7
+mini_stack_t6:
+	.word 0xdeadbee8
+	.word 0xdeadbee9
+mini_stack_t5:
+	.word 0xdeadbee8
+	.word 0xdeadbee9
+mini_stack_t4:
+	.word 0xdeadbee8
+	.word 0xdeadbee9
+.popsection
+*/
+
+.macro add_bp_lable name
+bp_lable_\name:
+	.endm
+
+.macro reset_mcycle
+	csrw mcycle, x0
+	.endm
+
+/*
+.macro save_cycles name
+	csrr t6, mcycle
+	la t5, counter_\name
+	LOAD t4, 0(t5)
+	addi t4, t4, 1
+	STORE t4, 0(t5)
+	LOAD t4, 4(t5)
+	add t4, t4, t6
+	STORE t4, 4(t5)
+.endm
+*/
 
 /* Macro for saving task context */
 .macro portSAVE_CONTEXT
+	reset_mcycle
 	.global	pxCurrentTCB
 	/* make room in stack */
 	addi	sp, sp, -REGBYTES * 32
@@ -136,22 +187,27 @@
 	/* Store current stackpointer in task control block (TCB) */
 	LOAD	t0, pxCurrentTCB	//pointer
 	STORE	sp, 0x0(t0) // save sp to t0
+	add_bp_lable portSAVE_CONTEXT\@
 	.endm
 
 /* Saves current error program counter (EPC) as task program counter */
 .macro portSAVE_EPC
+	reset_mcycle
   	csrr	t0, mepc
 	STORE	t0, 31 * REGBYTES(sp)
+	add_bp_lable portSAVE_EPC\@
 	.endm
 
 /* Saves current return adress (RA) as task program counter */
 .macro portSAVE_RA
+	reset_mcycle
 	STORE	ra, 31 * REGBYTES(sp)
+	add_bp_lable portSAVE_RA\@
 	.endm
 
 /* Macro for restoring task context */
 .macro portRESTORE_CONTEXT
-
+	reset_mcycle
 	.global	pxCurrentTCB
 	/* Load stack pointer from the current TCB */
 	LOAD	sp, pxCurrentTCB
@@ -198,6 +254,7 @@
 	LOAD	x31, 30 * REGBYTES(sp)
 
 	addi	sp, sp, REGBYTES * 32
+	add_bp_lable portRESTORE_CONTEXT\@
 	mret
 	.endm
 

@@ -136,8 +136,10 @@ void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName );
 
 int main( void )
 {
-TimerHandle_t xCheckTimer = NULL;
-
+	TimerHandle_t xCheckTimer = NULL;
+	size_t free_heap_start = xPortGetFreeHeapSize();
+	REG32(uart, UART_REG_TXCTRL) = UART_TXEN;
+	printf("Booting Spike FreeRtos... Preparing Threads... free Heap: %dBytes \r\n", free_heap_start);
 	/* Create the standard demo tasks, including the interrupt nesting test
 	tasks. */
 	vCreateBlockTimeTasks();
@@ -164,6 +166,7 @@ TimerHandle_t xCheckTimer = NULL;
 
 
 	/* Start the kernel.  From here on, only tasks and interrupts will run. */
+	printf("Starting Scheduler... Heap free : %dB Heap used: %dBytes\r\n", xPortGetFreeHeapSize(), free_heap_start - xPortGetFreeHeapSize());
 	vTaskStartScheduler();
 
 	/* Exit FreeRTOS */
@@ -174,8 +177,10 @@ TimerHandle_t xCheckTimer = NULL;
 /* See the description at the top of this file. */
 static void prvCheckTimerCallback(__attribute__ ((unused)) TimerHandle_t xTimer )
 {
-static int count = 0;
-unsigned long ulErrorFound = pdFALSE;
+	static int count = 0;
+	unsigned long ulErrorFound = pdFALSE;
+	char tasks_stats[1024];
+	size_t free_heap = xPortGetFreeHeapSize();
 
 	/* Check all the demo and test tasks to ensure that they are all still
 	running, and that none have detected an error. */
@@ -204,7 +209,7 @@ unsigned long ulErrorFound = pdFALSE;
 		printf("One or more threads has exited! \r\n");
 	}else{
 		__asm volatile("li t6, 0xdeadbeef");
-		printf("[%d] All threads still alive! \r\n", count++);
+		printf("[%d] All threads still alive! free Heap: %dBytes \r\n", count++, free_heap);
 	}
 
     /* Do _not_ stop the scheduler; this would halt the system, but was left for reference on how to do so */

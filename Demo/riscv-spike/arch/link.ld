@@ -74,13 +74,14 @@ OUTPUT_ARCH( "riscv" )
 
 _STACK_SIZE = DEFINED(_STACK_SIZE) ? _STACK_SIZE : 0x1000;
 _HEAP_SIZE = DEFINED(_HEAP_SIZE) ? _HEAP_SIZE : 0x1000;
+_COUNTERS_SIZE = 0x1000;
 
 /*****************************************************************************
  * Define memory layout
  ****************************************************************************/
 MEMORY {
 	imem : ORIGIN = 0x80000000, LENGTH = 0x00020000
-	dmem : ORIGIN = 0x80020000, LENGTH = 0x00020000
+	dmem : ORIGIN = 0x80020000, LENGTH = 100M
 }
 
 /* Specify the default entry point to the program */
@@ -146,7 +147,17 @@ SECTIONS {
        . = ALIGN(4);
        __bss_end = .;
     } > dmem
-
+    _end = .;
+/*
+    .counters : {
+    	. = ALIGN(4);
+    	_counters = .;
+    	_counters_start = .;
+    	*(.counters)
+    	. += _COUNTERS_SIZE;
+    	_counters_end = .;
+    } > dmem
+*/
     /* Generate Stack and Heap definitions */
 
     .heap : {
@@ -164,6 +175,4 @@ SECTIONS {
        _stack = .;
        __stack = _stack;
     } > dmem
-    
-    _end = .;
 }

@@ -75,6 +75,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+//#include <stdint.h>
+//#include <putchar.h>
 #include "clib.h"
 #include "syscalls.h"
 
@@ -84,19 +86,22 @@
 #undef putchar
 int putchar(int ch)
 {
-	static char buf[64] __attribute__((aligned(64)));
-	static int buflen = 0;
-
-	buf[buflen++] = ch;
-
-	if (ch == '\n' || buflen == sizeof(buf)) {
-		syscall(SYS_write, 1, (long) buf, buflen);
-		buflen = 0;
-	}
-
+	volatile uint32_t *tx = &REG32(uart, UART_REG_TXFIFO);
+#ifdef __riscv_atomic
+	int32_t r;
+	do {
+		__asm__ __volatile__ (
+			"amoor.w %0, %2, %1\n"
+			: "=r" (r), "+A" (*tx)
+			: "r" (ch));
+	} while (r < 0);
+#else
+	while ((int32_t)(*tx) < 0);
+	*tx = ch;
+#endif
 	return 0;
 }
-/*-----------------------------------------------------------*/
+///*-----------------------------------------------------------*/
 
 /* Writes number to putchar. */
 static inline void printnum(void (*putch)(int, void**), void **putdat,

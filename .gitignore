@@ -1,0 +1,9 @@
+Demo/riscv-spike/arch/*.o
+Demo/riscv-spike/*.o
+Source/portable/GCC/RISCV/*.o
+Source/portable/MemMang/*.o
+Source/*.o
+Demo/riscv-spike/riscv-spike.asm
+Demo/riscv-spike/riscv-spike.bin
+Demo/riscv-spike/riscv-spike.elf
+Demo/riscv-spike/riscv-spike.map

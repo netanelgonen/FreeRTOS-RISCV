@@ -69,6 +69,7 @@
 
     1 tab == 4 spaces!
 */
+#include "arch/drivers/include/platform.h"
 
 #ifndef CLIB_H
 #define CLIB_H

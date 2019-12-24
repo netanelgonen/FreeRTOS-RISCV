@@ -82,6 +82,16 @@
 # define REGBYTES 4
 #endif
 
+#define NOSMP_HART 0
+#define smp_disable(reg1, reg2)	 \
+	csrr reg1, mhartid			;\
+  	li   reg2, NOSMP_HART			;\
+  	beq  reg1, reg2, __nosmp_hart	;\
+42:								;\
+	wfi							;\
+  	j 42b						;\
+__nosmp_hart:
+
 boot:
     li t6, 0x1800
     csrw mstatus, t6
@@ -94,6 +104,7 @@ boot:
 _mstart:
     la t0, trap_entry
     csrw mtvec, t0
+    smp_disable(t0, t1)
     li	x1, 0
     li	x2, 0
     li	x3, 0
@@ -149,7 +160,13 @@ write_stack_pattern:
     la	a1, __stack-4   /* section end is actually the start of the next section */
     li	a2, 0xABABABAB
     jal	fill_block
-
+/*
+zero_counters:
+    la	a0, _counters_start
+    la	a1, _counters_end-4
+    li	a2, 0x0
+    jal	fill_block
+*/
 init_stack:
     /* set stack pointer */
     la	sp, _stack
