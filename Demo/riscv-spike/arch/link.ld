@@ -76,12 +76,15 @@ _STACK_SIZE = DEFINED(_STACK_SIZE) ? _STACK_SIZE : 0x1000;
 _HEAP_SIZE = DEFINED(_HEAP_SIZE) ? _HEAP_SIZE : 0x1000;
 _COUNTERS_SIZE = 0x1000;
 
+
+_MEMORY_OFFSET = DEFINED(_MEMORY_OFFSET) ? _MEMORY_OFFSET : 0;
 /*****************************************************************************
  * Define memory layout
  ****************************************************************************/
 MEMORY {
-	imem : ORIGIN = 0x80000000, LENGTH = 0x00020000
-	dmem : ORIGIN = 0x80020000, LENGTH = 100M
+	imem : ORIGIN = 0x80000000 + _MEMORY_OFFSET, LENGTH = 0x00010000
+  ipc  : ORIGIN = 0x80020000, LENGTH = 1M
+	dmem : ORIGIN = 0x80020400 + _MEMORY_OFFSET, LENGTH = 99M
 }
 
 /* Specify the default entry point to the program */
@@ -89,7 +92,7 @@ MEMORY {
 ENTRY(_mstart)
 
 /*****************************************************************************
- * Define the sections, and where they are mapped in memory 
+ * Define the sections, and where they are mapped in memory
  ****************************************************************************/
 SECTIONS {
 	.text : {
@@ -121,7 +124,7 @@ SECTIONS {
 	   *(.gnu.linkonce.sb.*)
 	   __sbss_end = .;
 	} > dmem
-	
+
     .sdata : {
         _gp = . + 0x800;
         *(.srodata.cst16) *(.srodata.cst8) *(.srodata.cst4) *(.srodata.cst2) *(.srodata*)
@@ -175,4 +178,11 @@ SECTIONS {
        _stack = .;
        __stack = _stack;
     } > dmem
+
+
+    .shared :{
+    . = ALIGN(4);
+    ipc_mutex = .;
+    . += 4;
+    } > ipc
 }

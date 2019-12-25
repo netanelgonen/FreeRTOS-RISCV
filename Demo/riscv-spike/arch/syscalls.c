@@ -149,7 +149,14 @@ int __attribute__((weak)) main(__attribute__ ((unused)) int argc, __attribute__ 
 /* Starts main function. */
 void vSyscallInit(void)
 {
-	int ret = main(0, 0);
+	if (hart == 0)
+		entry_main = main;
+	else
+	{
+		entry_main = main_hart;
+	}
+	int ret = entry_main(0, 0);
+	// int ret = main(0, 0);
 	exit(ret);
 }
 /*-----------------------------------------------------------*/

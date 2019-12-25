@@ -104,7 +104,7 @@ boot:
 _mstart:
     la t0, trap_entry
     csrw mtvec, t0
-    smp_disable(t0, t1)
+    /*smp_disable(t0, t1)*/
     li	x1, 0
     li	x2, 0
     li	x3, 0
@@ -197,7 +197,7 @@ softwareInterrupt: // does nothing
 trap_entry:
 	/* Check for interrupt */
 	addi	sp, sp, -REGBYTES // add immediate: sp = sp - 4
-	STORE	t0, 0x0(sp) // store word: save t0 to memory at address *sp 
+	STORE	t0, 0x0(sp) // store word: save t0 to memory at address *sp
 	csrr	t0, mcause // csr read: m0 = mcause
 	blt	t0,x0,interrupt // branch if less than: if t0 < x0, pc = pc + interrupt offset (if interrupt bit is set, jump)
 	LOAD	t0, 0x0(sp) // load t0 from *sp

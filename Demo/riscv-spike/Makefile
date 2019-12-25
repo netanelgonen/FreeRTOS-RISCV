@@ -1,6 +1,6 @@
 #/*
 #    FreeRTOS V8.2.3 - Copyright (C) 2015 Real Time Engineers Ltd.
-#	
+#
 #
 #    ***************************************************************************
 #     *                                                                       *
@@ -84,7 +84,7 @@ DEMO_SRC-y = \
 	arch/syscalls.c \
 	arch/clib.c
 
-DEMO_SRC-$(BUILD_MINI) += main_mini.c
+DEMO_SRC-$(BUILD_MINI) += main_no_threads.c
 DEMO_SRC-$(BUILD_MINI:y=n) += main.c
 
 DEMO_SRC = $(DEMO_SRC-y)
@@ -98,7 +98,7 @@ INCLUDES-y = \
 	-I./include \
 	-I$(FREERTOS_SOURCE_DIR)/include \
 	-I$(FREERTOS_SOURCE_DIR)/portable/GCC/RISCV
-	
+
 INCLUDES-$(BUILD_MINI:y=n) += -I../Common/include
 INCLUDES = $(INCLUDES-y)
 
@@ -124,8 +124,8 @@ PORT_ASM_OBJ = $(PORT_ASM:.S=.o)
 CRT0_OBJ = $(CRT0:.S=.o)
 OBJS = $(CRT0_OBJ) $(PORT_ASM_OBJ) $(PORT_OBJ) $(RTOS_OBJ) $(DEMO_OBJ) $(APP_OBJ)
 
-LDFLAGS	 = -T arch/link.ld -nostartfiles -static -nostdlib -flto -Xlinker -Map=$(PROG).map 
-LIBS     = -lc -lgcc 
+LDFLAGS	 = -T arch/link.ld -nostartfiles -static -nostdlib -flto -Xlinker -Map=$(PROG).map
+LIBS     = -lc -lgcc
 
 %.o: %.c
 	$(Q)echo "    CC $<"
@@ -137,7 +137,7 @@ LIBS     = -lc -lgcc
 
 all: $(PROG).elf $(PROG).bin
 
-$(PROG).elf  : $(OBJS) Makefile 
+$(PROG).elf  : $(OBJS) Makefile
 	$(Q)echo Linking....
 	$(Q)$(GCC) -o $@ $(LDFLAGS) $(OBJS) $(LIBS)
 	$(Q)$(OBJDUMP) -S $(PROG).elf > $(PROG).asm
@@ -150,15 +150,13 @@ $(PROG).bin: $(PROG).elf
 
 clean :
 	$(Q)rm -f $(OBJS)
-	$(Q)rm -f $(PROG).elf 
+	$(Q)rm -f $(PROG).elf
 	$(Q)rm -f $(PROG).map
 	$(Q)rm -f $(PROG).asm
 	$(Q)rm -f $(PROG).bin
 
 force_true:
 	$(Q)true
-	
+
 debug-var-%:
 	@echo $* = $($*)
-	
-
