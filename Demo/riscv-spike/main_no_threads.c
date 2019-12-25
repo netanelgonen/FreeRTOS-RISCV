@@ -8,7 +8,7 @@
 #include "arch/syscalls.h"
 #include "arch/clib.h"
 
-extern uint32_t* ipc_mutex;
+extern uint64_t* ipc_mutex;
 
 int main( void )
 {

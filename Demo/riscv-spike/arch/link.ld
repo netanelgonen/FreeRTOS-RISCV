@@ -183,6 +183,6 @@ SECTIONS {
     .shared :{
     . = ALIGN(4);
     ipc_mutex = .;
-    . += 4;
+    . += 8;
     } > ipc
 }
